@@ -1,29 +1,49 @@
-// Campos asumidos: id, invoice_id, user_id, amount, payment_date, method
-// ('efectivo' | 'transferencia' | 'tarjeta'), reference, status
-// ('confirmado' | 'pendiente' | 'rechazado')
+// Columnas reales (tabla payments en Supabase):
+// id (uuid), factura_id (uuid), perfil_id (uuid), monto (numeric),
+// metodo (enum public.metodo_pago), referencia (text),
+// fecha_pago (timestamptz), confirmado (boolean), created_at (timestamptz)
 const supabase = require('../config/supabaseClient');
-const createModel = require("./basemodel.js");
+const createModel = require('./baseModel');
 
 const base = createModel('payments');
 
 module.exports = {
   ...base,
 
-  async findByInvoiceId(invoiceId) {
+  async findByFacturaid(facturaid) {
     const { data, error } = await supabase
       .from('payments')
       .select('*')
-      .eq('invoice_id', invoiceId);
+      .eq('factura_id', facturaid);
     if (error) throw error;
     return data;
   },
 
-  async findByUserId(userId) {
+  async findByPerfilid(perfilid) {
     const { data, error } = await supabase
       .from('payments')
       .select('*')
-      .eq('user_id', userId);
+      .eq('perfil_id', perfilid);
     if (error) throw error;
     return data;
+  },
+
+  async findByMetodo(metodo) {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('metodo', metodo);
+    if (error) throw error;
+    return data;
+  },
+
+  async confirmar(id) {
+    const { data, error } = await supabase
+      .from('payments')
+      .update({ confirmado: true })
+      .eq('id', id)
+      .select();
+    if (error) throw error;
+    return data[0];
   },
 };

@@ -1,26 +1,45 @@
-// Campos asumidos: id, user_id, title, message, type
-// ('averia' | 'pago' | 'corte' | 'general'), read (boolean), created_at
+// Columnas reales (tabla notifications en Supabase):
+// id (uuid), perfil_id (uuid), tipo (text), mensaje (text),
+// estado (enum public.estado_notificacion), fecha (timestamptz)
 const supabase = require('../config/supabaseClient');
-const createModel = require("./basemodel.js");
+const createModel = require('./baseModel');
 
 const base = createModel('notifications');
 
 module.exports = {
   ...base,
 
-  async findByUserId(userId) {
+  async findByPerfilid(perfilid) {
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
-      .eq('user_id', userId);
+      .eq('perfil_id', perfilid);
     if (error) throw error;
     return data;
   },
 
-  async markAsRead(id) {
+  async findByEstado(estado) {
     const { data, error } = await supabase
       .from('notifications')
-      .update({ read: true })
+      .select('*')
+      .eq('estado', estado);
+    if (error) throw error;
+    return data;
+  },
+
+  async findByTipo(tipo) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('tipo', tipo);
+    if (error) throw error;
+    return data;
+  },
+
+  async marcarLeida(id) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .update({ estado: 'leida' })
       .eq('id', id)
       .select();
     if (error) throw error;
