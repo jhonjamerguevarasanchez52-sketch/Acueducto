@@ -1,111 +1,118 @@
 const supabase = require('../config/supabaseClient');
 
-// Reportar una nueva avería (cualquier usuario autenticado)
+// POST / - usuario final reporta una avería
 async function reportarAveria(req, res) {
-  const userId = req.usuario.id;
-  const { descripcion, zona } = req.body;
-
-  if (!descripcion) {
-    return res.status(400).json({ error: 'La descripción es obligatoria' });
-  }
-
   try {
+    const perfilId = req.usuario.id;
+    const zonaUsuario = req.usuario.zona;
+    const { descripcion } = req.body;
+
+    if (!descripcion) {
+      return res.status(400).json({ error: 'La descripción es obligatoria' });
+    }
+
     const { data, error } = await supabase
-      .from('averias')
+      .from('breakdowns')
       .insert({
-        perfil_id: userId,
+        perfil_id: perfilId,
         descripcion,
-        zona: zona || null,
+        zona: zonaUsuario,
         estado: 'reportada',
+        fecha_reporte: new Date().toISOString()
       })
       .select()
       .single();
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
+    if (error) throw error;
 
-    return res.status(201).json({ message: 'Avería reportada con éxito', averia: data });
+    res.status(201).json({ data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    console.error('Error en reportarAveria:', err.message);
+    res.status(500).json({ error: 'Error al reportar la avería' });
   }
 }
 
-// Ver mis averías reportadas (usuario normal)
+// GET /mis-averias - averías reportadas por el usuario autenticado
 async function misAverias(req, res) {
-  const userId = req.usuario.id;
-
   try {
+    const perfilId = req.usuario.id;
+
     const { data, error } = await supabase
-      .from('averias')
+      .from('breakdowns')
       .select('*')
-      .eq('perfil_id', userId)
+      .eq('perfil_id', perfilId)
       .order('fecha_reporte', { ascending: false });
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
+    if (error) throw error;
 
-    return res.status(200).json(data);
+    res.status(200).json({ data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    console.error('Error en misAverias:', err.message);
+    res.status(500).json({ error: 'Error al obtener tus averías' });
   }
 }
 
-// Ver averías de mi zona (fontanero) — RLS ya filtra automáticamente
+// GET /zona - averías de la zona del fontanero autenticado
 async function averiasZona(req, res) {
   try {
-    const { data, error } = await supabase
-      .from('averias')
-      .select('*')
-      .order('fecha_reporte', { ascending: false });
+    const zonaFontanero = req.usuario.zona;
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
+    if (!zonaFontanero) {
+      return res.status(400).json({ error: 'El fontanero no tiene una zona asignada' });
     }
 
-    return res.status(200).json(data);
+    const { data, error } = await supabase
+      .from('breakdowns')
+      .select('*')
+      .eq('zona', zonaFontanero)
+      .order('fecha_reporte', { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json({ data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    console.error('Error en averiasZona:', err.message);
+    res.status(500).json({ error: 'Error al obtener averías de la zona' });
   }
 }
 
-// Actualizar estado de una avería (solo fontanero/administrador, según RLS)
+// PUT /:id - fontanero actualiza el estado de una avería
 async function actualizarAveria(req, res) {
-  const userId = req.usuario.id;
-  const { id } = req.params;
-  const { estado, fontanero_id } = req.body;
-
-  const estadosValidos = ['reportada', 'asignada', 'en_proceso', 'resuelta', 'cancelada'];
-  if (estado && !estadosValidos.includes(estado)) {
-    return res.status(400).json({ error: 'Estado inválido' });
-  }
-
-  const datosActualizar = {};
-  if (estado) datosActualizar.estado = estado;
-  if (fontanero_id) datosActualizar.fontanero_id = fontanero_id;
-  if (estado === 'resuelta') datosActualizar.fecha_resolucion = new Date().toISOString();
-
-  if (Object.keys(datosActualizar).length === 0) {
-    return res.status(400).json({ error: 'No hay campos para actualizar' });
-  }
-
   try {
+    const fontaneroId = req.usuario.id;
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    const estadosValidos = ['reportada', 'asignada', 'en_proceso', 'resuelta', 'cancelada'];
+    if (!estado || !estadosValidos.includes(estado)) {
+      return res.status(400).json({ error: 'Estado inválido' });
+    }
+
+    const actualizacion = {
+      estado,
+      fontanero_id: fontaneroId
+    };
+
+    if (estado === 'resuelta') {
+      actualizacion.fecha_resolucion = new Date().toISOString();
+    }
+
     const { data, error } = await supabase
-      .from('averias')
-      .update(datosActualizar)
+      .from('breakdowns')
+      .update(actualizacion)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) {
-      // Si RLS bloquea (no es fontanero/admin), Supabase devuelve error o data vacía
-      return res.status(403).json({ error: 'No tienes permiso para actualizar esta avería' });
+    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ error: 'Avería no encontrada' });
     }
 
-    return res.status(200).json({ message: 'Avería actualizada', averia: data });
+    res.status(200).json({ data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    console.error('Error en actualizarAveria:', err.message);
+    res.status(500).json({ error: 'Error al actualizar la avería' });
   }
 }
 
