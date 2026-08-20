@@ -1,6 +1,5 @@
 const supabase = require('../config/supabaseClient');
 
-// Ver mi propio perfil
 async function verPerfil(req, res) {
   const userId = req.usuario.id;
 
@@ -21,7 +20,6 @@ async function verPerfil(req, res) {
   }
 }
 
-// Editar mi propio perfil
 async function editarPerfil(req, res) {
   const userId = req.usuario.id;
   const camposPermitidos = [
@@ -29,7 +27,6 @@ async function editarPerfil(req, res) {
     'direccion', 'ocupacion', 'zona'
   ];
 
-  // Solo dejamos actualizar los campos permitidos (nunca 'rol', 'id', 'correo')
   const datosActualizar = {};
   for (const campo of camposPermitidos) {
     if (req.body[campo] !== undefined) {
