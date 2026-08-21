@@ -6,7 +6,7 @@ const {
   marcarLeida,
   marcarTodasLeidas,
 } = require('../controller/notificacionController');
-const verificarToken = require('../middleware/authMiddleware');
+const { verificarToken } = require('../middleware/authMiddleware');
 
 router.get('/', verificarToken, misNotificaciones);
 router.get('/no-leidas', verificarToken, contarNoLeidas);
