@@ -6,7 +6,7 @@ async function misCortes(req, res) {
 
   try {
     const { data, error } = await supabase
-      .from('cortes_servicio')
+      .from('service_outages')
       .select('*')
       .eq('perfil_id', userId)
       .order('fecha_corte', { ascending: false });
@@ -21,13 +21,13 @@ async function misCortes(req, res) {
   }
 }
 
-// Ver si mi servicio está activo actualmente (corte sin reconectar)
+// Ver si mi servicio está activo actualmente
 async function estadoServicio(req, res) {
   const userId = req.usuario.id;
 
   try {
     const { data, error } = await supabase
-      .from('cortes_servicio')
+      .from('service_outages')
       .select('*')
       .eq('perfil_id', userId)
       .eq('estado', 'activo')
@@ -50,7 +50,7 @@ async function estadoServicio(req, res) {
 async function todosCortes(req, res) {
   try {
     const { data, error } = await supabase
-      .from('cortes_servicio')
+      .from('service_outages')
       .select('*')
       .order('fecha_corte', { ascending: false });
 

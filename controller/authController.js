@@ -1,4 +1,5 @@
 const supabase = require('../config/supabaseClient');
+const supabaseAdmin = require('../config/supabaseAdminClient');
 
 async function registrar(req, res) {
   const { correo, password, nombre, apellido } = req.body;
@@ -22,7 +23,9 @@ async function registrar(req, res) {
       return res.status(500).json({ error: 'No se pudo crear el usuario' });
     }
 
-    const { error: profileError } = await supabase.from('profiles').insert({
+    // Usamos supabaseAdmin aquí, porque esta inserción la hace el backend
+    // justo después del signUp, sin sesión de usuario activa todavía.
+    const { error: profileError } = await supabaseAdmin.from('profiles').insert({
       id: userId,
       nombre,
       apellido,
