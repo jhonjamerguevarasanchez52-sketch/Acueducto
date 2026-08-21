@@ -6,7 +6,7 @@ async function misPagos(req, res) {
 
   try {
     const { data, error } = await supabase
-      .from('pagos')
+      .from('payments')
       .select('*')
       .eq('perfil_id', userId)
       .order('fecha_pago', { ascending: false });
@@ -33,7 +33,7 @@ async function registrarPago(req, res) {
   try {
     // Verifica que la factura le pertenezca al usuario antes de aceptar el pago
     const { data: factura, error: errorFactura } = await supabase
-      .from('facturas')
+      .from('invoices')
       .select('id, perfil_id, valor_total, estado')
       .eq('id', factura_id)
       .eq('perfil_id', userId)
@@ -48,9 +48,8 @@ async function registrarPago(req, res) {
     }
 
     // confirmado: false por defecto -> un administrador lo confirma después
-    // (el trigger procesar_pago_confirmado se activa solo cuando confirmado = true)
     const { data, error } = await supabase
-      .from('pagos')
+      .from('payments')
       .insert({
         factura_id,
         perfil_id: userId,

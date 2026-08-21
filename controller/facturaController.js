@@ -6,7 +6,7 @@ async function misFacturas(req, res) {
 
   try {
     const { data, error } = await supabase
-      .from('facturas')
+      .from('invoices')
       .select('*')
       .eq('perfil_id', userId)
       .order('fecha_emision', { ascending: false });
@@ -28,7 +28,7 @@ async function verFactura(req, res) {
 
   try {
     const { data, error } = await supabase
-      .from('facturas')
+      .from('invoices')
       .select('*')
       .eq('id', id)
       .eq('perfil_id', userId) // asegura que solo vea sus propias facturas
