@@ -61,6 +61,17 @@ async function iniciarSesion(req, res) {
       return res.status(401).json({ error: error.message });
     }
 
+    // Traer el perfil para incluir rol, zona, nombre, etc.
+    const { data: perfil, error: errorPerfil } = await supabaseAdmin
+      .from('profiles')
+      .select('id, rol, zona, nombre, apellido')
+      .eq('id', data.user.id)
+      .single();
+
+    if (errorPerfil || !perfil) {
+      return res.status(404).json({ error: 'Perfil de usuario no encontrado' });
+    }
+
     return res.status(200).json({
       message: 'Inicio de sesión exitoso',
       session: data.session,
