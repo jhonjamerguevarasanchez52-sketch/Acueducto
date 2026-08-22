@@ -1,4 +1,4 @@
-const supabase = require('../config/supabaseClient');
+const supabase = require('../config/supabaseClient.js');
 
 // POST / - usuario final reporta una avería
 async function reportarAveria(req, res) {

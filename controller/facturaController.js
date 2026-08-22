@@ -1,4 +1,4 @@
-const supabase = require('../config/supabaseClient');
+const supabase = require('../config/supabaseClient.js');
 
 // Ver mis facturas (usuario normal)
 async function misFacturas(req, res) {

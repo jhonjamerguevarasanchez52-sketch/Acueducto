@@ -1,4 +1,4 @@
-const supabase = require('../config/supabaseClient');
+const supabase = require('../config/supabaseClient.js');
 
 // Ver todas mis notificaciones
 async function misNotificaciones(req, res) {

@@ -1,4 +1,4 @@
-const supabase = require('../config/supabaseClient');
+const supabase = require('../config/supabaseClient.js');
 
 // Ver todas las tarifas
 async function verTarifas(req, res) {

@@ -1,4 +1,4 @@
-const supabase = require('../config/supabaseClient');
+const supabase = require('../config/supabaseClient.js');
 
 // Ver mis cortes de servicio (usuario normal)
 async function misCortes(req, res) {

@@ -1,15 +1,15 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const authRoutes = require('./routes/authRoutes');
-const profileRoutes = require('./routes/profileRoutes');
-const facturaRoutes = require('./routes/facturaRoutes');
-const averiaRoutes = require('./routes/averiaRoutes');
-const pagoRoutes = require('./routes/pagoRoutes');
-const notificacionRoutes = require('./routes/notificacionRoutes');
-const tarifaRoutes = require('./routes/tarifaRoutes');
-const corteRoutes = require('./routes/corteRoutes');
-const adminRoutes = require('./routes/adminRoutes');
+const authRoutes = require('./routes/authRoutes.js');
+const profileRoutes = require('./routes/profileRoutes.js');
+const facturaRoutes = require('./routes/facturaRoutes.js');
+const averiaRoutes = require('./routes/averiaRoutes.js');
+const pagoRoutes = require('./routes/pagoRoutes.js');
+const notificacionRoutes = require('./routes/notificacionRoutes.js');
+const tarifaRoutes = require('./routes/tarifaRoutes.js');
+const corteRoutes = require('./routes/corteRoutes.js');
+const adminRoutes = require('./routes/adminRoutes.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;

@@ -1,5 +1,5 @@
-const supabase = require('../config/supabaseClient');
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const supabase = require('../config/supabaseClient.js');
+const supabaseAdmin = require('../config/supabaseAdminClient.js');
 
 async function registrar(req, res) {
   const { correo, password, nombre, apellido } = req.body;

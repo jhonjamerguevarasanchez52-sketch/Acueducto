@@ -1,4 +1,4 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const supabaseAdmin = require('../config/supabaseAdminClient.js');
 
 async function cambiarRol(req, res) {
   const { userId } = req.params;

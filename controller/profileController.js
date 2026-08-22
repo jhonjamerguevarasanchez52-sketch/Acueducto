@@ -1,4 +1,4 @@
-const supabase = require('../config/supabaseClient');
+const supabase = require('../config/supabaseClient.js');
 
 async function verPerfil(req, res) {
   const userId = req.usuario.id;

@@ -1,4 +1,4 @@
-const supabase = require('../config/supabaseClient');
+const supabase = require('../config/supabaseClient.js');
 
 async function verificarToken(req, res, next) {
   const authHeader = req.headers.authorization;

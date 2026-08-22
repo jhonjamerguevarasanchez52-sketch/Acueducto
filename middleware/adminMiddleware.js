@@ -1,4 +1,4 @@
-const supabase = require('../config/supabaseClient');
+const supabase = require('../config/supabaseClient.js');
 
 async function verificarAdmin(req, res, next) {
   const userId = req.usuario.id;
