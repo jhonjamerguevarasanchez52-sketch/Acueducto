@@ -1,10 +1,10 @@
 const supabase = require('../config/supabaseClient');
 
-// Ver todas las tarifas (cualquiera puede verlas)
+// Ver todas las tarifas
 async function verTarifas(req, res) {
   try {
     const { data, error } = await supabase
-      .from('tarifas')
+      .from('rates')
       .select('*')
       .order('vigente_desde', { ascending: false });
 
@@ -24,7 +24,7 @@ async function tarifaVigente(req, res) {
 
   try {
     const { data, error } = await supabase
-      .from('tarifas')
+      .from('rates')
       .select('*')
       .eq('tipo', 'residencial')
       .lte('vigente_desde', hoy)
@@ -53,7 +53,7 @@ async function crearTarifa(req, res) {
 
   try {
     const { data, error } = await supabase
-      .from('tarifas')
+      .from('rates')
       .insert({
         tipo: tipo || 'residencial',
         cuota_fija,
@@ -64,7 +64,6 @@ async function crearTarifa(req, res) {
       .single();
 
     if (error) {
-      // Si RLS bloquea (no es admin), Supabase devuelve error aquí
       return res.status(403).json({ error: 'No tienes permiso para crear tarifas' });
     }
 

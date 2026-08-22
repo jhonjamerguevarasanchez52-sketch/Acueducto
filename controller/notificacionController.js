@@ -6,7 +6,7 @@ async function misNotificaciones(req, res) {
 
   try {
     const { data, error } = await supabase
-      .from('notificaciones')
+      .from('notifications')
       .select('*')
       .eq('perfil_id', userId)
       .order('fecha', { ascending: false });
@@ -21,13 +21,13 @@ async function misNotificaciones(req, res) {
   }
 }
 
-// Contar mis notificaciones no leídas (útil para un "badge" en la app)
+// Contar mis notificaciones no leídas
 async function contarNoLeidas(req, res) {
   const userId = req.usuario.id;
 
   try {
     const { count, error } = await supabase
-      .from('notificaciones')
+      .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('perfil_id', userId)
       .eq('estado', 'no_leido');
@@ -49,10 +49,10 @@ async function marcarLeida(req, res) {
 
   try {
     const { data, error } = await supabase
-      .from('notificaciones')
+      .from('notifications')
       .update({ estado: 'leido' })
       .eq('id', id)
-      .eq('perfil_id', userId) // asegura que solo marque las suyas
+      .eq('perfil_id', userId)
       .select()
       .single();
 
@@ -72,7 +72,7 @@ async function marcarTodasLeidas(req, res) {
 
   try {
     const { error } = await supabase
-      .from('notificaciones')
+      .from('notifications')
       .update({ estado: 'leido' })
       .eq('perfil_id', userId)
       .eq('estado', 'no_leido');
