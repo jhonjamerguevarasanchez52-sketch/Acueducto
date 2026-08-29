@@ -1,11 +1,21 @@
-const supabase = require('../config/supabaseClient');
+const { supabase } = require('../config/supabaseClient');
 const supabaseAdmin = require('../config/supabaseAdminClient');
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function registrar(req, res) {
   const { correo, password, nombre, apellido } = req.body;
 
   if (!correo || !password || !nombre || !apellido) {
     return res.status(400).json({ error: 'Faltan campos obligatorios' });
+  }
+
+  if (!EMAIL_REGEX.test(correo)) {
+    return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+  }
+
+  if (typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
   }
 
   try {
@@ -35,6 +45,10 @@ async function registrar(req, res) {
     });
 
     if (profileError) {
+      // Revertimos el usuario de Auth para no dejarlo huérfano (sin perfil).
+      await supabaseAdmin.auth.admin.deleteUser(userId).catch((e) => {
+        console.error('No se pudo revertir el usuario huérfano:', e.message);
+      });
       return res.status(500).json({ error: profileError.message });
     }
 

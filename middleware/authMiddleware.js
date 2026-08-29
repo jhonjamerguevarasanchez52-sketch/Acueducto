@@ -1,4 +1,5 @@
-const supabase = require('../config/supabaseClient');
+const { supabase, getUserClient } = require('../config/supabaseClient');
+const supabaseAdmin = require('../config/supabaseAdminClient');
 
 async function verificarToken(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -9,6 +10,10 @@ async function verificarToken(req, res, next) {
 
   const token = authHeader.split(' ')[1];
 
+  if (!token) {
+    return res.status(401).json({ error: 'Token no proporcionado' });
+  }
+
   try {
     const { data, error } = await supabase.auth.getUser(token);
 
@@ -16,22 +21,37 @@ async function verificarToken(req, res, next) {
       return res.status(401).json({ error: 'Token inválido o expirado' });
     }
 
-    // Traer el perfil (rol, zona, nombre, etc.) desde la tabla profiles
-    const { data: perfil, error: errorPerfil } = await supabase
+    // El perfil se consulta con la service key: es una operación de backend
+    // de confianza y no debe depender de las políticas RLS.
+    const { data: perfil, error: errorPerfil } = await supabaseAdmin
       .from('profiles')
-      .select('id, rol, zona, nombre, apellido')
+      .select('id, rol, zona, nombre, apellido, activo')
       .eq('id', data.user.id)
-      .single();
+      .maybeSingle();
 
-    if (errorPerfil || !perfil) {
+    if (errorPerfil) {
+      console.error('Error al consultar el perfil:', errorPerfil.message);
+      return res.status(500).json({ error: 'Error validando el perfil' });
+    }
+
+    if (!perfil) {
       return res.status(404).json({ error: 'Perfil de usuario no encontrado' });
     }
 
-    // Combinamos: datos de Auth (id, email, etc.) + datos del perfil (rol, zona, etc.)
+    if (perfil.activo === false) {
+      return res.status(403).json({ error: 'Tu cuenta está desactivada' });
+    }
+
+    // Datos de Auth (email, etc.) + datos del perfil (rol, zona, etc.).
+    // El perfil va al final para que su id/rol tengan prioridad.
     req.usuario = {
       ...data.user,
-      ...perfil
+      ...perfil,
     };
+
+    // Cliente ligado al token: respeta la RLS en las consultas de datos.
+    req.accessToken = token;
+    req.supabase = getUserClient(token);
 
     next();
   } catch (err) {

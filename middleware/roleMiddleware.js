@@ -1,4 +1,5 @@
-
+// Restringe una ruta a uno o varios roles.
+// Requiere que verificarToken se haya ejecutado antes (define req.usuario).
 function verificarRol(...rolesPermitidos) {
   return (req, res, next) => {
     if (!req.usuario) {
@@ -9,7 +10,7 @@ function verificarRol(...rolesPermitidos) {
 
     if (!rolUsuario || !rolesPermitidos.includes(rolUsuario)) {
       return res.status(403).json({
-        error: 'No autorizado. Rol requerido: ' + rolesPermitidos.join(' o ')
+        error: 'No autorizado. Rol requerido: ' + rolesPermitidos.join(' o '),
       });
     }
 
