@@ -309,6 +309,17 @@ async function resetearPassword(req, res) {
       return res.status(500).json({ error: updateError.message });
     }
 
+    try {
+      await enviarCorreo({
+        to: correo,
+        subject: 'Tu contraseña fue actualizada - Acueducto Campoamor',
+        html: `<p>Tu contraseña se actualizó correctamente.</p>
+               <p>Si no realizaste este cambio, contacta de inmediato al administrador del acueducto.</p>`,
+      });
+    } catch (mailErr) {
+      console.error('Error enviando correo de confirmación de cambio de contraseña:', mailErr.message);
+    }
+
     return res.status(200).json({ message: 'Contraseña actualizada con éxito' });
   } catch (err) {
     return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
