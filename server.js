@@ -71,7 +71,19 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT} 🚀`);
+  const entorno = process.env.NODE_ENV || 'development';
+  const linea = '─'.repeat(48);
+
+  console.log(linea);
+  console.log('  HIDROAPP · API REST del Acueducto Veredal Campo Amor');
+  console.log(linea);
+  console.log(`  ${'Estado'.padEnd(11)}: servidor iniciado correctamente`);
+  console.log(`  ${'Entorno'.padEnd(11)}: ${entorno}`);
+  console.log(`  ${'Puerto'.padEnd(11)}: ${PORT}`);
+  console.log(`  ${'URL local'.padEnd(11)}: http://localhost:${PORT}`);
+  console.log(`  ${'Healthcheck'.padEnd(11)}: http://localhost:${PORT}/health`);
+  console.log(`  ${'Iniciado'.padEnd(11)}: ${new Date().toISOString()}`);
+  console.log(linea);
 });
 
 module.exports = app;
