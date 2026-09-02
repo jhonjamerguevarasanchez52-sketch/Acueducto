@@ -31,6 +31,12 @@ const origenesPermitidos = process.env.CORS_ORIGIN
 app.use(cors({ origin: origenesPermitidos }));
 
 app.use(express.json());
+// En Express 5, req.body es undefined si la petición no trae JSON.
+// Lo normalizamos a {} para que los controladores no fallen al leerlo.
+app.use((req, res, next) => {
+  if (req.body == null) req.body = {};
+  next();
+});
 app.use(limiteGeneral);
 
 // Healthcheck para Railway / monitoreo
