@@ -1,11 +1,9 @@
-const supabase = require('../config/supabaseClient');
-
 // Ver todas mis notificaciones
 async function misNotificaciones(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('notifications')
       .select('*')
       .eq('perfil_id', userId)
@@ -26,7 +24,7 @@ async function contarNoLeidas(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { count, error } = await supabase
+    const { count, error } = await req.supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('perfil_id', userId)
@@ -36,7 +34,7 @@ async function contarNoLeidas(req, res) {
       return res.status(500).json({ error: error.message });
     }
 
-    return res.status(200).json({ noLeidas: count });
+    return res.status(200).json({ noLeidas: count || 0 });
   } catch (err) {
     return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
   }
@@ -48,15 +46,19 @@ async function marcarLeida(req, res) {
   const { id } = req.params;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('notifications')
       .update({ estado: 'leido' })
       .eq('id', id)
       .eq('perfil_id', userId)
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (!data) {
       return res.status(404).json({ error: 'Notificación no encontrada' });
     }
 
@@ -71,7 +73,7 @@ async function marcarTodasLeidas(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { error } = await supabase
+    const { error } = await req.supabase
       .from('notifications')
       .update({ estado: 'leido' })
       .eq('perfil_id', userId)

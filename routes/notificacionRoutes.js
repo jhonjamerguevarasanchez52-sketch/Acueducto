@@ -10,7 +10,9 @@ const { verificarToken } = require('../middleware/authMiddleware');
 
 router.get('/', verificarToken, misNotificaciones);
 router.get('/no-leidas', verificarToken, contarNoLeidas);
-router.put('/:id/leida', verificarToken, marcarLeida);
+
+// Las rutas literales van antes que las paramétricas para evitar colisiones.
 router.put('/marcar-todas', verificarToken, marcarTodasLeidas);
+router.put('/:id/leida', verificarToken, marcarLeida);
 
 module.exports = router;

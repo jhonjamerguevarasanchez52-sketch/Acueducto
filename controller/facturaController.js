@@ -1,11 +1,9 @@
-const supabase = require('../config/supabaseClient');
-
 // Ver mis facturas (usuario normal)
 async function misFacturas(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('invoices')
       .select('*')
       .eq('perfil_id', userId)
@@ -27,14 +25,18 @@ async function verFactura(req, res) {
   const { id } = req.params;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('invoices')
       .select('*')
       .eq('id', id)
       .eq('perfil_id', userId) // asegura que solo vea sus propias facturas
-      .single();
+      .maybeSingle();
 
     if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (!data) {
       return res.status(404).json({ error: 'Factura no encontrada' });
     }
 

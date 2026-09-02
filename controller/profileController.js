@@ -1,16 +1,23 @@
-const supabase = require('../config/supabaseClient');
+const CAMPOS_PERMITIDOS = [
+  'nombre', 'apellido', 'telefono', 'numero_lote',
+  'direccion', 'ocupacion', 'zona',
+];
 
 async function verPerfil(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (!data) {
       return res.status(404).json({ error: 'Perfil no encontrado' });
     }
 
@@ -22,13 +29,9 @@ async function verPerfil(req, res) {
 
 async function editarPerfil(req, res) {
   const userId = req.usuario.id;
-  const camposPermitidos = [
-    'nombre', 'apellido', 'telefono', 'numero_lote',
-    'direccion', 'ocupacion', 'zona'
-  ];
 
   const datosActualizar = {};
-  for (const campo of camposPermitidos) {
+  for (const campo of CAMPOS_PERMITIDOS) {
     if (req.body[campo] !== undefined) {
       datosActualizar[campo] = req.body[campo];
     }
@@ -39,7 +42,7 @@ async function editarPerfil(req, res) {
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('profiles')
       .update(datosActualizar)
       .eq('id', userId)
