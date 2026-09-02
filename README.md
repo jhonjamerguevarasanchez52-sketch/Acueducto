@@ -77,16 +77,23 @@ La `SUPABASE_SERVICE_KEY` y las credenciales privadas de Wompi nunca deben expon
 
 ## Variables de entorno
 
-Crear un archivo `.env` en la carpeta del backend con:
+Copiar `.env.example` a `.env` y rellenar los valores:
 
 ```
 SUPABASE_URL=
-SUPABASE_KEY=
-SUPABASE_SERVICE_KEY=
+SUPABASE_KEY=                # clave publishable / anon (pública)
+SUPABASE_SERVICE_KEY=        # Service Role Key — SECRETA, solo backend
 PORT=3000
+CORS_ORIGIN=                 # orígenes permitidos separados por coma; vacío = abierto
+
+EMAIL_USER=                  # remitente verificado en Brevo
+EMAIL_SENDER_NAME=Acueducto Campoamor
+BREVO_API_KEY=
+
+WOMPI_AMBIENTE=test          # test | prod
 WOMPI_PUBLIC_KEY=
-WOMPI_PRIVATE_KEY=
-WOMPI_EVENTS_SECRET=
+WOMPI_INTEGRITY_KEY=
+WOMPI_EVENTS_SECRET=         # para validar la firma de los webhooks
 ```
 
 ## Instalación y ejecución
@@ -109,15 +116,23 @@ flutter run
 
 | Módulo | Endpoints |
 |---|---|
-| Autenticación | `POST /api/auth/registro`, `POST /api/auth/login` |
+| Salud | `GET /health` |
+| Autenticación | `POST /api/auth/registro`, `POST /api/auth/login`, `POST /api/auth/verificar`, `POST /api/auth/reenviar-codigo`, `POST /api/auth/solicitar-recuperacion`, `POST /api/auth/resetear-password` |
 | Perfil | `GET /api/profile/mi-perfil`, `PUT /api/profile/mi-perfil` |
-| Facturas | `GET /api/facturas`, `GET /api/facturas/:id` |
-| Pagos | `GET /api/pagos`, `POST /api/pagos` |
-| Averías | `POST /api/averias`, `GET /api/averias/mis-averias`, `GET /api/averias/zona`, `PUT /api/averias/:id` |
-| Notificaciones | `GET /api/notificaciones`, `GET /api/notificaciones/no-leidas`, `PUT /api/notificaciones/:id/leida` |
-| Tarifas | `GET /api/tarifas`, `GET /api/tarifas/vigente`, `POST /api/tarifas` |
-| Cortes | `GET /api/cortes/mis-cortes`, `GET /api/cortes/estado` |
-| Administración | `GET /api/admin/usuarios`, `PUT /api/admin/usuarios/:userId/rol` |
+| Facturas (usuario) | `GET /api/facturas`, `GET /api/facturas/:id` |
+| Facturas (admin) | `GET /api/facturas/todas`, `POST /api/facturas`, `PUT /api/facturas/:id` |
+| Pagos (usuario) | `GET /api/pagos`, `POST /api/pagos` |
+| Pagos (admin) | `GET /api/pagos/todos`, `PUT /api/pagos/:id/confirmar` |
+| Averías (usuario) | `POST /api/averias`, `GET /api/averias/mis-averias` |
+| Averías (fontanero) | `GET /api/averias`, `PUT /api/averias/:id` |
+| Notificaciones (usuario) | `GET /api/notificaciones`, `GET /api/notificaciones/no-leidas`, `PUT /api/notificaciones/marcar-todas`, `PUT /api/notificaciones/:id/leida` |
+| Notificaciones (admin) | `POST /api/notificaciones` |
+| Tarifas | `GET /api/tarifas`, `GET /api/tarifas/vigente` |
+| Tarifas (admin) | `POST /api/tarifas`, `PUT /api/tarifas/:id` |
+| Cortes (usuario) | `GET /api/cortes/mis-cortes`, `GET /api/cortes/estado` |
+| Cortes (admin) | `GET /api/cortes`, `POST /api/cortes`, `PUT /api/cortes/:id/reconectar` |
+| Administración | `GET /api/admin/usuarios`, `GET /api/admin/usuarios/:userId`, `PUT /api/admin/usuarios/:userId`, `PUT /api/admin/usuarios/:userId/rol`, `PUT /api/admin/usuarios/:userId/estado` |
+| Wompi | `POST /api/wompi/webhook`, `GET /api/wompi/config` |
 
 ## Pagos
 
@@ -139,9 +154,19 @@ Cada integrante trabaja en su propia rama. Los cambios se integran mediante Pull
 
 - SRS v2.0 elaborado.
 - Frontend y backend estructurados.
-- Autenticación implementada y probada.
-- Perfiles, averías y notificaciones probados.
-- Validación de roles implementada.
-- Pruebas de API realizadas mediante Postman.
-- Integración con Wompi en desarrollo.
-- Despliegue en Railway pendiente.
+- Autenticación implementada (registro, verificación por código obligatoria en login, recuperación de contraseña).
+- Las consultas del backend usan el JWT del usuario, por lo que RLS también aplica en esta ruta.
+- Módulos de administración completos: facturación, confirmación de pagos, tarifas, cortes, notificaciones y gestión de usuarios (rol / activación).
+- Módulo del fontanero: ve todas las averías y actualiza su estado.
+- Integración con Wompi: webhook con verificación de firma y confirmación automática de pagos.
+- Seguridad: `helmet`, rate limiting (general y estricto en `/api/auth`), control de intentos en los códigos de un solo uso, CORS configurable.
+- Healthcheck (`GET /health`), manejador 404 y manejador central de errores.
+- Esquema de base de datos y políticas RLS documentados en `db/schema.sql`.
+- Pendiente: pruebas automatizadas y despliegue en Railway.
+
+### Notas para desplegar en Railway
+
+- Comando de inicio: `npm start`.
+- Configurar todas las variables de entorno del `.env.example` en el panel de Railway.
+- Registrar la URL `https://<tu-app>.up.railway.app/api/wompi/webhook` como URL de eventos en el panel de Wompi.
+- `node_modules` ya no se versiona; Railway ejecuta `npm install` en cada despliegue.

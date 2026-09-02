@@ -1,4 +1,5 @@
 const supabase = require('../config/supabaseClient');
+const { getClienteUsuario } = require('../config/supabaseClient');
 
 async function verificarToken(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -16,10 +17,15 @@ async function verificarToken(req, res, next) {
       return res.status(401).json({ error: 'Token inválido o expirado' });
     }
 
+    // Cliente de Supabase con el JWT del usuario: RLS se aplica en cada
+    // consulta que hagan los controladores a través de req.db.
+    req.db = getClienteUsuario(token);
+    req.token = token;
+
     // Traer el perfil (rol, zona, nombre, etc.) desde la tabla profiles
-    const { data: perfil, error: errorPerfil } = await supabase
+    const { data: perfil, error: errorPerfil } = await req.db
       .from('profiles')
-      .select('id, rol, zona, nombre, apellido')
+      .select('id, rol, zona, nombre, apellido, activo, is_verified')
       .eq('id', data.user.id)
       .single();
 
@@ -27,10 +33,16 @@ async function verificarToken(req, res, next) {
       return res.status(404).json({ error: 'Perfil de usuario no encontrado' });
     }
 
+    if (perfil.activo === false) {
+      return res.status(403).json({
+        error: 'Tu cuenta está desactivada. Contacta al administrador del acueducto.',
+      });
+    }
+
     // Combinamos: datos de Auth (id, email, etc.) + datos del perfil (rol, zona, etc.)
     req.usuario = {
       ...data.user,
-      ...perfil
+      ...perfil,
     };
 
     next();

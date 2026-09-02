@@ -1,10 +1,8 @@
-const supabase = require('../config/supabaseClient');
-
 async function verPerfil(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.db
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -24,7 +22,7 @@ async function editarPerfil(req, res) {
   const userId = req.usuario.id;
   const camposPermitidos = [
     'nombre', 'apellido', 'telefono', 'numero_lote',
-    'direccion', 'ocupacion', 'zona'
+    'direccion', 'ocupacion', 'zona',
   ];
 
   const datosActualizar = {};
@@ -39,7 +37,7 @@ async function editarPerfil(req, res) {
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.db
       .from('profiles')
       .update(datosActualizar)
       .eq('id', userId)

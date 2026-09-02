@@ -2,18 +2,34 @@ const crypto = require('crypto');
 const supabase = require('../config/supabaseClient');
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { enviarCorreo } = require('../config/mailer');
+const {
+  segundosDeBloqueo,
+  registrarFallo,
+  registrarExito,
+} = require('../utils/controlIntentos');
 
 // Genera un código numérico de 6 dígitos
 function generarCodigo() {
   return crypto.randomInt(100000, 999999).toString();
 }
 
+function normalizarCorreo(correo) {
+  return String(correo || '').toLowerCase().trim();
+}
+
 async function registrar(req, res) {
-  const { correo, password, nombre, apellido } = req.body;
+  const correo = normalizarCorreo(req.body.correo);
+  const { password, nombre, apellido } = req.body;
 
   if (!correo || !password || !nombre || !apellido) {
     return res.status(400).json({ error: 'Faltan campos obligatorios' });
   }
+
+  if (String(password).length < 8) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+  }
+
+  let userId;
 
   try {
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -25,7 +41,7 @@ async function registrar(req, res) {
       return res.status(400).json({ error: authError.message });
     }
 
-    const userId = authData.user?.id;
+    userId = authData.user?.id;
     if (!userId) {
       return res.status(500).json({ error: 'No se pudo crear el usuario' });
     }
@@ -49,6 +65,8 @@ async function registrar(req, res) {
     });
 
     if (profileError) {
+      // Evitamos dejar un usuario huérfano en auth.users sin perfil asociado.
+      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
       return res.status(500).json({ error: profileError.message });
     }
 
@@ -70,12 +88,16 @@ async function registrar(req, res) {
       userId,
     });
   } catch (err) {
+    if (userId) {
+      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
+    }
     return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
   }
 }
 
 async function iniciarSesion(req, res) {
-  const { correo, password } = req.body;
+  const correo = normalizarCorreo(req.body.correo);
+  const { password } = req.body;
 
   if (!correo || !password) {
     return res.status(400).json({ error: 'Correo y contraseña son obligatorios' });
@@ -91,6 +113,24 @@ async function iniciarSesion(req, res) {
       return res.status(401).json({ error: error.message });
     }
 
+    // Exigimos que la cuenta esté verificada por código antes de permitir el acceso.
+    const { data: perfil } = await supabaseAdmin
+      .from('profiles')
+      .select('is_verified, activo')
+      .eq('id', data.user.id)
+      .single();
+
+    if (!perfil || perfil.is_verified !== true) {
+      return res.status(403).json({
+        error: 'Debes verificar tu cuenta antes de iniciar sesión.',
+        requiereVerificacion: true,
+      });
+    }
+
+    if (perfil.activo === false) {
+      return res.status(403).json({ error: 'Tu cuenta está desactivada. Contacta al administrador.' });
+    }
+
     return res.status(200).json({
       message: 'Inicio de sesión exitoso',
       session: data.session,
@@ -104,10 +144,18 @@ async function iniciarSesion(req, res) {
 // --- VERIFICACIÓN DE CUENTA ---
 
 async function verificarCuenta(req, res) {
-  const { correo, codigo } = req.body;
+  const correo = normalizarCorreo(req.body.correo);
+  const { codigo } = req.body;
 
   if (!correo || !codigo) {
     return res.status(400).json({ error: 'Correo y código son obligatorios' });
+  }
+
+  const bloqueo = segundosDeBloqueo('verificar', correo);
+  if (bloqueo) {
+    return res.status(429).json({
+      error: `Demasiados intentos fallidos. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
+    });
   }
 
   try {
@@ -125,12 +173,13 @@ async function verificarCuenta(req, res) {
       return res.status(400).json({ error: 'La cuenta ya está verificada' });
     }
 
-    if (perfil.codigo_verificacion !== codigo) {
-      return res.status(400).json({ error: 'Código incorrecto' });
-    }
-
-    if (new Date(perfil.codigo_verificacion_expiracion) < new Date()) {
-      return res.status(400).json({ error: 'El código ha expirado, solicita uno nuevo' });
+    if (
+      !perfil.codigo_verificacion ||
+      perfil.codigo_verificacion !== codigo ||
+      new Date(perfil.codigo_verificacion_expiracion) < new Date()
+    ) {
+      registrarFallo('verificar', correo);
+      return res.status(400).json({ error: 'Código incorrecto o expirado' });
     }
 
     const { error: updateError } = await supabaseAdmin
@@ -146,6 +195,7 @@ async function verificarCuenta(req, res) {
       return res.status(500).json({ error: updateError.message });
     }
 
+    registrarExito('verificar', correo);
     return res.status(200).json({ message: 'Cuenta verificada con éxito' });
   } catch (err) {
     return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
@@ -153,7 +203,7 @@ async function verificarCuenta(req, res) {
 }
 
 async function reenviarCodigoVerificacion(req, res) {
-  const { correo } = req.body;
+  const correo = normalizarCorreo(req.body.correo);
 
   if (!correo) {
     return res.status(400).json({ error: 'El correo es obligatorio' });
@@ -162,7 +212,7 @@ async function reenviarCodigoVerificacion(req, res) {
   try {
     const { data: perfil, error: buscarError } = await supabaseAdmin
       .from('profiles')
-      .select('id, is_verified')
+      .select('id, is_verified, nombre')
       .eq('correo', correo)
       .single();
 
@@ -210,7 +260,7 @@ async function reenviarCodigoVerificacion(req, res) {
 // --- RECUPERACIÓN DE CONTRASEÑA ---
 
 async function solicitarRecuperacion(req, res) {
-  const { correo } = req.body;
+  const correo = normalizarCorreo(req.body.correo);
 
   if (!correo) {
     return res.status(400).json({ error: 'El correo es obligatorio' });
@@ -262,10 +312,22 @@ async function solicitarRecuperacion(req, res) {
 }
 
 async function resetearPassword(req, res) {
-  const { correo, codigo, nuevaPassword } = req.body;
+  const correo = normalizarCorreo(req.body.correo);
+  const { codigo, nuevaPassword } = req.body;
 
   if (!correo || !codigo || !nuevaPassword) {
     return res.status(400).json({ error: 'Correo, código y nueva contraseña son obligatorios' });
+  }
+
+  if (String(nuevaPassword).length < 8) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+  }
+
+  const bloqueo = segundosDeBloqueo('reset', correo);
+  if (bloqueo) {
+    return res.status(429).json({
+      error: `Demasiados intentos fallidos. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
+    });
   }
 
   try {
@@ -279,12 +341,13 @@ async function resetearPassword(req, res) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    if (perfil.codigo_recuperacion !== codigo) {
-      return res.status(400).json({ error: 'Código incorrecto' });
-    }
-
-    if (new Date(perfil.codigo_expiracion) < new Date()) {
-      return res.status(400).json({ error: 'El código ha expirado, solicita uno nuevo' });
+    if (
+      !perfil.codigo_recuperacion ||
+      perfil.codigo_recuperacion !== codigo ||
+      new Date(perfil.codigo_expiracion) < new Date()
+    ) {
+      registrarFallo('reset', correo);
+      return res.status(400).json({ error: 'Código incorrecto o expirado' });
     }
 
     // La contraseña real vive en auth.users, se actualiza vía admin API
@@ -308,6 +371,8 @@ async function resetearPassword(req, res) {
     if (updateError) {
       return res.status(500).json({ error: updateError.message });
     }
+
+    registrarExito('reset', correo);
 
     try {
       await enviarCorreo({

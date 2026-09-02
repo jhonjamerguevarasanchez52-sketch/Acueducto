@@ -1,0 +1,26 @@
+/**
+ * Restringe una ruta a uno o varios roles.
+ * Debe usarse SIEMPRE después de verificarToken (necesita req.usuario).
+ *
+ *   router.get('/x', verificarToken, verificarRol('administrador'), handler);
+ *   router.get('/y', verificarToken, verificarRol('administrador', 'fontanero'), handler);
+ */
+function verificarRol(...rolesPermitidos) {
+  return (req, res, next) => {
+    if (!req.usuario) {
+      return res.status(401).json({ error: 'No autenticado' });
+    }
+
+    const rolUsuario = req.usuario.rol;
+
+    if (!rolUsuario || !rolesPermitidos.includes(rolUsuario)) {
+      return res.status(403).json({
+        error: 'No autorizado. Rol requerido: ' + rolesPermitidos.join(' o '),
+      });
+    }
+
+    next();
+  };
+}
+
+module.exports = { verificarRol };
