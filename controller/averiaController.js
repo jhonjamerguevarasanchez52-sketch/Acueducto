@@ -1,9 +1,11 @@
-// Los controladores usan req.supabase (cliente ligado al token del usuario)
-// para que la RLS se aplique en cada consulta.
+const supabaseAdmin = require('../config/supabaseAdminClient');
+const { notificar } = require('../utils/notificar');
 
-const ESTADOS_VALIDOS = ['reportada', 'asignada', 'en_proceso', 'resuelta', 'cancelada'];
+const ESTADOS_VALIDOS = ['reportada', 'en_proceso', 'resuelta', 'cancelada'];
 
-// POST / - usuario final reporta una avería
+// ---------- USUARIO FINAL ----------
+
+// POST / - el usuario reporta una avería
 async function reportarAveria(req, res) {
   try {
     const perfilId = req.usuario.id;
@@ -14,16 +16,12 @@ async function reportarAveria(req, res) {
       return res.status(400).json({ error: 'La descripción es obligatoria' });
     }
 
-    if (!zonaUsuario) {
-      return res.status(400).json({ error: 'Tu perfil no tiene una zona asignada; contacta al administrador' });
-    }
-
-    const { data, error } = await req.supabase
+    const { data, error } = await req.db
       .from('breakdowns')
       .insert({
         perfil_id: perfilId,
         descripcion: descripcion.trim(),
-        zona: zonaUsuario,
+        zona: zonaUsuario || null,
         estado: 'reportada',
         fecha_reporte: new Date().toISOString(),
       })
@@ -44,7 +42,7 @@ async function misAverias(req, res) {
   try {
     const perfilId = req.usuario.id;
 
-    const { data, error } = await req.supabase
+    const { data, error } = await req.db
       .from('breakdowns')
       .select('*')
       .eq('perfil_id', perfilId)
@@ -59,73 +57,52 @@ async function misAverias(req, res) {
   }
 }
 
-// GET /zona - averías de la zona del fontanero autenticado
-async function averiasZona(req, res) {
+// ---------- FONTANERO ----------
+
+// GET / - el fontanero (único) ve TODAS las averías.
+// La `zona` identifica la ubicación del beneficiario, no una zona de
+// asignación, así que no se filtra por ella.
+async function listarAverias(req, res) {
   try {
-    const zonaFontanero = req.usuario.zona;
+    const { estado } = req.query;
 
-    if (!zonaFontanero) {
-      return res.status(400).json({ error: 'El fontanero no tiene una zona asignada' });
-    }
-
-    const { data, error } = await req.supabase
+    let query = supabaseAdmin
       .from('breakdowns')
       .select('*')
-      .eq('zona', zonaFontanero)
       .order('fecha_reporte', { ascending: false });
 
+    if (estado) query = query.eq('estado', estado);
+
+    const { data, error } = await query;
     if (error) throw error;
 
     res.status(200).json({ data });
   } catch (err) {
-    console.error('Error en averiasZona:', err.message);
-    res.status(500).json({ error: 'Error al obtener averías de la zona' });
+    console.error('Error en listarAverias:', err.message);
+    res.status(500).json({ error: 'Error al obtener las averías' });
   }
 }
 
-// PUT /:id - fontanero actualiza el estado de una avería de su zona
+// PUT /:id - el fontanero actualiza el estado de una avería
 async function actualizarAveria(req, res) {
   try {
     const fontaneroId = req.usuario.id;
-    const zonaFontanero = req.usuario.zona;
     const { id } = req.params;
-    const { estado } = req.body;
+    const { estado, nota } = req.body;
 
     if (!estado || !ESTADOS_VALIDOS.includes(estado)) {
-      return res.status(400).json({ error: 'Estado inválido' });
+      return res.status(400).json({
+        error: `Estado inválido. Usa: ${ESTADOS_VALIDOS.join(', ')}`,
+      });
     }
 
-    if (!zonaFontanero) {
-      return res.status(400).json({ error: 'El fontanero no tiene una zona asignada' });
-    }
-
-    // Comprobamos que la avería exista y sea de la zona del fontanero.
-    const { data: averia, error: errorBusqueda } = await req.supabase
-      .from('breakdowns')
-      .select('id, zona')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (errorBusqueda) throw errorBusqueda;
-
-    if (!averia) {
-      return res.status(404).json({ error: 'Avería no encontrada' });
-    }
-
-    if (averia.zona !== zonaFontanero) {
-      return res.status(403).json({ error: 'No puedes actualizar averías fuera de tu zona' });
-    }
-
-    const actualizacion = {
-      estado,
-      fontanero_id: fontaneroId,
-    };
-
+    const actualizacion = { estado, fontanero_id: fontaneroId };
+    if (nota !== undefined) actualizacion.nota_fontanero = nota;
     if (estado === 'resuelta') {
       actualizacion.fecha_resolucion = new Date().toISOString();
     }
 
-    const { data, error } = await req.supabase
+    const { data, error } = await supabaseAdmin
       .from('breakdowns')
       .update(actualizacion)
       .eq('id', id)
@@ -133,6 +110,15 @@ async function actualizarAveria(req, res) {
       .single();
 
     if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ error: 'Avería no encontrada' });
+    }
+
+    await notificar(
+      data.perfil_id,
+      `El estado de tu avería reportada cambió a "${estado}".`,
+      'averia'
+    );
 
     res.status(200).json({ data });
   } catch (err) {
@@ -141,4 +127,4 @@ async function actualizarAveria(req, res) {
   }
 }
 
-module.exports = { reportarAveria, misAverias, averiasZona, actualizarAveria };
+module.exports = { reportarAveria, misAverias, listarAverias, actualizarAveria };

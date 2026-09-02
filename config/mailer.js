@@ -21,6 +21,10 @@ const brevo = new BrevoClient({ apiKey });
  * @param {{ to: string, subject: string, html: string }} opciones
  */
 async function enviarCorreo({ to, subject, html }) {
+  if (!apiKey || !remitenteCorreo) {
+    console.warn('[mailer] Correo no enviado: falta BREVO_API_KEY o EMAIL_USER.');
+    return null;
+  }
   return brevo.transactionalEmails.sendTransacEmail({
     subject,
     sender: { name: remitenteNombre, email: remitenteCorreo },

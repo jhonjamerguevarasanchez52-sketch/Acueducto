@@ -1,5 +1,5 @@
-const { supabase, getUserClient } = require('../config/supabaseClient');
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const supabase = require('../config/supabaseClient');
+const { getClienteUsuario } = require('../config/supabaseClient');
 
 async function verificarToken(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -10,10 +10,6 @@ async function verificarToken(req, res, next) {
 
   const token = authHeader.split(' ')[1];
 
-  if (!token) {
-    return res.status(401).json({ error: 'Token no proporcionado' });
-  }
-
   try {
     const { data, error } = await supabase.auth.getUser(token);
 
@@ -21,37 +17,33 @@ async function verificarToken(req, res, next) {
       return res.status(401).json({ error: 'Token inválido o expirado' });
     }
 
-    // El perfil se consulta con la service key: es una operación de backend
-    // de confianza y no debe depender de las políticas RLS.
-    const { data: perfil, error: errorPerfil } = await supabaseAdmin
+    // Cliente de Supabase con el JWT del usuario: RLS se aplica en cada
+    // consulta que hagan los controladores a través de req.db.
+    req.db = getClienteUsuario(token);
+    req.token = token;
+
+    // Traer el perfil (rol, zona, nombre, etc.) desde la tabla profiles
+    const { data: perfil, error: errorPerfil } = await req.db
       .from('profiles')
-      .select('id, rol, zona, nombre, apellido, activo')
+      .select('id, rol, zona, nombre, apellido, activo, is_verified')
       .eq('id', data.user.id)
-      .maybeSingle();
+      .single();
 
-    if (errorPerfil) {
-      console.error('Error al consultar el perfil:', errorPerfil.message);
-      return res.status(500).json({ error: 'Error validando el perfil' });
-    }
-
-    if (!perfil) {
+    if (errorPerfil || !perfil) {
       return res.status(404).json({ error: 'Perfil de usuario no encontrado' });
     }
 
     if (perfil.activo === false) {
-      return res.status(403).json({ error: 'Tu cuenta está desactivada' });
+      return res.status(403).json({
+        error: 'Tu cuenta está desactivada. Contacta al administrador del acueducto.',
+      });
     }
 
-    // Datos de Auth (email, etc.) + datos del perfil (rol, zona, etc.).
-    // El perfil va al final para que su id/rol tengan prioridad.
+    // Combinamos: datos de Auth (id, email, etc.) + datos del perfil (rol, zona, etc.)
     req.usuario = {
       ...data.user,
       ...perfil,
     };
-
-    // Cliente ligado al token: respeta la RLS en las consultas de datos.
-    req.accessToken = token;
-    req.supabase = getUserClient(token);
 
     next();
   } catch (err) {

@@ -1,7 +1,18 @@
-const { verificarRol } = require('./roleMiddleware');
+/**
+ * Permite el paso solo a administradores.
+ * Debe usarse después de verificarToken (usa req.usuario.rol, que ya viene
+ * validado contra la base de datos por el middleware de autenticación).
+ */
+function verificarAdmin(req, res, next) {
+  if (!req.usuario) {
+    return res.status(401).json({ error: 'No autenticado' });
+  }
 
-// El rol ya viene cargado en req.usuario por verificarToken,
-// así que no hace falta una consulta extra a la base de datos.
-const verificarAdmin = verificarRol('administrador');
+  if (req.usuario.rol !== 'administrador') {
+    return res.status(403).json({ error: 'Solo un administrador puede realizar esta acción' });
+  }
 
-module.exports = { verificarAdmin };
+  next();
+}
+
+module.exports = verificarAdmin;

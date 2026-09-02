@@ -1,5 +1,10 @@
-// Restringe una ruta a uno o varios roles.
-// Requiere que verificarToken se haya ejecutado antes (define req.usuario).
+/**
+ * Restringe una ruta a uno o varios roles.
+ * Debe usarse SIEMPRE después de verificarToken (necesita req.usuario).
+ *
+ *   router.get('/x', verificarToken, verificarRol('administrador'), handler);
+ *   router.get('/y', verificarToken, verificarRol('administrador', 'fontanero'), handler);
+ */
 function verificarRol(...rolesPermitidos) {
   return (req, res, next) => {
     if (!req.usuario) {

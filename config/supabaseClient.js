@@ -5,29 +5,29 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  throw new Error('Faltan las variables de entorno SUPABASE_URL y/o SUPABASE_KEY');
+  throw new Error('Faltan SUPABASE_URL o SUPABASE_KEY en el archivo .env');
 }
 
-const commonOptions = {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-};
+// Cliente anónimo, sin sesión. Se usa para autenticación (signUp /
+// signInWithPassword) y para validar tokens en el middleware.
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
 
-// Cliente anónimo compartido. Úsalo solo para operaciones sin sesión de usuario
-// (por ejemplo signUp / signInWithPassword en el flujo de autenticación).
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, commonOptions);
-
-// Crea un cliente ligado al token del usuario para que las políticas RLS
-// (auth.uid()) se apliquen correctamente en cada petición.
-function getUserClient(accessToken) {
+/**
+ * Devuelve un cliente de Supabase que actúa EN NOMBRE del usuario dueño
+ * del token. Al enviar el JWT en cada consulta, las políticas de Row Level
+ * Security se aplican también cuando la petición pasa por el backend, no
+ * solo cuando el frontend habla directo con Supabase.
+ *
+ * @param {string} accessToken JWT de la sesión del usuario
+ */
+function getClienteUsuario(accessToken) {
   return createClient(SUPABASE_URL, SUPABASE_KEY, {
-    ...commonOptions,
-    global: {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: { autoRefreshToken: false, persistSession: false },
   });
 }
 
-module.exports = { supabase, getUserClient };
+module.exports = supabase;
+module.exports.getClienteUsuario = getClienteUsuario;

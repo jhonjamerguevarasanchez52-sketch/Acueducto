@@ -1,9 +1,14 @@
-// Ver mis cortes de servicio (usuario normal)
+const supabaseAdmin = require('../config/supabaseAdminClient');
+const { notificar } = require('../utils/notificar');
+
+// ---------- USUARIO FINAL ----------
+
+// Ver mis cortes de servicio
 async function misCortes(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await req.supabase
+    const { data, error } = await req.db
       .from('service_outages')
       .select('*')
       .eq('perfil_id', userId)
@@ -24,40 +29,43 @@ async function estadoServicio(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await req.supabase
+    const { data, error } = await req.db
       .from('service_outages')
       .select('*')
       .eq('perfil_id', userId)
       .eq('estado', 'activo')
-      .order('fecha_corte', { ascending: false })
-      .limit(1);
+      .maybeSingle();
 
     if (error) {
       return res.status(500).json({ error: error.message });
     }
 
-    const corte = data && data.length > 0 ? data[0] : null;
-
     return res.status(200).json({
-      servicioCortado: !!corte,
-      corte,
+      servicioCortado: !!data,
+      corte: data || null,
     });
   } catch (err) {
     return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
   }
 }
 
-// Ver todos los cortes (admin/fontanero)
-async function todosCortes(req, res) {
+// ---------- ADMINISTRADOR ----------
+
+// Ver todos los cortes, con filtro opcional ?estado=activo|resuelto
+async function listarCortes(req, res) {
+  const { estado, perfil_id } = req.query;
+
   try {
-    const { data, error } = await req.supabase
+    let query = supabaseAdmin
       .from('service_outages')
       .select('*')
       .order('fecha_corte', { ascending: false });
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
+    if (estado) query = query.eq('estado', estado);
+    if (perfil_id) query = query.eq('perfil_id', perfil_id);
+
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
 
     return res.status(200).json(data);
   } catch (err) {
@@ -65,4 +73,78 @@ async function todosCortes(req, res) {
   }
 }
 
-module.exports = { misCortes, estadoServicio, todosCortes };
+// Registrar un corte de servicio para un usuario
+async function crearCorte(req, res) {
+  const { perfil_id, motivo, factura_id } = req.body;
+
+  if (!perfil_id || !motivo) {
+    return res.status(400).json({ error: 'perfil_id y motivo son obligatorios' });
+  }
+
+  try {
+    // No duplicar un corte activo para el mismo usuario
+    const { data: existente } = await supabaseAdmin
+      .from('service_outages')
+      .select('id')
+      .eq('perfil_id', perfil_id)
+      .eq('estado', 'activo')
+      .maybeSingle();
+
+    if (existente) {
+      return res.status(409).json({ error: 'El usuario ya tiene un corte de servicio activo' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('service_outages')
+      .insert({
+        perfil_id,
+        motivo,
+        factura_id: factura_id || null,
+        estado: 'activo',
+        fecha_corte: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    await notificar(
+      perfil_id,
+      `Tu servicio de agua fue suspendido. Motivo: ${motivo}.`,
+      'corte'
+    );
+
+    return res.status(201).json({ message: 'Corte registrado', corte: data });
+  } catch (err) {
+    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+  }
+}
+
+// Reconectar el servicio (marca el corte como resuelto)
+async function reconectar(req, res) {
+  const { id } = req.params;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('service_outages')
+      .update({
+        estado: 'resuelto',
+        fecha_reconexion: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Corte no encontrado' });
+    }
+
+    await notificar(data.perfil_id, 'Tu servicio de agua fue reconectado.', 'corte');
+
+    return res.status(200).json({ message: 'Servicio reconectado', corte: data });
+  } catch (err) {
+    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+  }
+}
+
+module.exports = { misCortes, estadoServicio, listarCortes, crearCorte, reconectar };
