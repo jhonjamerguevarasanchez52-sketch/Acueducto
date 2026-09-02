@@ -1,9 +1,6 @@
 
-const { supabase } = require('../config/supabaseClient');
-
 const crypto = require('crypto');
-const supabase = require('../config/supabaseClient');
-
+const { supabase } = require('../config/supabaseClient');
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { enviarCorreo } = require('../config/mailer');
 
@@ -119,8 +116,6 @@ async function iniciarSesion(req, res) {
   }
 }
 
-
-module.exports = { registrar, iniciarSesion };
 
 // --- VERIFICACIÓN DE CUENTA ---
 
