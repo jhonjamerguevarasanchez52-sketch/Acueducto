@@ -1,5 +1,7 @@
+
 const crypto = require('crypto');
 const supabase = require('../config/supabaseClient');
+
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { enviarCorreo } = require('../config/mailer');
 const {
@@ -140,6 +142,9 @@ async function iniciarSesion(req, res) {
     return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
   }
 }
+
+
+module.exports = { registrar, iniciarSesion };
 
 // --- VERIFICACIÓN DE CUENTA ---
 
