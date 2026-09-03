@@ -30,7 +30,7 @@ const origenesPermitidos = process.env.CORS_ORIGIN
   : true;
 app.use(cors({ origin: origenesPermitidos }));
 
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 // En Express 5, req.body es undefined si la petición no trae JSON.
 // Lo normalizamos a {} para que los controladores no fallen al leerlo.
 app.use((req, res, next) => {
@@ -57,7 +57,7 @@ app.use('/api/cortes', corteRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/wompi', wompiRoutes);
 
-// 404
+// 404 para rutas no definidas
 app.use((req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
 });
@@ -67,6 +67,9 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error('Error no controlado:', err);
   if (res.headersSent) return next(err);
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'JSON inválido en el cuerpo de la petición' });
+  }
   res.status(err.status || 500).json({ error: 'Error interno del servidor' });
 });
 
