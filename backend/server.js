@@ -14,6 +14,8 @@ const tarifaRoutes = require('./routes/tarifaRoutes');
 const corteRoutes = require('./routes/corteRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const wompiRoutes = require('./routes/wompiRoutes');
+const chatbotRoutes = require('./routes/chatbotRoutes');
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -56,7 +58,7 @@ app.use('/api/tarifas', tarifaRoutes);
 app.use('/api/cortes', corteRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/wompi', wompiRoutes);
-
+app.use('/api/chat', chatbotRoutes);
 // 404 para rutas no definidas
 app.use((req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
