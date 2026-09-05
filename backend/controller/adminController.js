@@ -1,4 +1,4 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const supabaseAdmin = require('../config/supabaseAdminClient.js');
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
