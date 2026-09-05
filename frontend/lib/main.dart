@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -21,13 +22,15 @@ class AcueductoApp extends StatelessWidget {
         title: 'Acueducto Campo Amor',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        home: const AuthGate(),
+        // Splash animado; al terminar navega a AuthGate, que decide entre el
+        // login (sin sesión) y la pantalla principal (con sesión guardada).
+        home: const WelcomeScreen(nextRoute: AuthGate()),
       ),
     );
   }
 }
 
-/// Decide qué mostrar según el estado de la sesión.
+/// Decide qué mostrar según el estado de la sesión, una vez pasado el splash.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -43,7 +46,7 @@ class AuthGate extends StatelessWidget {
       case AuthStatus.authenticated:
         return const HomeScreen();
       case AuthStatus.unauthenticated:
-        return const WelcomeScreen();
+        return const LoginScreen();
     }
   }
 }
