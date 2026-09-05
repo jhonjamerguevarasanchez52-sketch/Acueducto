@@ -5,9 +5,9 @@ const {
   misAverias,
   listarAverias,
   actualizarAveria,
-} = require('../controller/averiaController');
-const { verificarToken } = require('../middleware/authMiddleware');
-const { verificarRol } = require('../middleware/roleMiddleware');
+} = require('../controller/averiaController.js');
+const { verificarToken } = require('../middleware/authMiddleware.js');
+const { verificarRol } = require('../middleware/rolemiddleware.js');
 
 // Cualquier usuario autenticado puede reportar y ver sus propias averías
 router.post('/', verificarToken, reportarAveria);
