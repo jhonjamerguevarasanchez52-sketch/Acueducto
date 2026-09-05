@@ -9,6 +9,7 @@ const {
   registrarFallo,
   registrarExito,
 } = require('../utils/controlIntentos');
+const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 // Genera un código numérico de 6 dígitos
 function generarCodigo() {
@@ -69,7 +70,7 @@ async function registrar(req, res) {
     if (profileError) {
       // Evitamos dejar un usuario huérfano en auth.users sin perfil asociado.
       await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
-      return res.status(500).json({ error: profileError.message });
+      return errorConsulta(res, profileError);
     }
 
     try {
@@ -93,7 +94,7 @@ async function registrar(req, res) {
     if (userId) {
       await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
     }
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -105,6 +106,13 @@ async function iniciarSesion(req, res) {
     return res.status(400).json({ error: 'Correo y contraseña son obligatorios' });
   }
 
+  const bloqueo = segundosDeBloqueo('login', correo);
+  if (bloqueo) {
+    return res.status(429).json({
+      error: `Demasiados intentos fallidos. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
+    });
+  }
+
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: correo,
@@ -112,6 +120,7 @@ async function iniciarSesion(req, res) {
     });
 
     if (error) {
+      registrarFallo('login', correo);
       return res.status(401).json({ error: error.message });
     }
 
@@ -133,18 +142,17 @@ async function iniciarSesion(req, res) {
       return res.status(403).json({ error: 'Tu cuenta está desactivada. Contacta al administrador.' });
     }
 
+    registrarExito('login', correo);
     return res.status(200).json({
       message: 'Inicio de sesión exitoso',
       session: data.session,
       user: data.user,
     });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
-
-module.exports = { registrar, iniciarSesion };
 
 // --- VERIFICACIÓN DE CUENTA ---
 
@@ -170,8 +178,10 @@ async function verificarCuenta(req, res) {
       .eq('correo', correo)
       .single();
 
+    // No revelamos si el correo existe: mismo mensaje que un código incorrecto.
     if (buscarError || !perfil) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
+      registrarFallo('verificar', correo);
+      return res.status(400).json({ error: 'Código incorrecto o expirado' });
     }
 
     if (perfil.is_verified) {
@@ -197,13 +207,13 @@ async function verificarCuenta(req, res) {
       .eq('id', perfil.id);
 
     if (updateError) {
-      return res.status(500).json({ error: updateError.message });
+      return errorConsulta(res, updateError);
     }
 
     registrarExito('verificar', correo);
     return res.status(200).json({ message: 'Cuenta verificada con éxito' });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -221,12 +231,11 @@ async function reenviarCodigoVerificacion(req, res) {
       .eq('correo', correo)
       .single();
 
-    if (buscarError || !perfil) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
+    // No revelamos si el correo existe o ya está verificado: mismo mensaje siempre.
+    const mensajeGenerico = { message: 'Si el correo existe y no ha sido verificado, se enviará un nuevo código' };
 
-    if (perfil.is_verified) {
-      return res.status(400).json({ error: 'La cuenta ya está verificada' });
+    if (buscarError || !perfil || perfil.is_verified) {
+      return res.status(200).json(mensajeGenerico);
     }
 
     const codigoVerificacion = generarCodigo();
@@ -241,7 +250,7 @@ async function reenviarCodigoVerificacion(req, res) {
       .eq('id', perfil.id);
 
     if (updateError) {
-      return res.status(500).json({ error: updateError.message });
+      return errorConsulta(res, updateError);
     }
 
     try {
@@ -256,9 +265,9 @@ async function reenviarCodigoVerificacion(req, res) {
       console.error('Error enviando correo de verificación:', mailErr.message);
     }
 
-    return res.status(200).json({ message: 'Nuevo código de verificación enviado' });
+    return res.status(200).json(mensajeGenerico);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -295,7 +304,7 @@ async function solicitarRecuperacion(req, res) {
       .eq('id', perfil.id);
 
     if (updateError) {
-      return res.status(500).json({ error: updateError.message });
+      return errorConsulta(res, updateError);
     }
 
     try {
@@ -312,7 +321,7 @@ async function solicitarRecuperacion(req, res) {
 
     return res.status(200).json({ message: 'Si el correo existe, se enviará un código de recuperación' });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -362,7 +371,7 @@ async function resetearPassword(req, res) {
     );
 
     if (authUpdateError) {
-      return res.status(500).json({ error: authUpdateError.message });
+      return errorConsulta(res, authUpdateError);
     }
 
     const { error: updateError } = await supabaseAdmin
@@ -374,7 +383,7 @@ async function resetearPassword(req, res) {
       .eq('id', perfil.id);
 
     if (updateError) {
-      return res.status(500).json({ error: updateError.message });
+      return errorConsulta(res, updateError);
     }
 
     registrarExito('reset', correo);
@@ -392,7 +401,7 @@ async function resetearPassword(req, res) {
 
     return res.status(200).json({ message: 'Contraseña actualizada con éxito' });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 

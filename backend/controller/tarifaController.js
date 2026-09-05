@@ -1,4 +1,5 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
+const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 // ---------- LECTURA (cualquier usuario autenticado) ----------
 
@@ -11,12 +12,12 @@ async function verTarifas(req, res) {
       .order('vigente_desde', { ascending: false });
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return errorConsulta(res, error);
     }
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -41,7 +42,7 @@ async function tarifaVigente(req, res) {
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -55,7 +56,7 @@ async function crearTarifa(req, res) {
     return res.status(400).json({ error: 'cuota_fija y vigente_desde son obligatorios' });
   }
 
-  if (Number(cuota_fija) < 0) {
+  if (!Number.isFinite(Number(cuota_fija)) || Number(cuota_fija) < 0) {
     return res.status(400).json({ error: 'cuota_fija no puede ser negativa' });
   }
 
@@ -72,12 +73,12 @@ async function crearTarifa(req, res) {
       .single();
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return errorConsulta(res, error);
     }
 
     return res.status(201).json({ message: 'Tarifa creada con éxito', tarifa: data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -110,7 +111,7 @@ async function actualizarTarifa(req, res) {
 
     return res.status(200).json({ message: 'Tarifa actualizada', tarifa: data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 

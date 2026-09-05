@@ -10,7 +10,9 @@ enum AuthStatus { unknown, authenticated, unauthenticated }
 class AuthProvider extends ChangeNotifier {
   AuthProvider({ApiService? api, FlutterSecureStorage? storage})
       : _api = api ?? ApiService(),
-        _storage = storage ?? const FlutterSecureStorage();
+        _storage = storage ?? const FlutterSecureStorage() {
+    _api.onUnauthorized = _manejarSesionExpirada;
+  }
 
   final ApiService _api;
   final FlutterSecureStorage _storage;
@@ -36,8 +38,19 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _loadProfile();
       _setStatus(AuthStatus.authenticated);
+    } on ApiException catch (e) {
+      // Solo borramos la sesión guardada si el propio servidor la rechazó
+      // (token inválido o expirado). Un error de red/timeout no debe forzar
+      // un nuevo login: seguimos mostrando la pantalla de acceso, pero el
+      // usuario podrá reintentar sin perder el token guardado.
+      if (e.statusCode == 401 || e.statusCode == 403) {
+        await _clear();
+      } else {
+        _api.authToken = null;
+      }
+      _setStatus(AuthStatus.unauthenticated);
     } catch (_) {
-      await _clear();
+      _api.authToken = null;
       _setStatus(AuthStatus.unauthenticated);
     }
   }
@@ -49,8 +62,13 @@ class AuthProvider extends ChangeNotifier {
     });
 
     String? token;
-    if (data is Map && data['session'] is Map) {
-      token = (data['session'] as Map)['access_token'] as String?;
+    try {
+      if (data is Map && data['session'] is Map) {
+        final accessToken = (data['session'] as Map)['access_token'];
+        if (accessToken is String) token = accessToken;
+      }
+    } catch (_) {
+      token = null;
     }
     if (token == null || token.isEmpty) {
       throw ApiException('La respuesta del servidor no incluyó una sesión válida.');
@@ -85,5 +103,20 @@ class AuthProvider extends ChangeNotifier {
   void _setStatus(AuthStatus status) {
     _status = status;
     notifyListeners();
+  }
+
+  /// Se llama cuando cualquier llamada autenticada recibe un 401 en medio de
+  /// la sesión (token expirado): cierra sesión y vuelve a la pantalla de
+  /// acceso en vez de dejar al usuario viendo un error suelto.
+  void _manejarSesionExpirada() {
+    if (_status != AuthStatus.authenticated) return;
+    _setStatus(AuthStatus.unauthenticated);
+    _clear();
+  }
+
+  @override
+  void dispose() {
+    _api.dispose();
+    super.dispose();
   }
 }

@@ -58,10 +58,11 @@ async function webhook(req, res) {
 
     const referencia = trx.reference; // id del registro en payments
     const estadoWompi = trx.status; // APPROVED | DECLINED | VOIDED | ERROR
+    const montoRecibidoCentavos = trx.amount_in_cents;
 
     const { data: pago } = await supabaseAdmin
       .from('payments')
-      .select('id, confirmado')
+      .select('id, confirmado, monto')
       .eq('id', referencia)
       .maybeSingle();
 
@@ -71,11 +72,31 @@ async function webhook(req, res) {
     }
 
     if (estadoWompi === 'APPROVED') {
-      await confirmarPago(pago.id, {
+      // El monto ya viene atado a la referencia por la firma de integridad
+      // (ver utils/wompiFirma.js), pero igual lo verificamos aquí: si no
+      // coincide con lo que se guardó al registrar el pago, algo no cuadra
+      // y no debe marcarse la factura como pagada.
+      const montoEsperadoCentavos = Math.round(Number(pago.monto) * 100);
+      if (montoRecibidoCentavos !== montoEsperadoCentavos) {
+        console.error(
+          `[wompi] monto recibido (${montoRecibidoCentavos}) no coincide con el esperado (${montoEsperadoCentavos}) para el pago ${pago.id}; no se confirma.`
+        );
+        await supabaseAdmin
+          .from('payments')
+          .update({ estado_wompi: 'MONTO_INVALIDO', transaccion_id: trx.id })
+          .eq('id', pago.id);
+        return;
+      }
+
+      const resultado = await confirmarPago(pago.id, {
         estado_wompi: estadoWompi,
         transaccion_id: trx.id,
         metodo_confirmacion: 'wompi',
       });
+
+      if (!resultado.ok) {
+        console.error('[wompi] confirmarPago no tuvo éxito para', pago.id, ':', resultado.error);
+      }
     } else {
       await supabaseAdmin
         .from('payments')
@@ -87,11 +108,13 @@ async function webhook(req, res) {
   }
 }
 
-// GET /api/wompi/config - datos públicos que necesita el frontend
+// GET /api/wompi/config - datos públicos que necesita el frontend.
+// WOMPI_INTEGRITY_KEY nunca debe salir de aquí: es el secreto con el que se
+// firma cada transacción (reference + amount + currency); si el cliente lo
+// tuviera, podría falsificar la firma de integridad de cualquier monto.
 function config(req, res) {
   return res.status(200).json({
     publicKey: process.env.WOMPI_PUBLIC_KEY || null,
-    integrityKey: process.env.WOMPI_INTEGRITY_KEY || null,
     ambiente: process.env.WOMPI_AMBIENTE || 'test',
   });
 }

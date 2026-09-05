@@ -16,6 +16,22 @@ class ApiConfig {
       String.fromEnvironment('API_BASE_URL', defaultValue: '');
 
   static String get baseUrl {
+    if (kReleaseMode) {
+      // En un build de release no hay dev server local: si no se pasó
+      // --dart-define=API_BASE_URL=https://..., es un error de compilación,
+      // no algo que deba degradar silenciosamente a localhost/HTTP.
+      if (_override.isEmpty) {
+        throw StateError(
+          'API_BASE_URL no está definido. Compila con '
+          '--dart-define=API_BASE_URL=https://tu-backend/api',
+        );
+      }
+      if (!_override.startsWith('https://')) {
+        throw StateError('API_BASE_URL debe ser https:// en un build de release.');
+      }
+      return _override;
+    }
+
     if (_override.isNotEmpty) return _override;
 
     const port = 3000;

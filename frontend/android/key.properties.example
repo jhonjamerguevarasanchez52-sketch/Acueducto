@@ -1,0 +1,14 @@
+# Copia este archivo como key.properties (en esta misma carpeta, android/) y
+# rellena los valores reales del keystore de release. NUNCA subas el archivo
+# key.properties ni el .jks/.keystore al repositorio.
+#
+# Para generar un keystore nuevo:
+#   keytool -genkey -v -keystore ~/acueducto-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias acueducto
+#
+# Guarda el .jks y estas contraseñas en un lugar seguro: si se pierden, no se
+# podrá volver a publicar actualizaciones de la app con la misma identidad.
+
+storeFile=/ruta/absoluta/a/acueducto-release.jks
+storePassword=
+keyAlias=acueducto
+keyPassword=

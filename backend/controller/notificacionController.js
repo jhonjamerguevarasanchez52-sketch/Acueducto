@@ -1,5 +1,6 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
+const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 // ---------- USUARIO FINAL ----------
 
@@ -15,12 +16,12 @@ async function misNotificaciones(req, res) {
       .order('fecha', { ascending: false });
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return errorConsulta(res, error);
     }
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -36,12 +37,12 @@ async function contarNoLeidas(req, res) {
       .eq('estado', 'no_leido');
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return errorConsulta(res, error);
     }
 
     return res.status(200).json({ noLeidas: count });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -65,7 +66,7 @@ async function marcarLeida(req, res) {
 
     return res.status(200).json({ message: 'Notificación marcada como leída', notificacion: data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -81,12 +82,12 @@ async function marcarTodasLeidas(req, res) {
       .eq('estado', 'no_leido');
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return errorConsulta(res, error);
     }
 
     return res.status(200).json({ message: 'Todas las notificaciones marcadas como leídas' });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -107,7 +108,7 @@ async function enviarNotificacion(req, res) {
         .select('id')
         .eq('activo', true);
 
-      if (perfilesError) return res.status(500).json({ error: perfilesError.message });
+      if (perfilesError) return errorConsulta(res, perfilesError);
 
       const filas = perfiles.map((p) => ({
         perfil_id: p.id,
@@ -118,7 +119,7 @@ async function enviarNotificacion(req, res) {
       }));
 
       const { error } = await supabaseAdmin.from('notifications').insert(filas);
-      if (error) return res.status(500).json({ error: error.message });
+      if (error) return errorConsulta(res, error);
 
       return res.status(201).json({ message: `Notificación enviada a ${filas.length} usuarios` });
     }
@@ -126,7 +127,7 @@ async function enviarNotificacion(req, res) {
     await notificar(perfil_id, mensaje, tipo || 'general');
     return res.status(201).json({ message: 'Notificación enviada' });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 

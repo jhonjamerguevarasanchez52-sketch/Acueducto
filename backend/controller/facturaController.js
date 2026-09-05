@@ -1,5 +1,6 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
+const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 // ---------- USUARIO FINAL ----------
 
@@ -15,12 +16,12 @@ async function misFacturas(req, res) {
       .order('fecha_emision', { ascending: false });
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return errorConsulta(res, error);
     }
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -43,7 +44,7 @@ async function verFactura(req, res) {
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -63,11 +64,11 @@ async function listarFacturas(req, res) {
     if (perfil_id) query = query.eq('perfil_id', perfil_id);
 
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return errorConsulta(res, error);
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -81,7 +82,7 @@ async function crearFactura(req, res) {
     });
   }
 
-  if (Number(valor_total) <= 0) {
+  if (!Number.isFinite(Number(valor_total)) || Number(valor_total) <= 0) {
     return res.status(400).json({ error: 'valor_total debe ser mayor que cero' });
   }
 
@@ -111,7 +112,7 @@ async function crearFactura(req, res) {
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return errorConsulta(res, error);
 
     await notificar(
       perfil_id,
@@ -121,7 +122,7 @@ async function crearFactura(req, res) {
 
     return res.status(201).json({ message: 'Factura creada', factura: data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -159,7 +160,7 @@ async function actualizarFactura(req, res) {
 
     return res.status(200).json({ message: 'Factura actualizada', factura: data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 

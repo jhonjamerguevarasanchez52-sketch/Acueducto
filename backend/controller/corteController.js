@@ -1,5 +1,6 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
+const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 // ---------- USUARIO FINAL ----------
 
@@ -15,12 +16,12 @@ async function misCortes(req, res) {
       .order('fecha_corte', { ascending: false });
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return errorConsulta(res, error);
     }
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -37,7 +38,7 @@ async function estadoServicio(req, res) {
       .maybeSingle();
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return errorConsulta(res, error);
     }
 
     return res.status(200).json({
@@ -45,7 +46,7 @@ async function estadoServicio(req, res) {
       corte: data || null,
     });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -65,11 +66,11 @@ async function listarCortes(req, res) {
     if (perfil_id) query = query.eq('perfil_id', perfil_id);
 
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return errorConsulta(res, error);
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -106,7 +107,16 @@ async function crearCorte(req, res) {
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      // 23505 = unique_violation. Cubre la carrera: dos solicitudes
+      // concurrentes pueden pasar el chequeo "no duplicar" de arriba antes
+      // de que cualquiera inserte; el índice único de la base de datos es
+      // la garantía real, esto solo la traduce a la respuesta 409 esperada.
+      if (error.code === '23505') {
+        return res.status(409).json({ error: 'El usuario ya tiene un corte de servicio activo' });
+      }
+      return errorConsulta(res, error);
+    }
 
     await notificar(
       perfil_id,
@@ -116,7 +126,7 @@ async function crearCorte(req, res) {
 
     return res.status(201).json({ message: 'Corte registrado', corte: data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -143,7 +153,7 @@ async function reconectar(req, res) {
 
     return res.status(200).json({ message: 'Servicio reconectado', corte: data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 

@@ -42,10 +42,25 @@ async function confirmarPago(pagoId, extra = {}) {
   }
 
   if (pago.factura_id) {
-    await supabaseAdmin
+    const { error: facturaError } = await supabaseAdmin
       .from('invoices')
       .update({ estado: 'pagada' })
       .eq('id', pago.factura_id);
+
+    if (facturaError) {
+      // El pago ya quedó marcado como confirmado (el dinero sí se recibió),
+      // pero la factura no se pudo actualizar: no lo ocultamos como éxito,
+      // para que quede visibles en logs y alguien lo corrija a mano.
+      console.error(
+        `[pagos] el pago ${pagoId} se confirmó pero la factura ${pago.factura_id} no se pudo marcar como pagada:`,
+        facturaError.message
+      );
+      return {
+        ok: false,
+        error: 'El pago se confirmó, pero no se pudo actualizar la factura. Contacta al administrador.',
+        pago: pagoActualizado,
+      };
+    }
   }
 
   await notificar(

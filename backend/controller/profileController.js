@@ -1,10 +1,13 @@
+const { CAMPOS_EDITABLES_PERFIL, COLUMNAS_PERFIL_PUBLICO } = require('../utils/perfilCampos');
+const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+
 async function verPerfil(req, res) {
   const userId = req.usuario.id;
 
   try {
     const { data, error } = await req.db
       .from('profiles')
-      .select('*')
+      .select(COLUMNAS_PERFIL_PUBLICO)
       .eq('id', userId)
       .single();
 
@@ -14,19 +17,15 @@ async function verPerfil(req, res) {
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
 async function editarPerfil(req, res) {
   const userId = req.usuario.id;
-  const camposPermitidos = [
-    'nombre', 'apellido', 'telefono', 'numero_lote',
-    'direccion', 'ocupacion', 'zona',
-  ];
 
   const datosActualizar = {};
-  for (const campo of camposPermitidos) {
+  for (const campo of CAMPOS_EDITABLES_PERFIL) {
     if (req.body[campo] !== undefined) {
       datosActualizar[campo] = req.body[campo];
     }
@@ -41,16 +40,16 @@ async function editarPerfil(req, res) {
       .from('profiles')
       .update(datosActualizar)
       .eq('id', userId)
-      .select()
+      .select(COLUMNAS_PERFIL_PUBLICO)
       .single();
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return errorConsulta(res, error);
     }
 
     return res.status(200).json({ message: 'Perfil actualizado', perfil: data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 

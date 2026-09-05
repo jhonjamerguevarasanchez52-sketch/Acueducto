@@ -17,6 +17,28 @@ const wompiRoutes = require('./routes/wompiRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const enProduccion = process.env.NODE_ENV === 'production';
+
+// Validaciones de arranque: fallar rápido y con un mensaje claro en vez de
+// dejar la app corriendo con una configuración insegura en producción.
+if (enProduccion) {
+  if (!process.env.CORS_ORIGIN) {
+    throw new Error(
+      'CORS_ORIGIN es obligatorio en producción (lista de orígenes separados por coma). ' +
+      'Sin esto, la API acepta peticiones de cualquier sitio web.'
+    );
+  }
+  if (!process.env.WOMPI_EVENTS_SECRET) {
+    console.warn(
+      '[arranque] WOMPI_EVENTS_SECRET no está configurado: todos los webhooks de Wompi serán rechazados.'
+    );
+  }
+  if (!process.env.WOMPI_INTEGRITY_KEY) {
+    console.warn(
+      '[arranque] WOMPI_INTEGRITY_KEY no está configurado: los pagos con Wompi no podrán firmarse.'
+    );
+  }
+}
 
 // Detrás de Railway (u otro proxy) para que el rate-limit lea la IP real.
 app.set('trust proxy', 1);

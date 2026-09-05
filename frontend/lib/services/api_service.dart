@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
@@ -28,6 +29,10 @@ class ApiService {
   /// Token de acceso de Supabase. Lo setea el [AuthProvider] al iniciar sesión.
   String? authToken;
 
+  /// Se invoca cuando una respuesta llega con 401 (token expirado/ inválido)
+  /// para que quien mantiene la sesión (el [AuthProvider]) pueda reaccionar.
+  void Function()? onUnauthorized;
+
   static const Duration _timeout = Duration(seconds: 20);
 
   Uri _uri(String path) => Uri.parse('${ApiConfig.baseUrl}$path');
@@ -53,9 +58,15 @@ class ApiService {
     http.Response res;
     try {
       res = await request();
-    } on TimeoutException {
+    } on TimeoutException catch (e) {
+      if (kDebugMode) debugPrint('[ApiService] timeout: $e');
       throw ApiException('El servidor no respondió a tiempo. Verifica tu conexión.');
-    } catch (_) {
+    } catch (e, st) {
+      // No filtramos el error real al usuario (podría ser un detalle técnico
+      // sin sentido para él), pero sí lo dejamos en el log para poder
+      // diagnosticar problemas reales (DNS, certificado, etc.) en vez de que
+      // todo se vea igual que "sin internet".
+      if (kDebugMode) debugPrint('[ApiService] fallo de red: $e\n$st');
       throw ApiException('No se pudo conectar con el servidor.');
     }
 
@@ -75,6 +86,11 @@ class ApiService {
     final msg = data is Map && data['error'] is String
         ? data['error'] as String
         : 'Error ${res.statusCode}';
+
+    if (res.statusCode == 401) {
+      onUnauthorized?.call();
+    }
+
     throw ApiException(msg, statusCode: res.statusCode);
   }
 

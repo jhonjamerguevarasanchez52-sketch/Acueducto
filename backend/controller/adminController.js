@@ -1,4 +1,6 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
+const { CAMPOS_EDITABLES_PERFIL, COLUMNAS_PERFIL_PUBLICO } = require('../utils/perfilCampos');
+const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
@@ -9,7 +11,7 @@ async function verTodosUsuarios(req, res) {
   try {
     let query = supabaseAdmin
       .from('profiles')
-      .select('*')
+      .select(COLUMNAS_PERFIL_PUBLICO)
       .order('created_at', { ascending: false });
 
     if (rol) query = query.eq('rol', rol);
@@ -17,11 +19,11 @@ async function verTodosUsuarios(req, res) {
     if (activo === 'false') query = query.eq('activo', false);
 
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return errorConsulta(res, error);
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -32,7 +34,7 @@ async function verUsuario(req, res) {
   try {
     const { data, error } = await supabaseAdmin
       .from('profiles')
-      .select('*')
+      .select(COLUMNAS_PERFIL_PUBLICO)
       .eq('id', userId)
       .single();
 
@@ -42,7 +44,7 @@ async function verUsuario(req, res) {
 
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -58,18 +60,22 @@ async function cambiarRol(req, res) {
   // El acueducto contempla un único fontanero: si se asigna, se quita al anterior.
   try {
     if (rol === 'fontanero') {
-      await supabaseAdmin
+      const { error: errorDegradacion } = await supabaseAdmin
         .from('profiles')
         .update({ rol: 'usuario' })
         .eq('rol', 'fontanero')
         .neq('id', userId);
+
+      if (errorDegradacion) {
+        return errorConsulta(res, errorDegradacion);
+      }
     }
 
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .update({ rol })
       .eq('id', userId)
-      .select()
+      .select(COLUMNAS_PERFIL_PUBLICO)
       .single();
 
     if (error || !data) {
@@ -78,20 +84,16 @@ async function cambiarRol(req, res) {
 
     return res.status(200).json({ message: `Rol actualizado a "${rol}"`, perfil: data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
 // Editar datos administrativos de un usuario
 async function editarUsuario(req, res) {
   const { userId } = req.params;
-  const camposPermitidos = [
-    'nombre', 'apellido', 'telefono', 'numero_lote',
-    'direccion', 'ocupacion', 'zona',
-  ];
 
   const cambios = {};
-  for (const campo of camposPermitidos) {
+  for (const campo of CAMPOS_EDITABLES_PERFIL) {
     if (req.body[campo] !== undefined) cambios[campo] = req.body[campo];
   }
 
@@ -104,7 +106,7 @@ async function editarUsuario(req, res) {
       .from('profiles')
       .update(cambios)
       .eq('id', userId)
-      .select()
+      .select(COLUMNAS_PERFIL_PUBLICO)
       .single();
 
     if (error || !data) {
@@ -113,7 +115,7 @@ async function editarUsuario(req, res) {
 
     return res.status(200).json({ message: 'Usuario actualizado', perfil: data });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 
@@ -135,7 +137,7 @@ async function cambiarEstadoUsuario(req, res) {
       .from('profiles')
       .update({ activo })
       .eq('id', userId)
-      .select()
+      .select(COLUMNAS_PERFIL_PUBLICO)
       .single();
 
     if (error || !data) {
@@ -147,7 +149,7 @@ async function cambiarEstadoUsuario(req, res) {
       perfil: data,
     });
   } catch (err) {
-    return res.status(500).json({ error: 'Error inesperado', detalle: err.message });
+    return errorInesperado(res, err);
   }
 }
 

@@ -137,6 +137,14 @@ create table if not exists public.service_outages (
 );
 create index if not exists idx_outages_perfil on public.service_outages (perfil_id);
 
+-- Un mismo usuario no puede tener dos cortes "activo" a la vez. Sin este
+-- índice, dos solicitudes POST /api/cortes concurrentes para el mismo
+-- perfil_id pueden pasar ambas la verificación de "no duplicar" en la
+-- aplicación (TOCTOU) e insertar dos cortes activos.
+create unique index if not exists idx_outages_perfil_activo_unico
+  on public.service_outages (perfil_id)
+  where estado = 'activo';
+
 -- ============================================================================
 --  ROW LEVEL SECURITY
 -- ----------------------------------------------------------------------------
