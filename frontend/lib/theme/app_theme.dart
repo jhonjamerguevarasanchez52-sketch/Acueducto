@@ -8,6 +8,12 @@ class AppTheme {
   static const Color primaryDark = Color(0xFF01579B);
   static const Color accent = Color(0xFF4FC3F7);
 
+  // Paleta extendida, compartida por el splash y las cabeceras.
+  static const Color midBlue = Color(0xFF1E5FA0);
+  static const Color deepBlue = Color(0xFF0A3665);
+  static const Color iceBlue = Color(0xFFDCEFF5);
+  static const Color skyText = Color(0xFFB5D4F4);
+
   static ThemeData get light {
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
