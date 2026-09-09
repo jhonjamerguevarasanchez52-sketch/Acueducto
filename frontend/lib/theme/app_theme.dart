@@ -19,6 +19,14 @@ class AppTheme {
   static const Color iceBlue = Color(0xFFDCEFF5);
   static const Color skyText = Color(0xFFB5D4F4);
 
+  // Colores semánticos para los estados de facturas, pagos, averías y cortes.
+  // `info` es el propio azul del acueducto; el resto acompaña esa paleta sin
+  // salirse del tono sobrio del resto de la app.
+  static const Color success = Color(0xFF2E7D32); // pagada, resuelta, activa
+  static const Color warning = Color(0xFFE65100); // pendiente, reportada
+  static const Color danger = Color(0xFFC62828); // vencida, rechazada, cortada
+  static const Color info = primaryDark; // en proceso
+
   static ThemeData get light {
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,

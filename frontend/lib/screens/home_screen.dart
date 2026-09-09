@@ -3,6 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'averias_screen.dart';
+import 'estado_servicio_screen.dart';
+import 'facturas_screen.dart';
+import 'notificaciones_screen.dart';
+import 'pagos_screen.dart';
 
 /// Pantalla principal tras iniciar sesión. Por ahora muestra los datos del
 /// perfil y sirve de base para los módulos (facturas, pagos, averías, etc.).
@@ -100,13 +105,31 @@ class HomeScreen extends StatelessWidget {
               style:
                   textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
-          _ModuloTile(icon: Icons.receipt_long, label: 'Mis facturas'),
-          _ModuloTile(icon: Icons.payments_outlined, label: 'Mis pagos'),
-          _ModuloTile(icon: Icons.build_outlined, label: 'Averías'),
           _ModuloTile(
-              icon: Icons.notifications_outlined, label: 'Notificaciones'),
+            icon: Icons.receipt_long,
+            label: 'Mis facturas',
+            destino: () => const FacturasScreen(),
+          ),
           _ModuloTile(
-              icon: Icons.water_drop_outlined, label: 'Estado del servicio'),
+            icon: Icons.payments_outlined,
+            label: 'Mis pagos',
+            destino: () => const PagosScreen(),
+          ),
+          _ModuloTile(
+            icon: Icons.build_outlined,
+            label: 'Averías',
+            destino: () => const AveriasScreen(),
+          ),
+          _ModuloTile(
+            icon: Icons.notifications_outlined,
+            label: 'Notificaciones',
+            destino: () => const NotificacionesScreen(),
+          ),
+          _ModuloTile(
+            icon: Icons.water_drop_outlined,
+            label: 'Estado del servicio',
+            destino: () => const EstadoServicioScreen(),
+          ),
         ],
       ),
     );
@@ -114,10 +137,18 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _ModuloTile extends StatelessWidget {
-  const _ModuloTile({required this.icon, required this.label});
+  const _ModuloTile({
+    required this.icon,
+    required this.label,
+    this.destino,
+  });
 
   final IconData icon;
   final String label;
+
+  /// Constructor de la pantalla a la que navega el módulo. Si es `null`, el
+  /// módulo aún no está implementado y solo muestra un aviso.
+  final Widget Function()? destino;
 
   @override
   Widget build(BuildContext context) {
@@ -133,9 +164,18 @@ class _ModuloTile extends StatelessWidget {
         ),
         title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
         trailing: const Icon(Icons.chevron_right, color: Colors.black38),
-        onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('"$label" estará disponible pronto')),
-        ),
+        onTap: () {
+          final destino = this.destino;
+          if (destino == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('"$label" estará disponible pronto')),
+            );
+            return;
+          }
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => destino()),
+          );
+        },
       ),
     );
   }

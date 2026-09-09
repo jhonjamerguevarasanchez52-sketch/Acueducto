@@ -15,6 +15,7 @@ frontend/build/
 frontend/.dart_tool/
 frontend/.flutter-plugins-dependencies
 frontend/**/*.iml
+frontend/devtools_options.yaml
 
 # Sistema operativo
 .DS_Store
