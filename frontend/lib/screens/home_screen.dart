@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/gota_scaffold.dart';
 import 'averias_screen.dart';
 import 'estado_servicio_screen.dart';
 import 'facturas_screen.dart';
@@ -32,7 +33,7 @@ class HomeScreen extends StatelessWidget {
     final perfil = auth.profile;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
+    return GotaScaffold(
       appBar: AppBar(
         title: const Text('Acueducto Campo Amor'),
         actions: [
@@ -44,7 +45,7 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
         children: [
           Card(
             child: Padding(
