@@ -8,10 +8,19 @@ import '../config/api_config.dart';
 
 /// Error de API con el mensaje que devuelve el backend (`{ "error": "..." }`).
 class ApiException implements Exception {
-  ApiException(this.message, {this.statusCode});
+  ApiException(this.message, {this.statusCode, this.data});
 
   final String message;
   final int? statusCode;
+
+  /// Cuerpo de la respuesta ya decodificado (si lo hubo). Permite leer flags
+  /// extra que manda el backend junto al error, como `requiereVerificacion`.
+  final dynamic data;
+
+  /// `true` cuando el backend rechazó el login porque la cuenta todavía no ha
+  /// confirmado su código de verificación.
+  bool get requiereVerificacion =>
+      data is Map && (data as Map)['requiereVerificacion'] == true;
 
   @override
   String toString() => message;
@@ -91,7 +100,7 @@ class ApiService {
       onUnauthorized?.call();
     }
 
-    throw ApiException(msg, statusCode: res.statusCode);
+    throw ApiException(msg, statusCode: res.statusCode, data: data);
   }
 
   void dispose() => _client.close();

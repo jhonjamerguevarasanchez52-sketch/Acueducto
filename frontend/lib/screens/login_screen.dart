@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 
 import '../widgets/hidro_logo.dart';
+import 'verificar_cuenta_screen.dart';
 
 /// Pantalla de inicio de sesión de HIDRO-APP.
 ///
@@ -53,11 +54,21 @@ class _LoginScreenState extends State<LoginScreen> {
       // AuthGate observa el AuthProvider y esta misma ruta se reconstruye
       // como HomeScreen al quedar autenticado: no hay nada que "pop-ear".
     } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
+      if (!mounted) return;
+      if (e.requiereVerificacion) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => VerificarCuentaScreen(
+              correo: _correoCtrl.text.trim(),
+              password: _passwordCtrl.text,
+            ),
+          ),
         );
+        return;
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } finally {
       if (mounted) setState(() => _cargando = false);
     }

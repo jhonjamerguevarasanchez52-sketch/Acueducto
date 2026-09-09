@@ -82,6 +82,25 @@ class AuthProvider extends ChangeNotifier {
 
   // No hay auto-registro: las cuentas las crea el administrador del acueducto.
 
+  /// Confirma el código de 6 dígitos que se envió por correo al crear la cuenta.
+  /// Si el código es correcto, deja iniciada la sesión con [password].
+  Future<void> verificarCuenta(
+    String correo,
+    String codigo,
+    String password,
+  ) async {
+    await _api.post('/auth/verificar', body: {
+      'correo': correo.trim(),
+      'codigo': codigo.trim(),
+    });
+    await login(correo, password);
+  }
+
+  /// Pide al backend que reenvíe el código de verificación a [correo].
+  Future<void> reenviarCodigoVerificacion(String correo) async {
+    await _api.post('/auth/reenviar-codigo', body: {'correo': correo.trim()});
+  }
+
   Future<void> logout() async {
     await _clear();
     _setStatus(AuthStatus.unauthenticated);

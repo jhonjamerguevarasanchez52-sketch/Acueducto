@@ -10,6 +10,10 @@ class AppTheme {
   static const Color surfaceTint = Color(0xFFEAF5FB);
   static const Color secondaryText = Colors.black54;
 
+  // Ítems sin seleccionar de la barra inferior: un azul apagado en vez del gris
+  // por defecto, para que la barra no se vea "muerta".
+  static const Color _navInactivo = Color(0xFF6B8CA3);
+
   static const _fieldRadius = 14.0;
   static const _cardRadius = 18.0;
 
@@ -18,6 +22,14 @@ class AppTheme {
   static const Color deepBlue = Color(0xFF0A3665);
   static const Color iceBlue = Color(0xFFDCEFF5);
   static const Color skyText = Color(0xFFB5D4F4);
+
+  // Colores semánticos para los estados de facturas, pagos, averías y cortes.
+  // `info` es el propio azul del acueducto; el resto acompaña esa paleta sin
+  // salirse del tono sobrio del resto de la app.
+  static const Color success = Color(0xFF2E7D32); // pagada, resuelta, activa
+  static const Color warning = Color(0xFFE65100); // pendiente, reportada
+  static const Color danger = Color(0xFFC62828); // vencida, rechazada, cortada
+  static const Color info = primaryDark; // en proceso
 
   static ThemeData get light {
     final scheme = ColorScheme.fromSeed(
@@ -103,6 +115,29 @@ class AppTheme {
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 66,
+        backgroundColor: Colors.white,
+        elevation: 3,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: accent.withValues(alpha: 0.30),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final seleccionado = states.contains(WidgetState.selected);
+          return IconThemeData(
+            size: 26,
+            color: seleccionado ? primary : _navInactivo,
+          );
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final seleccionado = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 11.5,
+            fontWeight: seleccionado ? FontWeight.w700 : FontWeight.w600,
+            color: seleccionado ? primaryDark : _navInactivo,
+          );
+        }),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
