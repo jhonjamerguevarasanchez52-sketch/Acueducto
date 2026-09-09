@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
-import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/main_shell.dart';
 import 'screens/welcome_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -44,7 +44,7 @@ class AuthGate extends StatelessWidget {
           body: Center(child: CircularProgressIndicator()),
         );
       case AuthStatus.authenticated:
-        return const HomeScreen();
+        return const MainShell();
       case AuthStatus.unauthenticated:
         return const LoginScreen();
     }
