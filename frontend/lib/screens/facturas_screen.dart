@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formato.dart';
+import '../widgets/gota_scaffold.dart';
 import '../widgets/mensaje_estado.dart';
 import '../widgets/pagar_sheet.dart';
 import 'pagos_screen.dart';
@@ -78,7 +79,7 @@ class _FacturasScreenState extends State<FacturasScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GotaScaffold(
       appBar: AppBar(title: const Text('Mis facturas')),
       body: RefreshIndicator(
         onRefresh: _refrescar,

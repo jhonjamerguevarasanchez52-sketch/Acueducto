@@ -6,9 +6,13 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 
+import '../widgets/gota_scaffold.dart';
+
+
 import '../utils/formato.dart';
 import '../widgets/pagar_sheet.dart';
 import 'estado_servicio_screen.dart';
+
 
 import 'averias_screen.dart';
 import 'estado_servicio_screen.dart';
@@ -81,6 +85,21 @@ class _HomeScreenState extends State<HomeScreen> {
     final auth = context.watch<AuthProvider>();
     final perfil = auth.profile;
     final textTheme = Theme.of(context).textTheme;
+
+
+    return GotaScaffold(
+      appBar: AppBar(
+        title: const Text('Acueducto Campo Amor'),
+        actions: [
+          IconButton(
+            tooltip: 'Cerrar sesión',
+            icon: const Icon(Icons.logout),
+            onPressed: () => _cerrarSesion(context),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
 
     return Scaffold(
       body: RefreshIndicator(
@@ -225,6 +244,7 @@ class _Etiqueta extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+
         children: [
           if (conPunto) ...[
             Container(
