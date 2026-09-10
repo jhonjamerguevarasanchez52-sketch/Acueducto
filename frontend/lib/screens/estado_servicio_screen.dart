@@ -5,7 +5,8 @@ import '../models/corte.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/formato.dart';
+import '../widgets/estado_servicio/corte_card.dart';
+import '../widgets/estado_servicio/tarjeta_estado.dart';
 import '../widgets/gota_scaffold.dart';
 import '../widgets/mensaje_estado.dart';
 
@@ -85,7 +86,7 @@ class _EstadoServicioScreenState extends State<EstadoServicioScreen> {
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _TarjetaEstado(
+                TarjetaEstadoServicio(
                   cortado: cortado,
                   corteActivo: datos.estado.corte,
                 ),
@@ -101,7 +102,7 @@ class _EstadoServicioScreenState extends State<EstadoServicioScreen> {
                       ),
                     ),
                   ),
-                  ...datos.historial.map((c) => _CorteCard(corte: c)),
+                  ...datos.historial.map((c) => CorteCard(corte: c)),
                 ] else
                   const Padding(
                     padding: EdgeInsets.only(top: 24),
@@ -125,146 +126,4 @@ class _DatosServicio {
 
   final EstadoServicio estado;
   final List<Corte> historial;
-}
-
-class _TarjetaEstado extends StatelessWidget {
-  const _TarjetaEstado({required this.cortado, this.corteActivo});
-
-  final bool cortado;
-  final Corte? corteActivo;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = cortado ? AppTheme.danger : AppTheme.success;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.30)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                cortado ? Icons.water_drop_outlined : Icons.water_drop,
-                color: color,
-                size: 28,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  cortado ? 'Servicio suspendido' : 'Servicio activo',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            cortado
-                ? 'Tu suministro de agua está cortado en este momento.'
-                : 'Tu suministro de agua funciona con normalidad.',
-            style: const TextStyle(fontSize: 14, height: 1.35),
-          ),
-          if (cortado && corteActivo != null) ...[
-            const SizedBox(height: 12),
-            _fila(Icons.info_outline, 'Motivo: ${corteActivo!.motivo}'),
-            _fila(Icons.event_busy_outlined,
-                'Desde: ${Formato.fechaHora(corteActivo!.fechaCorte)}'),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _fila(IconData icono, String texto) => Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icono, size: 15, color: AppTheme.secondaryText),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                texto,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.secondaryText,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-}
-
-class _CorteCard extends StatelessWidget {
-  const _CorteCard({required this.corte});
-
-  final Corte corte;
-
-  @override
-  Widget build(BuildContext context) {
-    final activo = corte.activo;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    corte.motivo,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                EtiquetaEstado(
-                  texto: activo ? 'Activo' : 'Resuelto',
-                  color: activo ? AppTheme.danger : AppTheme.success,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _fila(Icons.event_busy_outlined,
-                'Corte: ${Formato.fechaHora(corte.fechaCorte)}'),
-            if (corte.fechaReconexion != null)
-              _fila(Icons.event_available_outlined,
-                  'Reconexión: ${Formato.fechaHora(corte.fechaReconexion)}'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _fila(IconData icono, String texto) => Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icono, size: 15, color: AppTheme.secondaryText),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                texto,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.secondaryText,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
 }
