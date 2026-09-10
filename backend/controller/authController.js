@@ -20,83 +20,10 @@ function normalizarCorreo(correo) {
   return String(correo || '').toLowerCase().trim();
 }
 
-async function registrar(req, res) {
-  const correo = normalizarCorreo(req.body.correo);
-  const { password, nombre, apellido } = req.body;
-
-  if (!correo || !password || !nombre || !apellido) {
-    return res.status(400).json({ error: 'Faltan campos obligatorios' });
-  }
-
-  if (String(password).length < 8) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
-  }
-
-  let userId;
-
-  try {
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: correo,
-      password: password,
-    });
-
-    if (authError) {
-      return res.status(400).json({ error: authError.message });
-    }
-
-    userId = authData.user?.id;
-    if (!userId) {
-      return res.status(500).json({ error: 'No se pudo crear el usuario' });
-    }
-
-    // Generamos el código de verificación de cuenta (expira en 15 minutos)
-    const codigoVerificacion = generarCodigo();
-    const codigoVerificacionExpiracion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-
-    // Usamos supabaseAdmin aquí, porque esta inserción la hace el backend
-    // justo después del signUp, sin sesión de usuario activa todavía.
-    const { error: profileError } = await supabaseAdmin.from('profiles').insert({
-      id: userId,
-      nombre,
-      apellido,
-      correo,
-      rol: 'usuario',
-      activo: true,
-      is_verified: false,
-      codigo_verificacion: codigoVerificacion,
-      codigo_verificacion_expiracion: codigoVerificacionExpiracion,
-    });
-
-    if (profileError) {
-      // Evitamos dejar un usuario huérfano en auth.users sin perfil asociado.
-      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
-      return errorConsulta(res, profileError);
-    }
-
-    try {
-      await enviarCorreo({
-        to: correo,
-        subject: 'Verifica tu cuenta - Acueducto Campoamor',
-        html: `<p>Hola ${nombre},</p>
-               <p>Tu código de verificación es:</p>
-               <h2>${codigoVerificacion}</h2>
-               <p>Este código expira en 15 minutos.</p>`,
-      });
-    } catch (mailErr) {
-      console.error('Error enviando correo de verificación:', mailErr.message);
-    }
-
-    return res.status(201).json({
-      message: 'Usuario registrado con éxito. Revisa tu correo para verificar la cuenta.',
-      userId,
-    });
-  } catch (err) {
-    if (userId) {
-      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
-    }
-    return errorInesperado(res, err);
-  }
-}
+// No hay endpoint de auto-registro: las cuentas las crea el administrador con
+// `scripts/crearUsuario.js` (Auth + fila en `profiles` con is_verified = true).
+// El flujo de verificación por código de abajo sigue disponible por si una
+// cuenta se crea sin verificar.
 
 async function iniciarSesion(req, res) {
   const correo = normalizarCorreo(req.body.correo);
@@ -406,7 +333,6 @@ async function resetearPassword(req, res) {
 }
 
 module.exports = {
-  registrar,
   iniciarSesion,
   verificarCuenta,
   reenviarCodigoVerificacion,
