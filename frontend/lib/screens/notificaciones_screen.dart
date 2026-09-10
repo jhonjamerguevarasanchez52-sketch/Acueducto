@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formato.dart';
+import '../widgets/gota_scaffold.dart';
 import '../widgets/mensaje_estado.dart';
 
 /// Módulo "Notificaciones": avisos del acueducto (facturas, pagos, averías,
@@ -96,7 +97,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GotaScaffold(
       appBar: AppBar(
         title: const Text('Notificaciones'),
         actions: [

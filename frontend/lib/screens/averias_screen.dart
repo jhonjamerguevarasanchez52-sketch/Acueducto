@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formato.dart';
+import '../widgets/gota_scaffold.dart';
 import '../widgets/mensaje_estado.dart';
 
 /// Módulo "Averías": el usuario reporta una avería del servicio y hace
@@ -55,7 +56,7 @@ class _AveriasScreenState extends State<AveriasScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GotaScaffold(
       appBar: AppBar(title: const Text('Averías')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _abrirReporte,
