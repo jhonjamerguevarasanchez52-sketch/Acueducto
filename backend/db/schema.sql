@@ -23,6 +23,7 @@ create table if not exists public.profiles (
                                    check (rol in ('administrador', 'usuario', 'fontanero')),
   activo                         boolean not null default true,
   is_verified                    boolean not null default false,
+  debe_cambiar_password         boolean not null default false,
 
   -- verificación de cuenta / recuperación de contraseña (códigos de un solo uso)
   codigo_verificacion            text,
@@ -257,3 +258,4 @@ alter table public.service_outages add column if not exists factura_id        uu
 alter table public.service_outages add column if not exists fecha_reconexion  timestamptz;
 
 alter table public.profiles        add column if not exists activo            boolean not null default true;
+alter table public.profiles        add column if not exists debe_cambiar_password boolean not null default false;

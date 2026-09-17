@@ -20,83 +20,10 @@ function normalizarCorreo(correo) {
   return String(correo || '').toLowerCase().trim();
 }
 
-async function registrar(req, res) {
-  const correo = normalizarCorreo(req.body.correo);
-  const { password, nombre, apellido } = req.body;
-
-  if (!correo || !password || !nombre || !apellido) {
-    return res.status(400).json({ error: 'Faltan campos obligatorios' });
-  }
-
-  if (String(password).length < 8) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
-  }
-
-  let userId;
-
-  try {
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: correo,
-      password: password,
-    });
-
-    if (authError) {
-      return res.status(400).json({ error: authError.message });
-    }
-
-    userId = authData.user?.id;
-    if (!userId) {
-      return res.status(500).json({ error: 'No se pudo crear el usuario' });
-    }
-
-    // Generamos el código de verificación de cuenta (expira en 15 minutos)
-    const codigoVerificacion = generarCodigo();
-    const codigoVerificacionExpiracion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-
-    // Usamos supabaseAdmin aquí, porque esta inserción la hace el backend
-    // justo después del signUp, sin sesión de usuario activa todavía.
-    const { error: profileError } = await supabaseAdmin.from('profiles').insert({
-      id: userId,
-      nombre,
-      apellido,
-      correo,
-      rol: 'usuario',
-      activo: true,
-      is_verified: false,
-      codigo_verificacion: codigoVerificacion,
-      codigo_verificacion_expiracion: codigoVerificacionExpiracion,
-    });
-
-    if (profileError) {
-      // Evitamos dejar un usuario huérfano en auth.users sin perfil asociado.
-      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
-      return errorConsulta(res, profileError);
-    }
-
-    try {
-      await enviarCorreo({
-        to: correo,
-        subject: 'Verifica tu cuenta - Acueducto Campoamor',
-        html: `<p>Hola ${nombre},</p>
-               <p>Tu código de verificación es:</p>
-               <h2>${codigoVerificacion}</h2>
-               <p>Este código expira en 15 minutos.</p>`,
-      });
-    } catch (mailErr) {
-      console.error('Error enviando correo de verificación:', mailErr.message);
-    }
-
-    return res.status(201).json({
-      message: 'Usuario registrado con éxito. Revisa tu correo para verificar la cuenta.',
-      userId,
-    });
-  } catch (err) {
-    if (userId) {
-      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
-    }
-    return errorInesperado(res, err);
-  }
-}
+// No hay endpoint de auto-registro: las cuentas las crea el administrador con
+// `scripts/crearUsuario.js` (Auth + fila en `profiles` con is_verified = true).
+// El flujo de verificación por código de abajo sigue disponible por si una
+// cuenta se crea sin verificar.
 
 async function iniciarSesion(req, res) {
   const correo = normalizarCorreo(req.body.correo);
@@ -125,11 +52,15 @@ async function iniciarSesion(req, res) {
     }
 
     // Exigimos que la cuenta esté verificada por código antes de permitir el acceso.
-    const { data: perfil } = await supabaseAdmin
+    const { data: perfil, error: perfilError } = await supabaseAdmin
       .from('profiles')
-      .select('is_verified, activo')
+      .select('is_verified, activo, debe_cambiar_password')
       .eq('id', data.user.id)
       .single();
+
+    if (perfilError) {
+      return errorConsulta(res, perfilError);
+    }
 
     if (!perfil || perfil.is_verified !== true) {
       return res.status(403).json({
@@ -147,6 +78,9 @@ async function iniciarSesion(req, res) {
       message: 'Inicio de sesión exitoso',
       session: data.session,
       user: data.user,
+      // El frontend usa esto para forzar la pantalla de cambio de contraseña
+      // cuando la cuenta fue creada por un administrador con clave temporal.
+      debeCambiarPassword: perfil.debe_cambiar_password === true,
     });
   } catch (err) {
     return errorInesperado(res, err);
@@ -266,6 +200,62 @@ async function reenviarCodigoVerificacion(req, res) {
     }
 
     return res.status(200).json(mensajeGenerico);
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+// --- CAMBIO DE CONTRASEÑA (usuario autenticado) ---
+
+// Usada tras el primer login con una contraseña temporal generada por un
+// administrador, pero también sirve como cambio de contraseña voluntario.
+async function cambiarPasswordPropio(req, res) {
+  const userId = req.usuario.id;
+  const correo = normalizarCorreo(req.usuario.email);
+  const { passwordActual, passwordNueva } = req.body;
+
+  if (!passwordActual || !passwordNueva) {
+    return res.status(400).json({ error: 'La contraseña actual y la nueva son obligatorias' });
+  }
+
+  if (String(passwordNueva).length < 8) {
+    return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+  }
+
+  if (passwordNueva === passwordActual) {
+    return res.status(400).json({ error: 'La nueva contraseña debe ser distinta de la actual' });
+  }
+
+  try {
+    // Confirmamos la contraseña actual reautenticando contra Supabase Auth,
+    // en vez de confiar en que quien llama con el token es realmente el dueño.
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: correo,
+      password: passwordActual,
+    });
+
+    if (authError) {
+      return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+    }
+
+    const { error: updateAuthError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password: passwordNueva,
+    });
+
+    if (updateAuthError) {
+      return errorConsulta(res, updateAuthError);
+    }
+
+    const { error: updatePerfilError } = await supabaseAdmin
+      .from('profiles')
+      .update({ debe_cambiar_password: false })
+      .eq('id', userId);
+
+    if (updatePerfilError) {
+      return errorConsulta(res, updatePerfilError);
+    }
+
+    return res.status(200).json({ message: 'Contraseña actualizada con éxito' });
   } catch (err) {
     return errorInesperado(res, err);
   }
@@ -406,10 +396,10 @@ async function resetearPassword(req, res) {
 }
 
 module.exports = {
-  registrar,
   iniciarSesion,
   verificarCuenta,
   reenviarCodigoVerificacion,
+  cambiarPasswordPropio,
   solicitarRecuperacion,
   resetearPassword,
 };

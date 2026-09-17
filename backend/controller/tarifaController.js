@@ -115,4 +115,26 @@ async function actualizarTarifa(req, res) {
   }
 }
 
-module.exports = { verTarifas, tarifaVigente, crearTarifa, actualizarTarifa };
+// Eliminar una tarifa creada por error
+async function eliminarTarifa(req, res) {
+  const { id } = req.params;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('rates')
+      .delete()
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Tarifa no encontrada' });
+    }
+
+    return res.status(200).json({ message: 'Tarifa eliminada', tarifa: data });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+module.exports = { verTarifas, tarifaVigente, crearTarifa, actualizarTarifa, eliminarTarifa };

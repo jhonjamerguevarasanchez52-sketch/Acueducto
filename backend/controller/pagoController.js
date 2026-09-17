@@ -154,4 +154,44 @@ async function confirmarPagoManual(req, res) {
   }
 }
 
-module.exports = { misPagos, registrarPago, listarPagos, confirmarPagoManual };
+// Eliminar un pago registrado por error. Si ya fue confirmado, no se
+// permite borrarlo directamente porque la factura asociada ya quedó marcada
+// como pagada con base en él; primero hay que revertir esa confirmación.
+async function eliminarPago(req, res) {
+  const { id } = req.params;
+
+  try {
+    const { data: pago, error: errorBusqueda } = await supabaseAdmin
+      .from('payments')
+      .select('id, confirmado')
+      .eq('id', id)
+      .single();
+
+    if (errorBusqueda || !pago) {
+      return res.status(404).json({ error: 'Pago no encontrado' });
+    }
+
+    if (pago.confirmado) {
+      return res.status(409).json({
+        error: 'No se puede eliminar un pago ya confirmado, porque la factura quedó marcada como pagada con base en él.',
+      });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('payments')
+      .delete()
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Pago no encontrado' });
+    }
+
+    return res.status(200).json({ message: 'Pago eliminado', pago: data });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+module.exports = { misPagos, registrarPago, listarPagos, confirmarPagoManual, eliminarPago };

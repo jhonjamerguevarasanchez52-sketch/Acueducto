@@ -60,11 +60,19 @@ async function webhook(req, res) {
     const estadoWompi = trx.status; // APPROVED | DECLINED | VOIDED | ERROR
     const montoRecibidoCentavos = trx.amount_in_cents;
 
-    const { data: pago } = await supabaseAdmin
+    const { data: pago, error: pagoError } = await supabaseAdmin
       .from('payments')
       .select('id, confirmado, monto')
       .eq('id', referencia)
       .maybeSingle();
+
+    // Ya respondimos 200 a Wompi, así que no reintentará: si esto fue un
+    // error transitorio de la consulta (no "no encontrado"), lo dejamos bien
+    // distinguido en logs para poder reconciliar el pago a mano.
+    if (pagoError) {
+      console.error('[wompi] error consultando pago para referencia', referencia, ':', pagoError.message);
+      return;
+    }
 
     if (!pago) {
       console.warn('[wompi] pago no encontrado para referencia', referencia);
