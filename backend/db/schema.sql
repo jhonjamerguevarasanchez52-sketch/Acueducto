@@ -132,7 +132,7 @@ create table if not exists public.service_outages (
   perfil_id        uuid not null references public.profiles (id) on delete cascade,
   factura_id       uuid references public.invoices (id) on delete set null,
   motivo           text not null,
-  estado           text not null default 'activo' check (estado in ('activo', 'resuelto')),
+  estado           text not null default 'activo' check (estado in ('activo', 'reconectado', 'resuelto')),
   fecha_corte      timestamptz not null default now(),
   fecha_reconexion timestamptz
 );
