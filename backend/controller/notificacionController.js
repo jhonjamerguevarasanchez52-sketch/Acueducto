@@ -1,5 +1,4 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
-const { notificar } = require('../utils/notificar');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 // ---------- USUARIO FINAL ----------
@@ -148,8 +147,21 @@ async function enviarNotificacion(req, res) {
       return res.status(201).json({ message: `Notificación enviada a ${filas.length} usuarios` });
     }
 
-    await notificar(perfil_id, mensaje, tipo || 'general');
-    return res.status(201).json({ message: 'Notificación enviada' });
+    const { data, error } = await supabaseAdmin
+      .from('notifications')
+      .insert({
+        perfil_id,
+        mensaje,
+        tipo: tipo || 'general',
+        estado: 'no_leido',
+        fecha: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) return errorConsulta(res, error);
+
+    return res.status(201).json({ message: 'Notificación enviada', notificacion: data });
   } catch (err) {
     return errorInesperado(res, err);
   }

@@ -19,4 +19,14 @@ const limiteAuth = rateLimit({
   message: { error: 'Demasiados intentos. Espera unos minutos antes de volver a intentar.' },
 });
 
-module.exports = { limiteGeneral, limiteAuth };
+// Límite estricto para el chatbot: cada petición exitosa cuesta tokens de
+// Groq, así que necesita un techo propio más bajo que el general.
+const limiteChat = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados mensajes al asistente. Espera unos minutos antes de volver a intentar.' },
+});
+
+module.exports = { limiteGeneral, limiteAuth, limiteChat };

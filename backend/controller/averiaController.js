@@ -1,5 +1,7 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
+const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+const { aplicarPaginacion } = require('../utils/paginacion');
 
 const ESTADOS_VALIDOS = ['reportada', 'en_proceso', 'resuelta', 'cancelada'];
 
@@ -28,12 +30,11 @@ async function reportarAveria(req, res) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) return errorConsulta(res, error);
 
     res.status(201).json({ data });
   } catch (err) {
-    console.error('Error en reportarAveria:', err.message);
-    res.status(500).json({ error: 'Error al reportar la avería' });
+    return errorInesperado(res, err);
   }
 }
 
@@ -48,12 +49,11 @@ async function misAverias(req, res) {
       .eq('perfil_id', perfilId)
       .order('fecha_reporte', { ascending: false });
 
-    if (error) throw error;
+    if (error) return errorConsulta(res, error);
 
     res.status(200).json({ data });
   } catch (err) {
-    console.error('Error en misAverias:', err.message);
-    res.status(500).json({ error: 'Error al obtener tus averías' });
+    return errorInesperado(res, err);
   }
 }
 
@@ -64,7 +64,7 @@ async function misAverias(req, res) {
 // asignación, así que no se filtra por ella.
 async function listarAverias(req, res) {
   try {
-    const { estado } = req.query;
+    const { estado, limit, offset } = req.query;
 
     let query = supabaseAdmin
       .from('breakdowns')
@@ -72,14 +72,14 @@ async function listarAverias(req, res) {
       .order('fecha_reporte', { ascending: false });
 
     if (estado) query = query.eq('estado', estado);
+    query = aplicarPaginacion(query, { limit, offset });
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) return errorConsulta(res, error);
 
     res.status(200).json({ data });
   } catch (err) {
-    console.error('Error en listarAverias:', err.message);
-    res.status(500).json({ error: 'Error al obtener las averías' });
+    return errorInesperado(res, err);
   }
 }
 
@@ -109,7 +109,7 @@ async function actualizarAveria(req, res) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) return errorConsulta(res, error);
     if (!data) {
       return res.status(404).json({ error: 'Avería no encontrada' });
     }
@@ -122,8 +122,7 @@ async function actualizarAveria(req, res) {
 
     res.status(200).json({ data });
   } catch (err) {
-    console.error('Error en actualizarAveria:', err.message);
-    res.status(500).json({ error: 'Error al actualizar la avería' });
+    return errorInesperado(res, err);
   }
 }
 
@@ -146,8 +145,7 @@ async function eliminarAveria(req, res) {
 
     res.status(200).json({ message: 'Avería eliminada', data });
   } catch (err) {
-    console.error('Error en eliminarAveria:', err.message);
-    res.status(500).json({ error: 'Error al eliminar la avería' });
+    return errorInesperado(res, err);
   }
 }
 

@@ -158,6 +158,17 @@ async function reenviarCodigoVerificacion(req, res) {
     return res.status(400).json({ error: 'El correo es obligatorio' });
   }
 
+  // Contamos cada solicitud (exista o no la cuenta) para no revelar por
+  // temporización/bloqueo si el correo está registrado, y para frenar el
+  // "email-bombing" de códigos a una bandeja de entrada real.
+  const bloqueo = segundosDeBloqueo('reenviar', correo);
+  if (bloqueo) {
+    return res.status(429).json({
+      error: `Demasiadas solicitudes. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
+    });
+  }
+  registrarFallo('reenviar', correo);
+
   try {
     const { data: perfil, error: buscarError } = await supabaseAdmin
       .from('profiles')
@@ -269,6 +280,16 @@ async function solicitarRecuperacion(req, res) {
   if (!correo) {
     return res.status(400).json({ error: 'El correo es obligatorio' });
   }
+
+  // Igual que en reenviarCodigoVerificacion: contamos cada solicitud exista o
+  // no la cuenta, para no filtrar su existencia vía el bloqueo por spam.
+  const bloqueo = segundosDeBloqueo('recuperar', correo);
+  if (bloqueo) {
+    return res.status(429).json({
+      error: `Demasiadas solicitudes. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
+    });
+  }
+  registrarFallo('recuperar', correo);
 
   try {
     const { data: perfil, error: buscarError } = await supabaseAdmin

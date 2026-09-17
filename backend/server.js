@@ -97,7 +97,7 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: 'Error interno del servidor' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   const entorno = process.env.NODE_ENV || 'development';
   const linea = '─'.repeat(48);
 
@@ -112,5 +112,23 @@ app.listen(PORT, () => {
   console.log(`  ${'Iniciado'.padEnd(11)}: ${new Date().toISOString()}`);
   console.log(linea);
 });
+
+// Apagado ordenado: Railway envía SIGTERM en cada redeploy. Sin esto, las
+// peticiones en curso se cortan a mitad de camino en vez de completarse.
+function apagarOrdenadamente(señal) {
+  console.log(`\n[apagado] Señal ${señal} recibida, cerrando servidor...`);
+  server.close(() => {
+    console.log('[apagado] Servidor cerrado, no quedan conexiones activas.');
+    process.exit(0);
+  });
+  // Si algo queda colgado, no dejamos el proceso vivo indefinidamente.
+  setTimeout(() => {
+    console.error('[apagado] Tiempo de espera agotado, forzando salida.');
+    process.exit(1);
+  }, 10000).unref();
+}
+
+process.on('SIGTERM', () => apagarOrdenadamente('SIGTERM'));
+process.on('SIGINT', () => apagarOrdenadamente('SIGINT'));
 
 module.exports = app;

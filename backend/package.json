@@ -10,7 +10,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "probar-correo": "node scripts/probarCorreo.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",
@@ -23,7 +23,6 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
-    "google-auth-library": "^11.0.2",
     "groq-sdk": "^1.6.0",
     "helmet": "^8.3.0"
   },
