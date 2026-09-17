@@ -57,17 +57,24 @@ async function cambiarRol(req, res) {
     return res.status(400).json({ error: 'Rol inválido. Usa: administrador, usuario o fontanero' });
   }
 
-  // El acueducto contempla un único fontanero: si se asigna, se quita al anterior.
+  // El acueducto contempla un único fontanero a la vez: si ya hay uno asignado
+  // a otro usuario, hay que quitarle el rol (o eliminarlo) antes de asignar uno nuevo.
   try {
     if (rol === 'fontanero') {
-      const { error: errorDegradacion } = await supabaseAdmin
+      const { data: fontaneroExistente, error: errorBusqueda } = await supabaseAdmin
         .from('profiles')
-        .update({ rol: 'usuario' })
+        .select('id, nombre, apellido, correo')
         .eq('rol', 'fontanero')
-        .neq('id', userId);
+        .neq('id', userId)
+        .maybeSingle();
 
-      if (errorDegradacion) {
-        return errorConsulta(res, errorDegradacion);
+      if (errorBusqueda) {
+        return errorConsulta(res, errorBusqueda);
+      }
+      if (fontaneroExistente) {
+        return res.status(409).json({
+          error: `Ya existe un fontanero registrado (${fontaneroExistente.correo}). Cambia su rol o elimínalo antes de asignar uno nuevo.`,
+        });
       }
     }
 
@@ -153,10 +160,35 @@ async function cambiarEstadoUsuario(req, res) {
   }
 }
 
+// Eliminar un usuario por completo (Auth + perfil, en cascada)
+async function eliminarUsuario(req, res) {
+  const { userId } = req.params;
+
+  if (userId === req.usuario.id) {
+    return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta' });
+  }
+
+  try {
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+    if (error) {
+      if (/not found|no encontrado/i.test(error.message || '')) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+      return errorConsulta(res, error);
+    }
+
+    return res.status(200).json({ message: 'Usuario eliminado' });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
 module.exports = {
   verTodosUsuarios,
   verUsuario,
   cambiarRol,
   editarUsuario,
   cambiarEstadoUsuario,
+  eliminarUsuario,
 };

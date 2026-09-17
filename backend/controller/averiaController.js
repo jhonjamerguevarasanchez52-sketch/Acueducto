@@ -1,7 +1,41 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
+const { enviarCorreo } = require('../config/mailer');
 
 const ESTADOS_VALIDOS = ['reportada', 'en_proceso', 'resuelta', 'cancelada'];
+
+// Avisa por correo al/los fontanero(s) activos de una nueva avería reportada.
+// No lanza: si falla el envío, se registra el error y se sigue, para no
+// tumbar el reporte de la avería por un problema de correo.
+async function avisarFontaneroPorCorreo(averia) {
+  try {
+    const { data: fontaneros, error } = await supabaseAdmin
+      .from('profiles')
+      .select('correo')
+      .eq('rol', 'fontanero')
+      .eq('activo', true);
+
+    if (error) throw error;
+    if (!fontaneros || fontaneros.length === 0) return;
+
+    const html = `<p>Se reportó una nueva avería:</p>
+      <p><strong>Descripción:</strong> ${averia.descripcion}</p>
+      ${averia.zona ? `<p><strong>Zona:</strong> ${averia.zona}</p>` : ''}
+      <p><strong>Fecha:</strong> ${new Date(averia.fecha_reporte).toLocaleString('es-CO')}</p>`;
+
+    await Promise.all(
+      fontaneros.map((f) =>
+        enviarCorreo({
+          to: f.correo,
+          subject: 'Nueva avería reportada - Acueducto Campoamor',
+          html,
+        })
+      )
+    );
+  } catch (err) {
+    console.error('Error avisando al fontanero por correo:', err.message);
+  }
+}
 
 // ---------- USUARIO FINAL ----------
 
@@ -29,6 +63,8 @@ async function reportarAveria(req, res) {
       .single();
 
     if (error) throw error;
+
+    await avisarFontaneroPorCorreo(data);
 
     res.status(201).json({ data });
   } catch (err) {

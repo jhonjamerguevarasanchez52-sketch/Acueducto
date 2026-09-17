@@ -52,7 +52,6 @@ class _GotaFabState extends State<GotaFab>
         child: Container(
           width: 68,
           height: 68,
-          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppTheme.surfaceTint,
@@ -64,13 +63,19 @@ class _GotaFabState extends State<GotaFab>
               ),
             ],
           ),
-          child: Image.asset(
-            'assets/images/gota_mascota.png',
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => const Icon(
-              Icons.water_drop,
-              color: AppTheme.primary,
-              size: 34,
+          // ClipOval recorta la imagen al círculo del botón (la imagen es
+          // casi cuadrada, así que sin esto se saldría del borde) y
+          // BoxFit.cover hace que la mascota llene todo el círculo en vez de
+          // quedar pequeña con margen alrededor.
+          child: ClipOval(
+            child: Image.asset(
+              'assets/images/gota_mascota.png',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.water_drop,
+                color: AppTheme.primary,
+                size: 34,
+              ),
             ),
           ),
         ),

@@ -6,6 +6,7 @@ const {
   cambiarRol,
   editarUsuario,
   cambiarEstadoUsuario,
+  eliminarUsuario,
 } = require('../controller/adminController');
 const { verificarToken } = require('../middleware/authMiddleware');
 const verificarAdmin = require('../middleware/adminMiddleware');
@@ -18,5 +19,6 @@ router.get('/usuarios/:userId', verUsuario);
 router.put('/usuarios/:userId', editarUsuario);
 router.put('/usuarios/:userId/rol', cambiarRol);
 router.put('/usuarios/:userId/estado', cambiarEstadoUsuario);
+router.delete('/usuarios/:userId', eliminarUsuario);
 
 module.exports = router;
