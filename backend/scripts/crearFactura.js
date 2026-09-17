@@ -18,6 +18,7 @@
  */
 require('dotenv').config();
 const supabaseAdmin = require('../config/supabaseAdminClient');
+const { enviarCorreo } = require('../config/mailer');
 
 const VALOR_POR_DEFECTO = 15000;
 
@@ -110,6 +111,22 @@ async function main() {
   }
 
   // La notificación al usuario la crea un trigger de la BD al insertar la fila.
+
+  try {
+    await enviarCorreo({
+      to: perfil.correo,
+      subject: `Nueva factura - periodo ${periodo} - Acueducto Campoamor`,
+      html: `<p>Hola ${perfil.nombre || ''},</p>
+             <p>Se generó tu factura del periodo <strong>${periodo}</strong> por un valor de
+             <strong>$${valorTotal.toLocaleString('es-CO')}</strong>.</p>
+             <p>Fecha límite de pago: ${fechaVencimiento.toLocaleDateString('es-CO')}.</p>
+             <p>Puedes consultar el detalle desde la aplicación de Acueducto Campoamor.</p>`,
+    });
+    console.log('Correo enviado ✅');
+  } catch (mailErr) {
+    console.error('No se pudo enviar el correo de la factura ❌');
+    console.error(mailErr.message || mailErr);
+  }
 
   console.log('Factura creada ✅');
   console.log('---');

@@ -5,20 +5,10 @@ import '../models/factura.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-
-import '../widgets/gota_scaffold.dart';
-
-
 import '../utils/formato.dart';
+import '../widgets/gota_scaffold.dart';
 import '../widgets/pagar_sheet.dart';
 import 'estado_servicio_screen.dart';
-
-
-import 'averias_screen.dart';
-import 'estado_servicio_screen.dart';
-import 'facturas_screen.dart';
-import 'notificaciones_screen.dart';
-
 import 'pagos_screen.dart';
 
 /// Pestaña "Inicio": da la bienvenida al usuario, muestra la factura pendiente
@@ -86,22 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final perfil = auth.profile;
     final textTheme = Theme.of(context).textTheme;
 
-
     return GotaScaffold(
-      appBar: AppBar(
-        title: const Text('Acueducto Campo Amor'),
-        actions: [
-          IconButton(
-            tooltip: 'Cerrar sesión',
-            icon: const Icon(Icons.logout),
-            onPressed: () => _cerrarSesion(context),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
-
-    return Scaffold(
+      appBar: AppBar(title: const Text('Acueducto Campo Amor')),
       body: RefreshIndicator(
         onRefresh: _refrescar,
         child: ListView(
@@ -511,37 +487,7 @@ class _ProximaFactura extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _BotonPagar(onPressed: () => onPagar(factura)),
-
-          const SizedBox(height: 24),
-          Text('Módulos',
-              style:
-                  textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          _ModuloTile(
-            icon: Icons.receipt_long,
-            label: 'Mis facturas',
-            destino: () => const FacturasScreen(),
-          ),
-          _ModuloTile(
-            icon: Icons.payments_outlined,
-            label: 'Mis pagos',
-            destino: () => const PagosScreen(),
-          ),
-          _ModuloTile(
-            icon: Icons.build_outlined,
-            label: 'Averías',
-            destino: () => const AveriasScreen(),
-          ),
-          _ModuloTile(
-            icon: Icons.notifications_outlined,
-            label: 'Notificaciones',
-            destino: () => const NotificacionesScreen(),
-          ),
-          _ModuloTile(
-            icon: Icons.water_drop_outlined,
-            label: 'Estado del servicio',
-            destino: () => const EstadoServicioScreen(),
-        main
+          
         ],
       ),
     );
