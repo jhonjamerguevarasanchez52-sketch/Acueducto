@@ -6,6 +6,7 @@ const {
   listarFacturas,
   crearFactura,
   actualizarFactura,
+  eliminarFactura,
 } = require('../controller/facturaController');
 const { verificarToken } = require('../middleware/authMiddleware');
 const { verificarRol } = require('../middleware/roleMiddleware');
@@ -14,6 +15,7 @@ const { verificarRol } = require('../middleware/roleMiddleware');
 router.get('/todas', verificarToken, verificarRol('administrador'), listarFacturas);
 router.post('/', verificarToken, verificarRol('administrador'), crearFactura);
 router.put('/:id', verificarToken, verificarRol('administrador'), actualizarFactura);
+router.delete('/:id', verificarToken, verificarRol('administrador'), eliminarFactura);
 
 // --- Usuario final ---
 router.get('/', verificarToken, misFacturas);

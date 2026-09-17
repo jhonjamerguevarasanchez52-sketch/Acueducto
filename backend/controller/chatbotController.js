@@ -25,7 +25,9 @@ async function chatearConAsistente(req, res) {
       return res.status(400).json({ error: 'Debes enviar un mensaje válido.' });
     }
 
-    // req.usuario lo pone authMiddleware (verificarToken) tras validar el JWT
+    // req.usuario lo pone authOpcional cuando la petición trae un token válido;
+    // si es anónima, perfilId queda undefined y GOTA responde solo con la
+    // información general del acueducto.
     const perfilId = req.usuario?.id;
 
     // --- 1. Contexto general: tarifas vigentes ---

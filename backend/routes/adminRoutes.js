@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
+  crearUsuario,
   verTodosUsuarios,
   verUsuario,
   cambiarRol,
@@ -14,6 +15,7 @@ const verificarAdmin = require('../middleware/adminMiddleware');
 // Todo el módulo de administración requiere token + rol administrador
 router.use(verificarToken, verificarAdmin);
 
+router.post('/usuarios', crearUsuario);
 router.get('/usuarios', verTodosUsuarios);
 router.get('/usuarios/:userId', verUsuario);
 router.put('/usuarios/:userId', editarUsuario);

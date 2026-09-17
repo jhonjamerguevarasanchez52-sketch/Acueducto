@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { chatearConAsistente } = require('../controller/chatbotController');
-// const { verificarToken } = require('../middleware/authMiddleware'); // si aplica
+const { autenticacionOpcional } = require('../middleware/authOpcional');
 
-router.post('/', chatearConAsistente);
-// o con auth: router.post('/', verificarToken, chatearConAsistente);
+// Autenticación opcional: si viene un token válido, GOTA personaliza la
+// respuesta con los datos del usuario (facturas, averías); si no, responde
+// igual con la información general del acueducto.
+router.post('/', autenticacionOpcional, chatearConAsistente);
 
 module.exports = router;

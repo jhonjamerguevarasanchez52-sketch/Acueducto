@@ -52,11 +52,15 @@ async function iniciarSesion(req, res) {
     }
 
     // Exigimos que la cuenta esté verificada por código antes de permitir el acceso.
-    const { data: perfil } = await supabaseAdmin
+    const { data: perfil, error: perfilError } = await supabaseAdmin
       .from('profiles')
-      .select('is_verified, activo')
+      .select('is_verified, activo, debe_cambiar_password')
       .eq('id', data.user.id)
       .single();
+
+    if (perfilError) {
+      return errorConsulta(res, perfilError);
+    }
 
     if (!perfil || perfil.is_verified !== true) {
       return res.status(403).json({
@@ -74,6 +78,9 @@ async function iniciarSesion(req, res) {
       message: 'Inicio de sesión exitoso',
       session: data.session,
       user: data.user,
+      // El frontend usa esto para forzar la pantalla de cambio de contraseña
+      // cuando la cuenta fue creada por un administrador con clave temporal.
+      debeCambiarPassword: perfil.debe_cambiar_password === true,
     });
   } catch (err) {
     return errorInesperado(res, err);
@@ -193,6 +200,62 @@ async function reenviarCodigoVerificacion(req, res) {
     }
 
     return res.status(200).json(mensajeGenerico);
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+// --- CAMBIO DE CONTRASEÑA (usuario autenticado) ---
+
+// Usada tras el primer login con una contraseña temporal generada por un
+// administrador, pero también sirve como cambio de contraseña voluntario.
+async function cambiarPasswordPropio(req, res) {
+  const userId = req.usuario.id;
+  const correo = normalizarCorreo(req.usuario.email);
+  const { passwordActual, passwordNueva } = req.body;
+
+  if (!passwordActual || !passwordNueva) {
+    return res.status(400).json({ error: 'La contraseña actual y la nueva son obligatorias' });
+  }
+
+  if (String(passwordNueva).length < 8) {
+    return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+  }
+
+  if (passwordNueva === passwordActual) {
+    return res.status(400).json({ error: 'La nueva contraseña debe ser distinta de la actual' });
+  }
+
+  try {
+    // Confirmamos la contraseña actual reautenticando contra Supabase Auth,
+    // en vez de confiar en que quien llama con el token es realmente el dueño.
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: correo,
+      password: passwordActual,
+    });
+
+    if (authError) {
+      return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+    }
+
+    const { error: updateAuthError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password: passwordNueva,
+    });
+
+    if (updateAuthError) {
+      return errorConsulta(res, updateAuthError);
+    }
+
+    const { error: updatePerfilError } = await supabaseAdmin
+      .from('profiles')
+      .update({ debe_cambiar_password: false })
+      .eq('id', userId);
+
+    if (updatePerfilError) {
+      return errorConsulta(res, updatePerfilError);
+    }
+
+    return res.status(200).json({ message: 'Contraseña actualizada con éxito' });
   } catch (err) {
     return errorInesperado(res, err);
   }
@@ -336,6 +399,7 @@ module.exports = {
   iniciarSesion,
   verificarCuenta,
   reenviarCodigoVerificacion,
+  cambiarPasswordPropio,
   solicitarRecuperacion,
   resetearPassword,
 };
