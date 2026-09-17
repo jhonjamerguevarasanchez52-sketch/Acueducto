@@ -91,6 +91,30 @@ async function marcarTodasLeidas(req, res) {
   }
 }
 
+// Eliminar una notificación propia
+async function eliminarNotificacion(req, res) {
+  const userId = req.usuario.id;
+  const { id } = req.params;
+
+  try {
+    const { data, error } = await req.db
+      .from('notifications')
+      .delete()
+      .eq('id', id)
+      .eq('perfil_id', userId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Notificación no encontrada' });
+    }
+
+    return res.status(200).json({ message: 'Notificación eliminada', notificacion: data });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
 // ---------- ADMINISTRADOR ----------
 
 // Enviar una notificación a un usuario, o a todos (perfil_id: "todos")
@@ -136,5 +160,6 @@ module.exports = {
   contarNoLeidas,
   marcarLeida,
   marcarTodasLeidas,
+  eliminarNotificacion,
   enviarNotificacion,
 };

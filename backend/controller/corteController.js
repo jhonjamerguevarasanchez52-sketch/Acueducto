@@ -52,7 +52,7 @@ async function estadoServicio(req, res) {
 
 // ---------- ADMINISTRADOR ----------
 
-// Ver todos los cortes, con filtro opcional ?estado=activo|resuelto
+// Ver todos los cortes, con filtro opcional ?estado=activo|reconectado
 async function listarCortes(req, res) {
   const { estado, perfil_id } = req.query;
 
@@ -84,12 +84,16 @@ async function crearCorte(req, res) {
 
   try {
     // No duplicar un corte activo para el mismo usuario
-    const { data: existente } = await supabaseAdmin
+    const { data: existente, error: existenteError } = await supabaseAdmin
       .from('service_outages')
       .select('id')
       .eq('perfil_id', perfil_id)
       .eq('estado', 'activo')
       .maybeSingle();
+
+    if (existenteError) {
+      return errorConsulta(res, existenteError);
+    }
 
     if (existente) {
       return res.status(409).json({ error: 'El usuario ya tiene un corte de servicio activo' });
@@ -138,7 +142,7 @@ async function reconectar(req, res) {
     const { data, error } = await supabaseAdmin
       .from('service_outages')
       .update({
-        estado: 'resuelto',
+        estado: 'reconectado',
         fecha_reconexion: new Date().toISOString(),
       })
       .eq('id', id)
@@ -157,4 +161,26 @@ async function reconectar(req, res) {
   }
 }
 
-module.exports = { misCortes, estadoServicio, listarCortes, crearCorte, reconectar };
+// Eliminar un registro de corte (por ejemplo, uno creado por error)
+async function eliminarCorte(req, res) {
+  const { id } = req.params;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('service_outages')
+      .delete()
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Corte no encontrado' });
+    }
+
+    return res.status(200).json({ message: 'Corte eliminado', corte: data });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+module.exports = { misCortes, estadoServicio, listarCortes, crearCorte, reconectar, eliminarCorte };

@@ -7,7 +7,7 @@ const CAMPOS_EDITABLES_PERFIL = [
 // Columnas seguras de "profiles": excluye los códigos de un solo uso de
 // verificación/recuperación de contraseña, que nunca deben salir de authController.
 const COLUMNAS_PERFIL_PUBLICO =
-  'id, nombre, apellido, correo, rol, activo, is_verified, ' +
+  'id, nombre, apellido, correo, rol, activo, is_verified, debe_cambiar_password, ' +
   'telefono, numero_lote, direccion, ocupacion, zona, created_at';
 
 module.exports = { CAMPOS_EDITABLES_PERFIL, COLUMNAS_PERFIL_PUBLICO };
