@@ -58,7 +58,7 @@ class PerfilScreen extends StatelessWidget {
                   radius: 40,
                   backgroundColor: AppTheme.surfaceTint,
                   child: const Icon(Icons.person,
-                      color: AppTheme.primaryDark, size: 44),
+                      color: Color.fromARGB(255, 91, 153, 247), size: 44),
                 ),
                 const SizedBox(height: 12),
                 Text(

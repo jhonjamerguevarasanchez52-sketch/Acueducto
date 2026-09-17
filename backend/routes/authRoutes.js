@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 
 const {
-  registrar,
   iniciarSesion,
   verificarCuenta,
   reenviarCodigoVerificacion,
@@ -16,7 +15,8 @@ const { verificarToken } = require('../middleware/authMiddleware');
 // Todas las rutas de autenticación pasan por el límite estricto de intentos.
 router.use(limiteAuth);
 
-router.post('/registro', registrar);
+// No hay auto-registro: las cuentas las crea el administrador con
+// `scripts/crearUsuario.js`. Por eso no se expone ninguna ruta de registro.
 router.post('/login', iniciarSesion);
 
 // TODO: login con Google pendiente de reimplementar con Supabase
