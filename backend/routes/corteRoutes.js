@@ -6,6 +6,7 @@ const {
   listarCortes,
   crearCorte,
   reconectar,
+  eliminarCorte,
 } = require('../controller/corteController');
 const { verificarToken } = require('../middleware/authMiddleware');
 const { verificarRol } = require('../middleware/roleMiddleware');
@@ -18,5 +19,6 @@ router.get('/estado', verificarToken, estadoServicio);
 router.get('/', verificarToken, verificarRol('administrador'), listarCortes);
 router.post('/', verificarToken, verificarRol('administrador'), crearCorte);
 router.put('/:id/reconectar', verificarToken, verificarRol('administrador'), reconectar);
+router.delete('/:id', verificarToken, verificarRol('administrador'), eliminarCorte);
 
 module.exports = router;

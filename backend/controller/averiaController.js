@@ -127,4 +127,28 @@ async function actualizarAveria(req, res) {
   }
 }
 
-module.exports = { reportarAveria, misAverias, listarAverias, actualizarAveria };
+// DELETE /:id - el fontanero o el administrador borran un reporte
+// erróneo o duplicado.
+async function eliminarAveria(req, res) {
+  try {
+    const { id } = req.params;
+
+    const { data, error } = await supabaseAdmin
+      .from('breakdowns')
+      .delete()
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Avería no encontrada' });
+    }
+
+    res.status(200).json({ message: 'Avería eliminada', data });
+  } catch (err) {
+    console.error('Error en eliminarAveria:', err.message);
+    res.status(500).json({ error: 'Error al eliminar la avería' });
+  }
+}
+
+module.exports = { reportarAveria, misAverias, listarAverias, actualizarAveria, eliminarAveria };

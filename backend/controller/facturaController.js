@@ -164,10 +164,48 @@ async function actualizarFactura(req, res) {
   }
 }
 
+// Eliminar una factura (solo si no tiene pagos registrados; si ya tiene
+// pagos, se debe anular con actualizarFactura en vez de borrarla, para no
+// perder el historial de pagos).
+async function eliminarFactura(req, res) {
+  const { id } = req.params;
+
+  try {
+    const { count, error: errorPagos } = await supabaseAdmin
+      .from('payments')
+      .select('*', { count: 'exact', head: true })
+      .eq('factura_id', id);
+
+    if (errorPagos) return errorConsulta(res, errorPagos);
+
+    if (count > 0) {
+      return res.status(409).json({
+        error: 'No se puede eliminar una factura con pagos registrados. Anúlala en su lugar.',
+      });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('invoices')
+      .delete()
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Factura no encontrada' });
+    }
+
+    return res.status(200).json({ message: 'Factura eliminada', factura: data });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
 module.exports = {
   misFacturas,
   verFactura,
   listarFacturas,
   crearFactura,
   actualizarFactura,
+  eliminarFactura,
 };
