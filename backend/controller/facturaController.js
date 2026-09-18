@@ -1,6 +1,28 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
+const { enviarCorreo } = require('../config/mailer');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+
+function formatearMoneda(valor) {
+  return Number(valor).toLocaleString('es-CO');
+}
+
+async function enviarCorreoFactura({ correo, nombre, periodo, valorTotal, fechaVencimiento }) {
+  if (!correo) return;
+  try {
+    await enviarCorreo({
+      to: correo,
+      subject: `Nueva factura - periodo ${periodo} - Acueducto Campoamor`,
+      html: `<p>Hola ${nombre || ''},</p>
+             <p>Se generó tu factura del periodo <strong>${periodo}</strong> por un valor de
+             <strong>$${formatearMoneda(valorTotal)}</strong>.</p>
+             ${fechaVencimiento ? `<p>Fecha límite de pago: ${new Date(fechaVencimiento).toLocaleDateString('es-CO')}.</p>` : ''}
+             <p>Puedes consultar el detalle desde la aplicación de Acueducto Campoamor.</p>`,
+    });
+  } catch (mailErr) {
+    console.error('Error enviando correo de factura:', mailErr.message);
+  }
+}
 
 // ---------- USUARIO FINAL ----------
 
@@ -90,7 +112,7 @@ async function crearFactura(req, res) {
     // Verificamos que el usuario destino exista
     const { data: perfil, error: perfilError } = await supabaseAdmin
       .from('profiles')
-      .select('id')
+      .select('id, nombre, correo')
       .eq('id', perfil_id)
       .single();
 
@@ -119,6 +141,14 @@ async function crearFactura(req, res) {
       `Se generó tu factura del periodo ${periodo} por $${valor_total}.`,
       'factura'
     );
+
+    await enviarCorreoFactura({
+      correo: perfil.correo,
+      nombre: perfil.nombre,
+      periodo,
+      valorTotal: valor_total,
+      fechaVencimiento: fecha_vencimiento,
+    });
 
     return res.status(201).json({ message: 'Factura creada', factura: data });
   } catch (err) {
