@@ -1,4 +1,5 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const notificationModel = require('../models/notificationModel');
+const profileModel = require('../models/profileModel');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 // ---------- USUARIO FINAL ----------
@@ -8,11 +9,7 @@ async function misNotificaciones(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await req.db
-      .from('notifications')
-      .select('*')
-      .eq('perfil_id', userId)
-      .order('fecha', { ascending: false });
+    const { data, error } = await notificationModel.listByProfile(userId, req.db);
 
     if (error) {
       return errorConsulta(res, error);
@@ -29,11 +26,7 @@ async function contarNoLeidas(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { count, error } = await req.db
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('perfil_id', userId)
-      .eq('estado', 'no_leido');
+    const { count, error } = await notificationModel.countUnread(userId, req.db);
 
     if (error) {
       return errorConsulta(res, error);
@@ -51,13 +44,7 @@ async function marcarLeida(req, res) {
   const { id } = req.params;
 
   try {
-    const { data, error } = await req.db
-      .from('notifications')
-      .update({ estado: 'leido' })
-      .eq('id', id)
-      .eq('perfil_id', userId)
-      .select()
-      .single();
+    const { data, error } = await notificationModel.markRead(id, userId, req.db);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Notificación no encontrada' });
@@ -74,11 +61,7 @@ async function marcarTodasLeidas(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { error } = await req.db
-      .from('notifications')
-      .update({ estado: 'leido' })
-      .eq('perfil_id', userId)
-      .eq('estado', 'no_leido');
+    const { error } = await notificationModel.markAllRead(userId, req.db);
 
     if (error) {
       return errorConsulta(res, error);
@@ -96,13 +79,7 @@ async function eliminarNotificacion(req, res) {
   const { id } = req.params;
 
   try {
-    const { data, error } = await req.db
-      .from('notifications')
-      .delete()
-      .eq('id', id)
-      .eq('perfil_id', userId)
-      .select()
-      .single();
+    const { data, error } = await notificationModel.removeOwn(id, userId, req.db);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Notificación no encontrada' });
@@ -126,38 +103,20 @@ async function enviarNotificacion(req, res) {
 
   try {
     if (perfil_id === 'todos') {
-      const { data: perfiles, error: perfilesError } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('activo', true);
+      const { data: perfiles, error: perfilesError } = await profileModel.listActiveIds();
 
       if (perfilesError) return errorConsulta(res, perfilesError);
 
-      const filas = perfiles.map((p) => ({
-        perfil_id: p.id,
-        mensaje,
-        tipo: tipo || 'general',
-        estado: 'no_leido',
-        fecha: new Date().toISOString(),
-      }));
-
-      const { error } = await supabaseAdmin.from('notifications').insert(filas);
+      const { error } = await notificationModel.createMany(
+        perfiles.map((p) => p.id),
+        { mensaje, tipo }
+      );
       if (error) return errorConsulta(res, error);
 
-      return res.status(201).json({ message: `Notificación enviada a ${filas.length} usuarios` });
+      return res.status(201).json({ message: `Notificación enviada a ${perfiles.length} usuarios` });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('notifications')
-      .insert({
-        perfil_id,
-        mensaje,
-        tipo: tipo || 'general',
-        estado: 'no_leido',
-        fecha: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const { data, error } = await notificationModel.create({ perfil_id, mensaje, tipo });
 
     if (error) return errorConsulta(res, error);
 

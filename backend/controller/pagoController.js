@@ -1,8 +1,8 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const paymentModel = require('../models/paymentModel');
+const invoiceModel = require('../models/invoiceModel');
 const { confirmarPago } = require('../services/pagosService');
 const { calcularFirmaIntegridad } = require('../utils/wompiFirma');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
-const { aplicarPaginacion } = require('../utils/paginacion');
 
 const WOMPI_CURRENCY = process.env.WOMPI_CURRENCY || 'COP';
 
@@ -13,11 +13,7 @@ async function misPagos(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await req.db
-      .from('payments')
-      .select('*')
-      .eq('perfil_id', userId)
-      .order('fecha_pago', { ascending: false });
+    const { data, error } = await paymentModel.listByProfile(userId, req.db);
 
     if (error) {
       return errorConsulta(res, error);
@@ -40,12 +36,10 @@ async function registrarPago(req, res) {
 
   try {
     // Verifica que la factura le pertenezca al usuario antes de aceptar el pago
-    const { data: factura, error: errorFactura } = await req.db
-      .from('invoices')
-      .select('id, perfil_id, valor_total, estado')
-      .eq('id', factura_id)
-      .eq('perfil_id', userId)
-      .single();
+    const { data: factura, error: errorFactura } = await invoiceModel.getOwn(factura_id, userId, {
+      columns: 'id, perfil_id, valor_total, estado',
+      db: req.db,
+    });
 
     if (errorFactura || !factura) {
       return res.status(404).json({ error: 'Factura no encontrada o no te pertenece' });
@@ -62,12 +56,10 @@ async function registrarPago(req, res) {
     // Evita ensuciar el panel de pagos pendientes con duplicados por doble
     // clic o reintentos del frontend: solo un pago sin confirmar a la vez
     // por factura.
-    const { data: pagoPendiente, error: errorPendiente } = await req.db
-      .from('payments')
-      .select('id')
-      .eq('factura_id', factura_id)
-      .eq('confirmado', false)
-      .maybeSingle();
+    const { data: pagoPendiente, error: errorPendiente } = await paymentModel.findPendingByInvoice(
+      factura_id,
+      req.db
+    );
 
     if (errorPendiente) {
       return errorConsulta(res, errorPendiente);
@@ -83,19 +75,10 @@ async function registrarPago(req, res) {
     // factura, para que nadie pueda registrar un pago por menos de lo debido.
     const monto = factura.valor_total;
 
-    const { data, error } = await req.db
-      .from('payments')
-      .insert({
-        factura_id,
-        perfil_id: userId,
-        monto,
-        metodo,
-        referencia: referencia || null,
-        confirmado: false,
-        fecha_pago: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const { data, error } = await paymentModel.create(
+      { factura_id, perfil_id: userId, monto, metodo, referencia },
+      req.db
+    );
 
     if (error) {
       return errorConsulta(res, error);
@@ -139,17 +122,7 @@ async function listarPagos(req, res) {
   const { confirmado, perfil_id, limit, offset } = req.query;
 
   try {
-    let query = supabaseAdmin
-      .from('payments')
-      .select('*')
-      .order('fecha_pago', { ascending: false });
-
-    if (confirmado === 'true') query = query.eq('confirmado', true);
-    if (confirmado === 'false') query = query.eq('confirmado', false);
-    if (perfil_id) query = query.eq('perfil_id', perfil_id);
-    query = aplicarPaginacion(query, { limit, offset });
-
-    const { data, error } = await query;
+    const { data, error } = await paymentModel.list({ confirmado, perfil_id, limit, offset });
     if (error) return errorConsulta(res, error);
 
     return res.status(200).json(data);
@@ -183,11 +156,7 @@ async function eliminarPago(req, res) {
   const { id } = req.params;
 
   try {
-    const { data: pago, error: errorBusqueda } = await supabaseAdmin
-      .from('payments')
-      .select('id, confirmado')
-      .eq('id', id)
-      .single();
+    const { data: pago, error: errorBusqueda } = await paymentModel.getById(id, 'id, confirmado');
 
     if (errorBusqueda || !pago) {
       return res.status(404).json({ error: 'Pago no encontrado' });
@@ -199,12 +168,7 @@ async function eliminarPago(req, res) {
       });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('payments')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await paymentModel.remove(id);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Pago no encontrado' });

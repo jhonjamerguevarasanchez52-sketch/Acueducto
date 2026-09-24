@@ -1,10 +1,10 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
-const { CAMPOS_EDITABLES_PERFIL, COLUMNAS_PERFIL_PUBLICO } = require('../utils/perfilCampos');
+const authModel = require('../models/authModel');
+const profileModel = require('../models/profileModel');
+const { CAMPOS_EDITABLES_PERFIL } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
 const { enviarCorreo } = require('../config/mailer');
 const { notificar } = require('../utils/notificar');
-const { aplicarPaginacion } = require('../utils/paginacion');
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
@@ -33,11 +33,7 @@ async function crearUsuario(req, res) {
   let userId;
 
   try {
-    const { data: creado, error: crearError } = await supabaseAdmin.auth.admin.createUser({
-      email: correo,
-      password: passwordTemporal,
-      email_confirm: true,
-    });
+    const { data: creado, error: crearError } = await authModel.createUser(correo, passwordTemporal);
 
     if (crearError) {
       const yaExiste = /already been registered|already exists|duplicate/i.test(crearError.message);
@@ -50,18 +46,15 @@ async function crearUsuario(req, res) {
 
     // El acueducto contempla un único fontanero: si se asigna, se quita al anterior.
     if (rol === 'fontanero') {
-      const { error: errorDegradacion } = await supabaseAdmin
-        .from('profiles')
-        .update({ rol: 'usuario' })
-        .eq('rol', 'fontanero');
+      const { error: errorDegradacion } = await profileModel.demotePlumbers();
 
       if (errorDegradacion) {
-        await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
+        await authModel.deleteUser(userId).catch(() => {});
         return errorConsulta(res, errorDegradacion);
       }
     }
 
-    const { error: profileError } = await supabaseAdmin.from('profiles').insert({
+    const { error: profileError } = await profileModel.create({
       id: userId,
       nombre,
       apellido,
@@ -74,7 +67,7 @@ async function crearUsuario(req, res) {
 
     if (profileError) {
       // Evitamos dejar un usuario huérfano en auth.users sin perfil asociado.
-      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
+      await authModel.deleteUser(userId).catch(() => {});
       return errorConsulta(res, profileError);
     }
 
@@ -107,7 +100,7 @@ async function crearUsuario(req, res) {
     });
   } catch (err) {
     if (userId) {
-      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
+      await authModel.deleteUser(userId).catch(() => {});
     }
     return errorInesperado(res, err);
   }
@@ -118,17 +111,7 @@ async function verTodosUsuarios(req, res) {
   const { rol, activo, limit, offset } = req.query;
 
   try {
-    let query = supabaseAdmin
-      .from('profiles')
-      .select(COLUMNAS_PERFIL_PUBLICO)
-      .order('created_at', { ascending: false });
-
-    if (rol) query = query.eq('rol', rol);
-    if (activo === 'true') query = query.eq('activo', true);
-    if (activo === 'false') query = query.eq('activo', false);
-    query = aplicarPaginacion(query, { limit, offset });
-
-    const { data, error } = await query;
+    const { data, error } = await profileModel.list({ rol, activo, limit, offset });
     if (error) return errorConsulta(res, error);
 
     return res.status(200).json(data);
@@ -142,11 +125,7 @@ async function verUsuario(req, res) {
   const { userId } = req.params;
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .select(COLUMNAS_PERFIL_PUBLICO)
-      .eq('id', userId)
-      .single();
+    const { data, error } = await profileModel.getById(userId);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -171,29 +150,14 @@ async function cambiarRol(req, res) {
   // a otro usuario, hay que quitarle el rol (o eliminarlo) antes de asignar uno nuevo.
   try {
     if (rol === 'fontanero') {
-      const { data: fontaneroExistente, error: errorBusqueda } = await supabaseAdmin
-        .from('profiles')
-        .select('id, nombre, apellido, correo')
-        .eq('rol', 'fontanero')
-        .neq('id', userId)
-        .maybeSingle();
+      const { error: errorDegradacion } = await profileModel.demotePlumbers(userId);
 
-      if (errorBusqueda) {
-        return errorConsulta(res, errorBusqueda);
-      }
-      if (fontaneroExistente) {
-        return res.status(409).json({
-          error: `Ya existe un fontanero registrado (${fontaneroExistente.correo}). Cambia su rol o elimínalo antes de asignar uno nuevo.`,
-        });
+      if (errorDegradacion) {
+        return errorConsulta(res, errorDegradacion);
       }
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .update({ rol })
-      .eq('id', userId)
-      .select(COLUMNAS_PERFIL_PUBLICO)
-      .single();
+    const { data, error } = await profileModel.update(userId, { rol });
 
     if (error || !data) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -219,12 +183,7 @@ async function editarUsuario(req, res) {
   }
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .update(cambios)
-      .eq('id', userId)
-      .select(COLUMNAS_PERFIL_PUBLICO)
-      .single();
+    const { data, error } = await profileModel.update(userId, cambios);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -250,12 +209,7 @@ async function cambiarEstadoUsuario(req, res) {
   }
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .update({ activo })
-      .eq('id', userId)
-      .select(COLUMNAS_PERFIL_PUBLICO)
-      .single();
+    const { data, error } = await profileModel.update(userId, { activo });
 
     if (error || !data) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -285,7 +239,7 @@ async function eliminarUsuario(req, res) {
   }
 
   try {
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    const { error } = await authModel.deleteUser(userId);
 
     if (error) {
       const noExiste = /not found|no rows/i.test(error.message);

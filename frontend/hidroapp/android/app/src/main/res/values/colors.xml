@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#22130C</color>
+    <!-- Mismo azul del fondo del splash animado de Flutter (WelcomeScreen). -->
+    <color name="splash_background">#0A3665</color>
 </resources>

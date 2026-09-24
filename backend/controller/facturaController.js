@@ -1,8 +1,9 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const invoiceModel = require('../models/invoiceModel');
+const paymentModel = require('../models/paymentModel');
+const profileModel = require('../models/profileModel');
 const { notificar } = require('../utils/notificar');
 const { enviarCorreo } = require('../config/mailer');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
-const { aplicarPaginacion } = require('../utils/paginacion');
 
 function formatearMoneda(valor) {
   return Number(valor).toLocaleString('es-CO');
@@ -32,11 +33,7 @@ async function misFacturas(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await req.db
-      .from('invoices')
-      .select('*')
-      .eq('perfil_id', userId)
-      .order('fecha_emision', { ascending: false });
+    const { data, error } = await invoiceModel.listByProfile(userId, req.db);
 
     if (error) {
       return errorConsulta(res, error);
@@ -54,12 +51,8 @@ async function verFactura(req, res) {
   const { id } = req.params;
 
   try {
-    const { data, error } = await req.db
-      .from('invoices')
-      .select('*')
-      .eq('id', id)
-      .eq('perfil_id', userId) // asegura que solo vea sus propias facturas
-      .single();
+    // getOwn asegura que solo vea sus propias facturas
+    const { data, error } = await invoiceModel.getOwn(id, userId, { db: req.db });
 
     if (error) {
       return res.status(404).json({ error: 'Factura no encontrada' });
@@ -78,16 +71,7 @@ async function listarFacturas(req, res) {
   const { estado, perfil_id, limit, offset } = req.query;
 
   try {
-    let query = supabaseAdmin
-      .from('invoices')
-      .select('*')
-      .order('fecha_emision', { ascending: false });
-
-    if (estado) query = query.eq('estado', estado);
-    if (perfil_id) query = query.eq('perfil_id', perfil_id);
-    query = aplicarPaginacion(query, { limit, offset });
-
-    const { data, error } = await query;
+    const { data, error } = await invoiceModel.list({ estado, perfil_id, limit, offset });
     if (error) return errorConsulta(res, error);
 
     return res.status(200).json(data);
@@ -112,29 +96,21 @@ async function crearFactura(req, res) {
 
   try {
     // Verificamos que el usuario destino exista
-    const { data: perfil, error: perfilError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, nombre, correo')
-      .eq('id', perfil_id)
-      .single();
+    const { data: perfil, error: perfilError } = await profileModel.getById(perfil_id, {
+      columns: 'id, nombre, correo',
+    });
 
     if (perfilError || !perfil) {
       return res.status(404).json({ error: 'El usuario indicado no existe' });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('invoices')
-      .insert({
-        perfil_id,
-        periodo,
-        valor_total,
-        estado: 'pendiente',
-        fecha_emision: new Date().toISOString(),
-        fecha_vencimiento: fecha_vencimiento || null,
-        observacion: observacion || null,
-      })
-      .select()
-      .single();
+    const { data, error } = await invoiceModel.create({
+      perfil_id,
+      periodo,
+      valor_total,
+      fecha_vencimiento,
+      observacion,
+    });
 
     if (error) return errorConsulta(res, error);
 
@@ -179,12 +155,7 @@ async function actualizarFactura(req, res) {
   }
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from('invoices')
-      .update(cambios)
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await invoiceModel.update(id, cambios);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Factura no encontrada' });
@@ -203,10 +174,7 @@ async function eliminarFactura(req, res) {
   const { id } = req.params;
 
   try {
-    const { count, error: errorPagos } = await supabaseAdmin
-      .from('payments')
-      .select('*', { count: 'exact', head: true })
-      .eq('factura_id', id);
+    const { count, error: errorPagos } = await paymentModel.countByInvoice(id);
 
     if (errorPagos) return errorConsulta(res, errorPagos);
 
@@ -216,12 +184,7 @@ async function eliminarFactura(req, res) {
       });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('invoices')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await invoiceModel.remove(id);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Factura no encontrada' });

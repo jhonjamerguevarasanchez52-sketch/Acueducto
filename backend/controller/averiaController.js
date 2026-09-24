@@ -1,8 +1,7 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const breakdownModel = require('../models/breakdownModel');
 const { notificar } = require('../utils/notificar');
 const { enviarCorreo } = require('../config/mailer');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
-const { aplicarPaginacion } = require('../utils/paginacion');
 
 const ESTADOS_VALIDOS = ['reportada', 'en_proceso', 'resuelta', 'cancelada'];
 
@@ -52,17 +51,10 @@ async function reportarAveria(req, res) {
       return res.status(400).json({ error: 'La descripción es obligatoria' });
     }
 
-    const { data, error } = await req.db
-      .from('breakdowns')
-      .insert({
-        perfil_id: perfilId,
-        descripcion: descripcion.trim(),
-        zona: zonaUsuario || null,
-        estado: 'reportada',
-        fecha_reporte: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const { data, error } = await breakdownModel.create(
+      { perfil_id: perfilId, descripcion: descripcion.trim(), zona: zonaUsuario },
+      req.db
+    );
 
     if (error) return errorConsulta(res, error);
 
@@ -79,11 +71,7 @@ async function misAverias(req, res) {
   try {
     const perfilId = req.usuario.id;
 
-    const { data, error } = await req.db
-      .from('breakdowns')
-      .select('*')
-      .eq('perfil_id', perfilId)
-      .order('fecha_reporte', { ascending: false });
+    const { data, error } = await breakdownModel.listByProfile(perfilId, req.db);
 
     if (error) return errorConsulta(res, error);
 
@@ -102,15 +90,7 @@ async function listarAverias(req, res) {
   try {
     const { estado, limit, offset } = req.query;
 
-    let query = supabaseAdmin
-      .from('breakdowns')
-      .select('*')
-      .order('fecha_reporte', { ascending: false });
-
-    if (estado) query = query.eq('estado', estado);
-    query = aplicarPaginacion(query, { limit, offset });
-
-    const { data, error } = await query;
+    const { data, error } = await breakdownModel.list({ estado, limit, offset });
     if (error) return errorConsulta(res, error);
 
     res.status(200).json({ data });
@@ -138,12 +118,7 @@ async function actualizarAveria(req, res) {
       actualizacion.fecha_resolucion = new Date().toISOString();
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('breakdowns')
-      .update(actualizacion)
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await breakdownModel.update(id, actualizacion);
 
     if (error) return errorConsulta(res, error);
     if (!data) {
@@ -168,12 +143,7 @@ async function eliminarAveria(req, res) {
   try {
     const { id } = req.params;
 
-    const { data, error } = await supabaseAdmin
-      .from('breakdowns')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await breakdownModel.remove(id);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Avería no encontrada' });

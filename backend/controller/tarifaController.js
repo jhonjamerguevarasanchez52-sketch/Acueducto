@@ -1,4 +1,4 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const rateModel = require('../models/rateModel');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 // ---------- LECTURA (cualquier usuario autenticado) ----------
@@ -6,10 +6,7 @@ const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 // Ver todas las tarifas
 async function verTarifas(req, res) {
   try {
-    const { data, error } = await req.db
-      .from('rates')
-      .select('*')
-      .order('vigente_desde', { ascending: false });
+    const { data, error } = await rateModel.list(req.db);
 
     if (error) {
       return errorConsulta(res, error);
@@ -26,15 +23,7 @@ async function tarifaVigente(req, res) {
   const hoy = new Date().toISOString().split('T')[0];
 
   try {
-    const { data, error } = await req.db
-      .from('rates')
-      .select('*')
-      .eq('tipo', 'residencial')
-      .lte('vigente_desde', hoy)
-      .or(`vigente_hasta.is.null,vigente_hasta.gte.${hoy}`)
-      .order('vigente_desde', { ascending: false })
-      .limit(1)
-      .single();
+    const { data, error } = await rateModel.getCurrent(hoy, { db: req.db });
 
     if (error) {
       return res.status(404).json({ error: 'No hay tarifa vigente configurada' });
@@ -61,16 +50,7 @@ async function crearTarifa(req, res) {
   }
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from('rates')
-      .insert({
-        tipo: tipo || 'residencial',
-        cuota_fija,
-        vigente_desde,
-        vigente_hasta: vigente_hasta || null,
-      })
-      .select()
-      .single();
+    const { data, error } = await rateModel.create({ tipo, cuota_fija, vigente_desde, vigente_hasta });
 
     if (error) {
       return errorConsulta(res, error);
@@ -98,12 +78,7 @@ async function actualizarTarifa(req, res) {
   }
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from('rates')
-      .update(cambios)
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await rateModel.update(id, cambios);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Tarifa no encontrada' });
@@ -120,12 +95,7 @@ async function eliminarTarifa(req, res) {
   const { id } = req.params;
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from('rates')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await rateModel.remove(id);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Tarifa no encontrada' });

@@ -1,5 +1,5 @@
-const supabase = require('../config/supabaseClient');
-const { getClienteUsuario } = require('../config/supabaseClient');
+const authModel = require('../models/authModel');
+const profileModel = require('../models/profileModel');
 
 /**
  * Autenticación OPCIONAL.
@@ -23,20 +23,19 @@ async function autenticacionOpcional(req, res, next) {
   const token = authHeader.split(' ')[1];
 
   try {
-    const { data, error } = await supabase.auth.getUser(token);
+    const { data, error } = await authModel.getUserByToken(token);
 
     if (error || !data.user) {
       return next(); // token inválido: seguimos como anónimo
     }
 
-    req.db = getClienteUsuario(token);
+    req.db = authModel.userClient(token);
     req.token = token;
 
-    const { data: perfil } = await req.db
-      .from('profiles')
-      .select('id, rol, zona, nombre, apellido, activo, is_verified')
-      .eq('id', data.user.id)
-      .single();
+    const { data: perfil } = await profileModel.getById(data.user.id, {
+      columns: 'id, rol, zona, nombre, apellido, activo, is_verified',
+      db: req.db,
+    });
 
     // Una cuenta desactivada se trata como anónima: no se le da contexto privado.
     if (perfil && perfil.activo !== false) {

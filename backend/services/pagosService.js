@@ -1,4 +1,5 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const paymentModel = require('../models/paymentModel');
+const invoiceModel = require('../models/invoiceModel');
 const { notificar } = require('../utils/notificar');
 
 /**
@@ -12,11 +13,7 @@ const { notificar } = require('../utils/notificar');
  * @returns {{ ok: boolean, error?: string, pago?: object }}
  */
 async function confirmarPago(pagoId, extra = {}) {
-  const { data: pago, error: pagoError } = await supabaseAdmin
-    .from('payments')
-    .select('*')
-    .eq('id', pagoId)
-    .single();
+  const { data: pago, error: pagoError } = await paymentModel.getById(pagoId);
 
   if (pagoError || !pago) {
     return { ok: false, error: 'Pago no encontrado' };
@@ -26,26 +23,18 @@ async function confirmarPago(pagoId, extra = {}) {
     return { ok: true, pago }; // idempotente: ya estaba confirmado
   }
 
-  const { data: pagoActualizado, error: updateError } = await supabaseAdmin
-    .from('payments')
-    .update({
-      confirmado: true,
-      fecha_confirmacion: new Date().toISOString(),
-      ...extra,
-    })
-    .eq('id', pagoId)
-    .select()
-    .single();
+  const { data: pagoActualizado, error: updateError } = await paymentModel.update(pagoId, {
+    confirmado: true,
+    fecha_confirmacion: new Date().toISOString(),
+    ...extra,
+  });
 
   if (updateError) {
     return { ok: false, error: updateError.message };
   }
 
   if (pago.factura_id) {
-    const { error: facturaError } = await supabaseAdmin
-      .from('invoices')
-      .update({ estado: 'pagada' })
-      .eq('id', pago.factura_id);
+    const { error: facturaError } = await invoiceModel.update(pago.factura_id, { estado: 'pagada' });
 
     if (facturaError) {
       // El pago ya quedó marcado como confirmado (el dinero sí se recibió),

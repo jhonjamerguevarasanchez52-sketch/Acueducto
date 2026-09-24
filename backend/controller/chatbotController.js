@@ -1,5 +1,8 @@
 const Groq = require('groq-sdk');
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const rateModel = require('../models/rateModel');
+const profileModel = require('../models/profileModel');
+const invoiceModel = require('../models/invoiceModel');
+const breakdownModel = require('../models/breakdownModel');
 const { errorInesperado } = require('../utils/httpErrores');
 
 // El cliente se crea perezosamente (no al cargar el módulo): así, si falta
@@ -31,10 +34,7 @@ async function chatearConAsistente(req, res) {
     const perfilId = req.usuario?.id;
 
     // --- 1. Contexto general: tarifas vigentes ---
-    const { data: tarifas } = await supabaseAdmin
-      .from('rates')
-      .select('tipo, cuota_fija, vigente_desde, vigente_hasta')
-      .order('vigente_desde', { ascending: false });
+    const { data: tarifas } = await rateModel.listForChatbot();
 
     const contextoTarifas = (tarifas || [])
       .map(t => `- ${t.tipo}: $${t.cuota_fija} (vigente desde ${t.vigente_desde}${t.vigente_hasta ? ' hasta ' + t.vigente_hasta : ''})`)
@@ -44,25 +44,13 @@ async function chatearConAsistente(req, res) {
     let contextoUsuario = 'No hay un usuario autenticado en esta conversación.';
 
     if (perfilId) {
-      const { data: perfil } = await supabaseAdmin
-        .from('profiles')
-        .select('nombre, apellido, numero_lote, zona, activo')
-        .eq('id', perfilId)
-        .single();
+      const { data: perfil } = await profileModel.getById(perfilId, {
+        columns: 'nombre, apellido, numero_lote, zona, activo',
+      });
 
-      const { data: ultimasFacturas } = await supabaseAdmin
-        .from('invoices')
-        .select('periodo, valor_total, fecha_vencimiento, estado')
-        .eq('perfil_id', perfilId)
-        .order('fecha_emision', { ascending: false })
-        .limit(3);
+      const { data: ultimasFacturas } = await invoiceModel.latestByProfile(perfilId, 3);
 
-      const { data: ultimasAverias } = await supabaseAdmin
-        .from('breakdowns')
-        .select('descripcion, estado, fecha_reporte')
-        .eq('perfil_id', perfilId)
-        .order('fecha_reporte', { ascending: false })
-        .limit(3);
+      const { data: ultimasAverias } = await breakdownModel.latestByProfile(perfilId, 3);
 
       const facturasTexto = (ultimasFacturas || [])
         .map(f => `- Periodo ${f.periodo}: $${f.valor_total}, vence ${f.fecha_vencimiento}, estado: ${f.estado}`)

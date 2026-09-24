@@ -1,7 +1,7 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const outageModel = require('../models/outageModel');
+const profileModel = require('../models/profileModel');
 const { notificar } = require('../utils/notificar');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
-const { aplicarPaginacion } = require('../utils/paginacion');
 
 // ---------- USUARIO FINAL ----------
 
@@ -10,11 +10,7 @@ async function misCortes(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await req.db
-      .from('service_outages')
-      .select('*')
-      .eq('perfil_id', userId)
-      .order('fecha_corte', { ascending: false });
+    const { data, error } = await outageModel.listByProfile(userId, req.db);
 
     if (error) {
       return errorConsulta(res, error);
@@ -31,12 +27,7 @@ async function estadoServicio(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await req.db
-      .from('service_outages')
-      .select('*')
-      .eq('perfil_id', userId)
-      .eq('estado', 'activo')
-      .maybeSingle();
+    const { data, error } = await outageModel.findActiveByProfile(userId, { db: req.db });
 
     if (error) {
       return errorConsulta(res, error);
@@ -58,16 +49,7 @@ async function listarCortes(req, res) {
   const { estado, perfil_id, limit, offset } = req.query;
 
   try {
-    let query = supabaseAdmin
-      .from('service_outages')
-      .select('*')
-      .order('fecha_corte', { ascending: false });
-
-    if (estado) query = query.eq('estado', estado);
-    if (perfil_id) query = query.eq('perfil_id', perfil_id);
-    query = aplicarPaginacion(query, { limit, offset });
-
-    const { data, error } = await query;
+    const { data, error } = await outageModel.list({ estado, perfil_id, limit, offset });
     if (error) return errorConsulta(res, error);
 
     return res.status(200).json(data);
@@ -86,23 +68,16 @@ async function crearCorte(req, res) {
 
   try {
     // Verificamos que el usuario destino exista
-    const { data: perfil, error: perfilError } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('id', perfil_id)
-      .single();
+    const { data: perfil, error: perfilError } = await profileModel.getById(perfil_id, { columns: 'id' });
 
     if (perfilError || !perfil) {
       return res.status(404).json({ error: 'El usuario indicado no existe' });
     }
 
     // No duplicar un corte activo para el mismo usuario
-    const { data: existente, error: existenteError } = await supabaseAdmin
-      .from('service_outages')
-      .select('id')
-      .eq('perfil_id', perfil_id)
-      .eq('estado', 'activo')
-      .maybeSingle();
+    const { data: existente, error: existenteError } = await outageModel.findActiveByProfile(perfil_id, {
+      columns: 'id',
+    });
 
     if (existenteError) {
       return errorConsulta(res, existenteError);
@@ -112,17 +87,7 @@ async function crearCorte(req, res) {
       return res.status(409).json({ error: 'El usuario ya tiene un corte de servicio activo' });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('service_outages')
-      .insert({
-        perfil_id,
-        motivo,
-        factura_id: factura_id || null,
-        estado: 'activo',
-        fecha_corte: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const { data, error } = await outageModel.create({ perfil_id, motivo, factura_id });
 
     if (error) {
       // 23505 = unique_violation. Cubre la carrera: dos solicitudes
@@ -152,15 +117,7 @@ async function reconectar(req, res) {
   const { id } = req.params;
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from('service_outages')
-      .update({
-        estado: 'reconectado',
-        fecha_reconexion: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await outageModel.reconnect(id);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Corte no encontrado' });
@@ -179,12 +136,7 @@ async function eliminarCorte(req, res) {
   const { id } = req.params;
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from('service_outages')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await outageModel.remove(id);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Corte no encontrado' });
