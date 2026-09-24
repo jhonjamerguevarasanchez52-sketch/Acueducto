@@ -1,15 +1,12 @@
-const { CAMPOS_EDITABLES_PERFIL, COLUMNAS_PERFIL_PUBLICO } = require('../utils/perfilCampos');
+const profileModel = require('../models/profileModel');
+const { CAMPOS_EDITABLES_PERFIL } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 async function verPerfil(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await req.db
-      .from('profiles')
-      .select(COLUMNAS_PERFIL_PUBLICO)
-      .eq('id', userId)
-      .single();
+    const { data, error } = await profileModel.getById(userId, { db: req.db });
 
     if (error) {
       return res.status(404).json({ error: 'Perfil no encontrado' });
@@ -36,12 +33,7 @@ async function editarPerfil(req, res) {
   }
 
   try {
-    const { data, error } = await req.db
-      .from('profiles')
-      .update(datosActualizar)
-      .eq('id', userId)
-      .select(COLUMNAS_PERFIL_PUBLICO)
-      .single();
+    const { data, error } = await profileModel.update(userId, datosActualizar, req.db);
 
     if (error) {
       return errorConsulta(res, error);

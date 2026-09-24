@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const paymentModel = require('../models/paymentModel');
 const { confirmarPago } = require('../services/pagosService');
 
 const EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET;
@@ -60,11 +60,7 @@ async function webhook(req, res) {
     const estadoWompi = trx.status; // APPROVED | DECLINED | VOIDED | ERROR
     const montoRecibidoCentavos = trx.amount_in_cents;
 
-    const { data: pago, error: pagoError } = await supabaseAdmin
-      .from('payments')
-      .select('id, confirmado, monto')
-      .eq('id', referencia)
-      .maybeSingle();
+    const { data: pago, error: pagoError } = await paymentModel.findById(referencia, 'id, confirmado, monto');
 
     // Ya respondimos 200 a Wompi, así que no reintentará: si esto fue un
     // error transitorio de la consulta (no "no encontrado"), lo dejamos bien
@@ -89,10 +85,7 @@ async function webhook(req, res) {
         console.error(
           `[wompi] monto recibido (${montoRecibidoCentavos}) no coincide con el esperado (${montoEsperadoCentavos}) para el pago ${pago.id}; no se confirma.`
         );
-        await supabaseAdmin
-          .from('payments')
-          .update({ estado_wompi: 'MONTO_INVALIDO', transaccion_id: trx.id })
-          .eq('id', pago.id);
+        await paymentModel.update(pago.id, { estado_wompi: 'MONTO_INVALIDO', transaccion_id: trx.id });
         return;
       }
 
@@ -106,10 +99,7 @@ async function webhook(req, res) {
         console.error('[wompi] confirmarPago no tuvo éxito para', pago.id, ':', resultado.error);
       }
     } else {
-      await supabaseAdmin
-        .from('payments')
-        .update({ estado_wompi: estadoWompi, transaccion_id: trx.id })
-        .eq('id', pago.id);
+      await paymentModel.update(pago.id, { estado_wompi: estadoWompi, transaccion_id: trx.id });
     }
   } catch (err) {
     console.error('[wompi] error procesando webhook:', err.message);

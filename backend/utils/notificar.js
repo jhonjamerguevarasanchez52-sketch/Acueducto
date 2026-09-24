@@ -1,4 +1,4 @@
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const notificationModel = require('../models/notificationModel');
 
 /**
  * Crea una notificación para un usuario. Pensada para llamarse desde el
@@ -10,13 +10,7 @@ const supabaseAdmin = require('../config/supabaseAdminClient');
  */
 async function notificar(perfilId, mensaje, tipo = 'general') {
   try {
-    const { error } = await supabaseAdmin.from('notifications').insert({
-      perfil_id: perfilId,
-      mensaje,
-      tipo,
-      estado: 'no_leido',
-      fecha: new Date().toISOString(),
-    });
+    const { error } = await notificationModel.insert({ perfil_id: perfilId, mensaje, tipo });
     if (error) console.error('Error creando notificación:', error.message);
   } catch (err) {
     console.error('Error inesperado creando notificación:', err.message);

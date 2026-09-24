@@ -1,8 +1,6 @@
-
 const crypto = require('crypto');
-const supabase = require('../config/supabaseClient');
-
-const supabaseAdmin = require('../config/supabaseAdminClient');
+const authModel = require('../models/authModel');
+const profileModel = require('../models/profileModel');
 const { enviarCorreo } = require('../config/mailer');
 const {
   segundosDeBloqueo,
@@ -41,10 +39,7 @@ async function iniciarSesion(req, res) {
   }
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: correo,
-      password: password,
-    });
+    const { data, error } = await authModel.signIn(correo, password);
 
     if (error) {
       registrarFallo('login', correo);
@@ -52,11 +47,9 @@ async function iniciarSesion(req, res) {
     }
 
     // Exigimos que la cuenta esté verificada por código antes de permitir el acceso.
-    const { data: perfil, error: perfilError } = await supabaseAdmin
-      .from('profiles')
-      .select('is_verified, activo, debe_cambiar_password')
-      .eq('id', data.user.id)
-      .single();
+    const { data: perfil, error: perfilError } = await profileModel.getById(data.user.id, {
+      columns: 'is_verified, activo, debe_cambiar_password',
+    });
 
     if (perfilError) {
       return errorConsulta(res, perfilError);
@@ -106,11 +99,10 @@ async function verificarCuenta(req, res) {
   }
 
   try {
-    const { data: perfil, error: buscarError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, is_verified, codigo_verificacion, codigo_verificacion_expiracion')
-      .eq('correo', correo)
-      .single();
+    const { data: perfil, error: buscarError } = await profileModel.findByEmail(
+      correo,
+      'id, is_verified, codigo_verificacion, codigo_verificacion_expiracion'
+    );
 
     // No revelamos si el correo existe: mismo mensaje que un código incorrecto.
     if (buscarError || !perfil) {
@@ -131,14 +123,11 @@ async function verificarCuenta(req, res) {
       return res.status(400).json({ error: 'Código incorrecto o expirado' });
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        is_verified: true,
-        codigo_verificacion: null,
-        codigo_verificacion_expiracion: null,
-      })
-      .eq('id', perfil.id);
+    const { error: updateError } = await profileModel.saveFields(perfil.id, {
+      is_verified: true,
+      codigo_verificacion: null,
+      codigo_verificacion_expiracion: null,
+    });
 
     if (updateError) {
       return errorConsulta(res, updateError);
@@ -170,11 +159,10 @@ async function reenviarCodigoVerificacion(req, res) {
   registrarFallo('reenviar', correo);
 
   try {
-    const { data: perfil, error: buscarError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, is_verified, nombre')
-      .eq('correo', correo)
-      .single();
+    const { data: perfil, error: buscarError } = await profileModel.findByEmail(
+      correo,
+      'id, is_verified, nombre'
+    );
 
     // No revelamos si el correo existe o ya está verificado: mismo mensaje siempre.
     const mensajeGenerico = { message: 'Si el correo existe y no ha sido verificado, se enviará un nuevo código' };
@@ -186,13 +174,10 @@ async function reenviarCodigoVerificacion(req, res) {
     const codigoVerificacion = generarCodigo();
     const codigoVerificacionExpiracion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-    const { error: updateError } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        codigo_verificacion: codigoVerificacion,
-        codigo_verificacion_expiracion: codigoVerificacionExpiracion,
-      })
-      .eq('id', perfil.id);
+    const { error: updateError } = await profileModel.saveFields(perfil.id, {
+      codigo_verificacion: codigoVerificacion,
+      codigo_verificacion_expiracion: codigoVerificacionExpiracion,
+    });
 
     if (updateError) {
       return errorConsulta(res, updateError);
@@ -240,27 +225,21 @@ async function cambiarPasswordPropio(req, res) {
   try {
     // Confirmamos la contraseña actual reautenticando contra Supabase Auth,
     // en vez de confiar en que quien llama con el token es realmente el dueño.
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: correo,
-      password: passwordActual,
-    });
+    const { error: authError } = await authModel.signIn(correo, passwordActual);
 
     if (authError) {
       return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
     }
 
-    const { error: updateAuthError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-      password: passwordNueva,
-    });
+    const { error: updateAuthError } = await authModel.changePassword(userId, passwordNueva);
 
     if (updateAuthError) {
       return errorConsulta(res, updateAuthError);
     }
 
-    const { error: updatePerfilError } = await supabaseAdmin
-      .from('profiles')
-      .update({ debe_cambiar_password: false })
-      .eq('id', userId);
+    const { error: updatePerfilError } = await profileModel.saveFields(userId, {
+      debe_cambiar_password: false,
+    });
 
     if (updatePerfilError) {
       return errorConsulta(res, updatePerfilError);
@@ -292,11 +271,7 @@ async function solicitarRecuperacion(req, res) {
   registrarFallo('recuperar', correo);
 
   try {
-    const { data: perfil, error: buscarError } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('correo', correo)
-      .single();
+    const { data: perfil, error: buscarError } = await profileModel.findByEmail(correo, 'id');
 
     if (buscarError || !perfil) {
       // No revelamos si el correo existe o no, por seguridad
@@ -306,13 +281,10 @@ async function solicitarRecuperacion(req, res) {
     const codigoRecuperacion = generarCodigo();
     const codigoExpiracion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-    const { error: updateError } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        codigo_recuperacion: codigoRecuperacion,
-        codigo_expiracion: codigoExpiracion,
-      })
-      .eq('id', perfil.id);
+    const { error: updateError } = await profileModel.saveFields(perfil.id, {
+      codigo_recuperacion: codigoRecuperacion,
+      codigo_expiracion: codigoExpiracion,
+    });
 
     if (updateError) {
       return errorConsulta(res, updateError);
@@ -356,11 +328,10 @@ async function resetearPassword(req, res) {
   }
 
   try {
-    const { data: perfil, error: buscarError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, codigo_recuperacion, codigo_expiracion')
-      .eq('correo', correo)
-      .single();
+    const { data: perfil, error: buscarError } = await profileModel.findByEmail(
+      correo,
+      'id, codigo_recuperacion, codigo_expiracion'
+    );
 
     if (buscarError || !perfil) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -376,22 +347,16 @@ async function resetearPassword(req, res) {
     }
 
     // La contraseña real vive en auth.users, se actualiza vía admin API
-    const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
-      perfil.id,
-      { password: nuevaPassword }
-    );
+    const { error: authUpdateError } = await authModel.changePassword(perfil.id, nuevaPassword);
 
     if (authUpdateError) {
       return errorConsulta(res, authUpdateError);
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        codigo_recuperacion: null,
-        codigo_expiracion: null,
-      })
-      .eq('id', perfil.id);
+    const { error: updateError } = await profileModel.saveFields(perfil.id, {
+      codigo_recuperacion: null,
+      codigo_expiracion: null,
+    });
 
     if (updateError) {
       return errorConsulta(res, updateError);
