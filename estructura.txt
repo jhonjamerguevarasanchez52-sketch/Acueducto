@@ -1,0 +1,493 @@
+Acueducto/
+|-- .idea/
+|   |-- caches/
+|   |-- .gitignore
+|   |-- Acueducto.iml
+|   |-- deviceManager.xml
+|   |-- misc.xml
+|   |-- modules.xml
+|   |-- vcs.xml
+|   |-- workspace.xml
+|-- backend/
+|   |-- config/
+|   |   |-- mailer.js
+|   |   |-- supabaseAdminClient.js
+|   |   |-- supabaseClient.js
+|   |-- controller/
+|   |   |-- adminController.js
+|   |   |-- authController.js
+|   |   |-- averiaController.js
+|   |   |-- chatbotController.js
+|   |   |-- corteController.js
+|   |   |-- facturaController.js
+|   |   |-- notificacionController.js
+|   |   |-- pagoController.js
+|   |   |-- profileController.js
+|   |   |-- tarifaController.js
+|   |   |-- wompiController.js
+|   |-- db/
+|   |   |-- schema.sql
+|   |-- docs/
+|   |   |-- HIDROAPP.postman_collection.json
+|   |-- middleware/
+|   |   |-- adminMiddleware.js
+|   |   |-- authMiddleware.js
+|   |   |-- authOpcional.js
+|   |   |-- rateLimit.js
+|   |   |-- roleMiddleware.js
+|   |-- routes/
+|   |   |-- adminRoutes.js
+|   |   |-- authRoutes.js
+|   |   |-- averiaRoutes.js
+|   |   |-- chatbotRoutes.js
+|   |   |-- corteRoutes.js
+|   |   |-- facturaRoutes.js
+|   |   |-- notificacionRoutes.js
+|   |   |-- pagoRoutes.js
+|   |   |-- profileRoutes.js
+|   |   |-- tarifaRoutes.js
+|   |   |-- wompiRoutes.js
+|   |-- scripts/
+|   |   |-- crearFactura.js
+|   |   |-- crearNotificacion.js
+|   |   |-- crearUsuario.js
+|   |   |-- probarCorreo.js
+|   |-- services/
+|   |   |-- pagosService.js
+|   |   |-- pagosService.test.js
+|   |-- utils/
+|   |   |-- controlIntentos.js
+|   |   |-- controlIntentos.test.js
+|   |   |-- httpErrores.js
+|   |   |-- notificar.js
+|   |   |-- paginacion.js
+|   |   |-- passwords.js
+|   |   |-- perfilCampos.js
+|   |   |-- wompiFirma.js
+|   |   |-- wompiFirma.test.js
+|   |-- .env
+|   |-- .env.example
+|   |-- .nvmrc
+|   |-- package-lock.json
+|   |-- package.json
+|   |-- railway.json
+|   |-- server.js
+|-- frontend/
+|   |-- hidroapp/
+|   |   |-- .dart_tool/
+|   |   |   |-- dartpad/
+|   |   |   |   |-- web_plugin_registrant.dart
+|   |   |   |-- extension_discovery/
+|   |   |   |   |-- vs_code.json
+|   |   |   |-- flutter_build/
+|   |   |   |   |-- c9059bcdae112edb587670887eaa2014/
+|   |   |   |   |   |-- .filecache
+|   |   |   |   |   |-- app.dill
+|   |   |   |   |   |-- dart_build_result.json
+|   |   |   |   |   |-- dart_build.d
+|   |   |   |   |   |-- dart_build.stamp
+|   |   |   |   |   |-- debug_android_application.stamp
+|   |   |   |   |   |-- flutter_assets.d
+|   |   |   |   |   |-- gen_dart_plugin_registrant.stamp
+|   |   |   |   |   |-- gen_localizations.stamp
+|   |   |   |   |   |-- install_code_assets.d
+|   |   |   |   |   |-- install_code_assets.stamp
+|   |   |   |   |   |-- kernel_snapshot_program.d
+|   |   |   |   |   |-- kernel_snapshot_program.stamp
+|   |   |   |   |   |-- native_assets.json
+|   |   |   |   |   |-- outputs.json
+|   |   |   |   |-- dart_plugin_registrant.dart
+|   |   |   |-- hooks_runner/
+|   |   |   |   |-- objective_c/
+|   |   |   |   |   |-- 337ce265dc/
+|   |   |   |   |   |   |-- .lock
+|   |   |   |   |   |   |-- dependencies.dependencies_hash_file.json
+|   |   |   |   |   |   |-- hook.dependencies_hash_file.json
+|   |   |   |   |   |   |-- hook.dill
+|   |   |   |   |   |   |-- hook.dill.d
+|   |   |   |   |   |   |-- input.json
+|   |   |   |   |   |   |-- output.json
+|   |   |   |   |   |   |-- stderr.txt
+|   |   |   |   |   |   |-- stdout.txt
+|   |   |   |   |   |-- 562664bbbc/
+|   |   |   |   |   |   |-- .lock
+|   |   |   |   |   |   |-- dependencies.dependencies_hash_file.json
+|   |   |   |   |   |   |-- hook.dependencies_hash_file.json
+|   |   |   |   |   |   |-- hook.dill
+|   |   |   |   |   |   |-- hook.dill.d
+|   |   |   |   |   |   |-- input.json
+|   |   |   |   |   |   |-- output.json
+|   |   |   |   |   |   |-- stderr.txt
+|   |   |   |   |   |   |-- stdout.txt
+|   |   |   |   |-- shared/
+|   |   |   |   |   |-- objective_c/
+|   |   |   |   |   |   |-- .lock
+|   |   |   |-- pub/
+|   |   |   |   |-- bin/
+|   |   |   |   |   |-- flutter_launcher_icons/
+|   |   |   |   |   |   |-- flutter_launcher_icons.dart-3.12.2.snapshot
+|   |   |   |-- package_config.json
+|   |   |   |-- package_graph.json
+|   |   |   |-- version
+|   |   |-- android/
+|   |   |   |-- .gradle/
+|   |   |   |   |-- 9.1.0/
+|   |   |   |   |   |-- checksums/
+|   |   |   |   |   |   |-- checksums.lock
+|   |   |   |   |   |   |-- md5-checksums.bin
+|   |   |   |   |   |   |-- sha1-checksums.bin
+|   |   |   |   |   |-- executionHistory/
+|   |   |   |   |   |   |-- executionHistory.bin
+|   |   |   |   |   |   |-- executionHistory.lock
+|   |   |   |   |   |-- expanded/
+|   |   |   |   |   |-- fileChanges/
+|   |   |   |   |   |   |-- last-build.bin
+|   |   |   |   |   |-- fileHashes/
+|   |   |   |   |   |   |-- fileHashes.bin
+|   |   |   |   |   |   |-- fileHashes.lock
+|   |   |   |   |   |   |-- resourceHashesCache.bin
+|   |   |   |   |   |-- vcsMetadata/
+|   |   |   |   |   |-- gc.properties
+|   |   |   |   |-- buildOutputCleanup/
+|   |   |   |   |   |-- buildOutputCleanup.lock
+|   |   |   |   |   |-- cache.properties
+|   |   |   |   |   |-- outputFiles.bin
+|   |   |   |   |-- noVersion/
+|   |   |   |   |   |-- buildLogic.lock
+|   |   |   |   |-- vcs-1/
+|   |   |   |   |   |-- gc.properties
+|   |   |   |   |-- file-system.probe
+|   |   |   |-- .kotlin/
+|   |   |   |   |-- sessions/
+|   |   |   |-- app/
+|   |   |   |   |-- src/
+|   |   |   |   |   |-- debug/
+|   |   |   |   |   |   |-- AndroidManifest.xml
+|   |   |   |   |   |-- main/
+|   |   |   |   |   |   |-- java/
+|   |   |   |   |   |   |   |-- io/
+|   |   |   |   |   |   |   |   |-- flutter/
+|   |   |   |   |   |   |   |   |   |-- plugins/
+|   |   |   |   |   |   |   |   |   |   |-- GeneratedPluginRegistrant.java
+|   |   |   |   |   |   |-- kotlin/
+|   |   |   |   |   |   |   |-- com/
+|   |   |   |   |   |   |   |   |-- acueductocampoamor/
+|   |   |   |   |   |   |   |   |   |-- acueducto_app/
+|   |   |   |   |   |   |   |   |   |   |-- MainActivity.kt
+|   |   |   |   |   |   |-- res/
+|   |   |   |   |   |   |   |-- drawable/
+|   |   |   |   |   |   |   |   |-- launch_background.xml
+|   |   |   |   |   |   |   |-- drawable-hdpi/
+|   |   |   |   |   |   |   |   |-- ic_launcher_foreground.png
+|   |   |   |   |   |   |   |-- drawable-mdpi/
+|   |   |   |   |   |   |   |   |-- ic_launcher_foreground.png
+|   |   |   |   |   |   |   |-- drawable-v21/
+|   |   |   |   |   |   |   |   |-- launch_background.xml
+|   |   |   |   |   |   |   |-- drawable-xhdpi/
+|   |   |   |   |   |   |   |   |-- ic_launcher_foreground.png
+|   |   |   |   |   |   |   |-- drawable-xxhdpi/
+|   |   |   |   |   |   |   |   |-- ic_launcher_foreground.png
+|   |   |   |   |   |   |   |-- drawable-xxxhdpi/
+|   |   |   |   |   |   |   |   |-- ic_launcher_foreground.png
+|   |   |   |   |   |   |   |-- mipmap-anydpi-v26/
+|   |   |   |   |   |   |   |   |-- launcher_icon.xml
+|   |   |   |   |   |   |   |-- mipmap-hdpi/
+|   |   |   |   |   |   |   |   |-- ic_launcher.png
+|   |   |   |   |   |   |   |   |-- launcher_icon.png
+|   |   |   |   |   |   |   |-- mipmap-mdpi/
+|   |   |   |   |   |   |   |   |-- ic_launcher.png
+|   |   |   |   |   |   |   |   |-- launcher_icon.png
+|   |   |   |   |   |   |   |-- mipmap-xhdpi/
+|   |   |   |   |   |   |   |   |-- ic_launcher.png
+|   |   |   |   |   |   |   |   |-- launcher_icon.png
+|   |   |   |   |   |   |   |-- mipmap-xxhdpi/
+|   |   |   |   |   |   |   |   |-- ic_launcher.png
+|   |   |   |   |   |   |   |   |-- launcher_icon.png
+|   |   |   |   |   |   |   |-- mipmap-xxxhdpi/
+|   |   |   |   |   |   |   |   |-- ic_launcher.png
+|   |   |   |   |   |   |   |   |-- launcher_icon.png
+|   |   |   |   |   |   |   |-- values/
+|   |   |   |   |   |   |   |   |-- colors.xml
+|   |   |   |   |   |   |   |   |-- styles.xml
+|   |   |   |   |   |   |   |-- values-night/
+|   |   |   |   |   |   |   |   |-- styles.xml
+|   |   |   |   |   |   |-- AndroidManifest.xml
+|   |   |   |   |   |-- profile/
+|   |   |   |   |   |   |-- AndroidManifest.xml
+|   |   |   |   |-- build.gradle.kts
+|   |   |   |-- gradle/
+|   |   |   |   |-- wrapper/
+|   |   |   |   |   |-- gradle-wrapper.jar
+|   |   |   |   |   |-- gradle-wrapper.properties
+|   |   |   |-- .gitignore
+|   |   |   |-- build.gradle.kts
+|   |   |   |-- gradle.properties
+|   |   |   |-- gradlew
+|   |   |   |-- gradlew.bat
+|   |   |   |-- key.properties.example
+|   |   |   |-- local.properties
+|   |   |   |-- settings.gradle.kts
+|   |   |-- assets/
+|   |   |   |-- images/
+|   |   |   |   |-- README.md
+|   |   |   |-- hidroapp_logo_512x512.png
+|   |   |-- ios/
+|   |   |   |-- Flutter/
+|   |   |   |   |-- ephemeral/
+|   |   |   |   |   |-- Packages/
+|   |   |   |   |   |   |-- .packages/
+|   |   |   |   |   |   |-- FlutterGeneratedPluginSwiftPackage/
+|   |   |   |   |   |   |   |-- Sources/
+|   |   |   |   |   |   |   |   |-- FlutterGeneratedPluginSwiftPackage/
+|   |   |   |   |   |   |   |   |   |-- FlutterGeneratedPluginSwiftPackage.swift
+|   |   |   |   |   |   |   |-- Package.swift
+|   |   |   |   |   |-- flutter_lldb_helper.py
+|   |   |   |   |   |-- flutter_lldbinit
+|   |   |   |   |   |-- flutter_native_integration.env
+|   |   |   |   |-- AppFrameworkInfo.plist
+|   |   |   |   |-- Debug.xcconfig
+|   |   |   |   |-- flutter_export_environment.sh
+|   |   |   |   |-- Generated.xcconfig
+|   |   |   |   |-- Release.xcconfig
+|   |   |   |-- Runner/
+|   |   |   |   |-- Assets.xcassets/
+|   |   |   |   |   |-- AppIcon.appiconset/
+|   |   |   |   |   |   |-- Contents.json
+|   |   |   |   |   |   |-- Icon-App-1024x1024@1x.png
+|   |   |   |   |   |   |-- Icon-App-20x20@1x.png
+|   |   |   |   |   |   |-- Icon-App-20x20@2x.png
+|   |   |   |   |   |   |-- Icon-App-20x20@3x.png
+|   |   |   |   |   |   |-- Icon-App-29x29@1x.png
+|   |   |   |   |   |   |-- Icon-App-29x29@2x.png
+|   |   |   |   |   |   |-- Icon-App-29x29@3x.png
+|   |   |   |   |   |   |-- Icon-App-40x40@1x.png
+|   |   |   |   |   |   |-- Icon-App-40x40@2x.png
+|   |   |   |   |   |   |-- Icon-App-40x40@3x.png
+|   |   |   |   |   |   |-- Icon-App-50x50@1x.png
+|   |   |   |   |   |   |-- Icon-App-50x50@2x.png
+|   |   |   |   |   |   |-- Icon-App-57x57@1x.png
+|   |   |   |   |   |   |-- Icon-App-57x57@2x.png
+|   |   |   |   |   |   |-- Icon-App-60x60@2x.png
+|   |   |   |   |   |   |-- Icon-App-60x60@3x.png
+|   |   |   |   |   |   |-- Icon-App-72x72@1x.png
+|   |   |   |   |   |   |-- Icon-App-72x72@2x.png
+|   |   |   |   |   |   |-- Icon-App-76x76@1x.png
+|   |   |   |   |   |   |-- Icon-App-76x76@2x.png
+|   |   |   |   |   |   |-- Icon-App-83.5x83.5@2x.png
+|   |   |   |   |   |-- LaunchImage.imageset/
+|   |   |   |   |   |   |-- Contents.json
+|   |   |   |   |   |   |-- LaunchImage.png
+|   |   |   |   |   |   |-- LaunchImage@2x.png
+|   |   |   |   |   |   |-- LaunchImage@3x.png
+|   |   |   |   |   |   |-- README.md
+|   |   |   |   |-- Base.lproj/
+|   |   |   |   |   |-- LaunchScreen.storyboard
+|   |   |   |   |   |-- Main.storyboard
+|   |   |   |   |-- AppDelegate.swift
+|   |   |   |   |-- GeneratedPluginRegistrant.h
+|   |   |   |   |-- GeneratedPluginRegistrant.m
+|   |   |   |   |-- Info.plist
+|   |   |   |   |-- Runner-Bridging-Header.h
+|   |   |   |   |-- SceneDelegate.swift
+|   |   |   |-- Runner.xcodeproj/
+|   |   |   |   |-- project.xcworkspace/
+|   |   |   |   |   |-- xcshareddata/
+|   |   |   |   |   |   |-- IDEWorkspaceChecks.plist
+|   |   |   |   |   |   |-- WorkspaceSettings.xcsettings
+|   |   |   |   |   |-- contents.xcworkspacedata
+|   |   |   |   |-- xcshareddata/
+|   |   |   |   |   |-- xcschemes/
+|   |   |   |   |   |   |-- Runner.xcscheme
+|   |   |   |   |-- project.pbxproj
+|   |   |   |-- Runner.xcworkspace/
+|   |   |   |   |-- xcshareddata/
+|   |   |   |   |   |-- IDEWorkspaceChecks.plist
+|   |   |   |   |   |-- WorkspaceSettings.xcsettings
+|   |   |   |   |-- contents.xcworkspacedata
+|   |   |   |-- RunnerTests/
+|   |   |   |   |-- RunnerTests.swift
+|   |   |   |-- .gitignore
+|   |   |-- lib/
+|   |   |   |-- config/
+|   |   |   |   |-- api_config.dart
+|   |   |   |-- models/
+|   |   |   |   |-- averia.dart
+|   |   |   |   |-- corte.dart
+|   |   |   |   |-- factura.dart
+|   |   |   |   |-- notificacion.dart
+|   |   |   |   |-- pago.dart
+|   |   |   |   |-- profile.dart
+|   |   |   |-- providers/
+|   |   |   |   |-- auth_provider.dart
+|   |   |   |-- screens/
+|   |   |   |   |-- averias_screen.dart
+|   |   |   |   |-- cambiar_password_obligatorio_screen.dart
+|   |   |   |   |-- chat_screen.dart
+|   |   |   |   |-- estado_servicio_screen.dart
+|   |   |   |   |-- facturas_screen.dart
+|   |   |   |   |-- home_screen.dart
+|   |   |   |   |-- login_screen.dart
+|   |   |   |   |-- main_shell.dart
+|   |   |   |   |-- notificaciones_screen.dart
+|   |   |   |   |-- pagos_screen.dart
+|   |   |   |   |-- perfil_screen.dart
+|   |   |   |   |-- verificar_cuenta_screen.dart
+|   |   |   |   |-- welcome_screen.dart
+|   |   |   |-- services/
+|   |   |   |   |-- api_service.dart
+|   |   |   |-- theme/
+|   |   |   |   |-- app_theme.dart
+|   |   |   |-- utils/
+|   |   |   |   |-- formato.dart
+|   |   |   |-- widgets/
+|   |   |   |   |-- auth/
+|   |   |   |   |   |-- auth_style.dart
+|   |   |   |   |   |-- login_form.dart
+|   |   |   |   |   |-- verificar_form.dart
+|   |   |   |   |-- averias/
+|   |   |   |   |   |-- averia_card.dart
+|   |   |   |   |   |-- formulario_reporte.dart
+|   |   |   |   |-- chat/
+|   |   |   |   |   |-- chat_barra_entrada.dart
+|   |   |   |   |   |-- chat_burbuja.dart
+|   |   |   |   |   |-- chat_mensaje.dart
+|   |   |   |   |-- estado_servicio/
+|   |   |   |   |   |-- corte_card.dart
+|   |   |   |   |   |-- tarjeta_estado.dart
+|   |   |   |   |-- facturas/
+|   |   |   |   |   |-- factura_card.dart
+|   |   |   |   |   |-- facturas_resumen.dart
+|   |   |   |   |-- home/
+|   |   |   |   |   |-- home_cabecera.dart
+|   |   |   |   |   |-- home_factura_widgets.dart
+|   |   |   |   |   |-- home_mensaje_destacado.dart
+|   |   |   |   |   |-- home_modulo_tile.dart
+|   |   |   |   |   |-- home_proxima_factura.dart
+|   |   |   |   |-- pagos/
+|   |   |   |   |   |-- pago_card.dart
+|   |   |   |   |-- welcome/
+|   |   |   |   |   |-- half_clipper.dart
+|   |   |   |   |   |-- welcome_background.dart
+|   |   |   |   |   |-- welcome_common.dart
+|   |   |   |   |   |-- welcome_drop.dart
+|   |   |   |   |   |-- welcome_loading_dots.dart
+|   |   |   |   |   |-- welcome_ring.dart
+|   |   |   |   |   |-- welcome_textos.dart
+|   |   |   |   |-- fila_detalle.dart
+|   |   |   |   |-- gota_fab.dart
+|   |   |   |   |-- gota_scaffold.dart
+|   |   |   |   |-- hidro_logo.dart
+|   |   |   |   |-- mensaje_estado.dart
+|   |   |   |   |-- pagar_sheet.dart
+|   |   |   |-- main.dart
+|   |   |-- linux/
+|   |   |   |-- flutter/
+|   |   |   |   |-- CMakeLists.txt
+|   |   |   |   |-- generated_plugin_registrant.cc
+|   |   |   |   |-- generated_plugin_registrant.h
+|   |   |   |   |-- generated_plugins.cmake
+|   |   |   |-- runner/
+|   |   |   |   |-- CMakeLists.txt
+|   |   |   |   |-- main.cc
+|   |   |   |   |-- my_application.cc
+|   |   |   |   |-- my_application.h
+|   |   |   |-- .gitignore
+|   |   |   |-- CMakeLists.txt
+|   |   |-- macos/
+|   |   |   |-- Flutter/
+|   |   |   |   |-- ephemeral/
+|   |   |   |   |   |-- Packages/
+|   |   |   |   |   |   |-- .packages/
+|   |   |   |   |   |   |-- FlutterGeneratedPluginSwiftPackage/
+|   |   |   |   |   |   |   |-- Sources/
+|   |   |   |   |   |   |   |   |-- FlutterGeneratedPluginSwiftPackage/
+|   |   |   |   |   |   |   |   |   |-- FlutterGeneratedPluginSwiftPackage.swift
+|   |   |   |   |   |   |   |-- Package.swift
+|   |   |   |   |   |-- flutter_export_environment.sh
+|   |   |   |   |   |-- flutter_native_integration.env
+|   |   |   |   |   |-- Flutter-Generated.xcconfig
+|   |   |   |   |-- Flutter-Debug.xcconfig
+|   |   |   |   |-- Flutter-Release.xcconfig
+|   |   |   |   |-- GeneratedPluginRegistrant.swift
+|   |   |   |-- Runner/
+|   |   |   |   |-- Assets.xcassets/
+|   |   |   |   |   |-- AppIcon.appiconset/
+|   |   |   |   |   |   |-- app_icon_1024.png
+|   |   |   |   |   |   |-- app_icon_128.png
+|   |   |   |   |   |   |-- app_icon_16.png
+|   |   |   |   |   |   |-- app_icon_256.png
+|   |   |   |   |   |   |-- app_icon_32.png
+|   |   |   |   |   |   |-- app_icon_512.png
+|   |   |   |   |   |   |-- app_icon_64.png
+|   |   |   |   |   |   |-- Contents.json
+|   |   |   |   |-- Base.lproj/
+|   |   |   |   |   |-- MainMenu.xib
+|   |   |   |   |-- Configs/
+|   |   |   |   |   |-- AppInfo.xcconfig
+|   |   |   |   |   |-- Debug.xcconfig
+|   |   |   |   |   |-- Release.xcconfig
+|   |   |   |   |   |-- Warnings.xcconfig
+|   |   |   |   |-- AppDelegate.swift
+|   |   |   |   |-- DebugProfile.entitlements
+|   |   |   |   |-- Info.plist
+|   |   |   |   |-- MainFlutterWindow.swift
+|   |   |   |   |-- Release.entitlements
+|   |   |   |-- Runner.xcodeproj/
+|   |   |   |   |-- project.xcworkspace/
+|   |   |   |   |   |-- xcshareddata/
+|   |   |   |   |   |   |-- IDEWorkspaceChecks.plist
+|   |   |   |   |-- xcshareddata/
+|   |   |   |   |   |-- xcschemes/
+|   |   |   |   |   |   |-- Runner.xcscheme
+|   |   |   |   |-- project.pbxproj
+|   |   |   |-- Runner.xcworkspace/
+|   |   |   |   |-- xcshareddata/
+|   |   |   |   |   |-- IDEWorkspaceChecks.plist
+|   |   |   |   |-- contents.xcworkspacedata
+|   |   |   |-- RunnerTests/
+|   |   |   |   |-- RunnerTests.swift
+|   |   |   |-- .gitignore
+|   |   |-- test/
+|   |   |   |-- widget_test.dart
+|   |   |-- web/
+|   |   |   |-- icons/
+|   |   |   |   |-- Icon-192.png
+|   |   |   |   |-- Icon-512.png
+|   |   |   |   |-- Icon-maskable-192.png
+|   |   |   |   |-- Icon-maskable-512.png
+|   |   |   |-- favicon.png
+|   |   |   |-- index.html
+|   |   |   |-- manifest.json
+|   |   |-- windows/
+|   |   |   |-- flutter/
+|   |   |   |   |-- ephemeral/
+|   |   |   |   |   |-- .plugin_symlinks/
+|   |   |   |   |-- CMakeLists.txt
+|   |   |   |   |-- generated_plugin_registrant.cc
+|   |   |   |   |-- generated_plugin_registrant.h
+|   |   |   |   |-- generated_plugins.cmake
+|   |   |   |-- runner/
+|   |   |   |   |-- resources/
+|   |   |   |   |   |-- app_icon.ico
+|   |   |   |   |-- CMakeLists.txt
+|   |   |   |   |-- flutter_window.cpp
+|   |   |   |   |-- flutter_window.h
+|   |   |   |   |-- main.cpp
+|   |   |   |   |-- resource.h
+|   |   |   |   |-- runner.exe.manifest
+|   |   |   |   |-- Runner.rc
+|   |   |   |   |-- utils.cpp
+|   |   |   |   |-- utils.h
+|   |   |   |   |-- win32_window.cpp
+|   |   |   |   |-- win32_window.h
+|   |   |   |-- .gitignore
+|   |   |   |-- CMakeLists.txt
+|   |   |-- .flutter-plugins-dependencies
+|   |   |-- .gitignore
+|   |   |-- .metadata
+|   |   |-- analysis_options.yaml
+|   |   |-- devtools_options.yaml
+|   |   |-- pubspec.lock
+|   |   |-- pubspec.yaml
+|   |   |-- README.md
+|-- .gitignore

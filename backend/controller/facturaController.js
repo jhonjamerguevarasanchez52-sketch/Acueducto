@@ -82,7 +82,7 @@ async function listarFacturas(req, res) {
 
 // Emitir una factura para un usuario
 async function crearFactura(req, res) {
-  const { perfil_id, periodo, valor_total, fecha_vencimiento, observacion } = req.body;
+  const { perfil_id, periodo, valor_total, fecha_vencimiento, observacion, tipo } = req.body;
 
   if (!perfil_id || !periodo || valor_total === undefined) {
     return res.status(400).json({
@@ -110,6 +110,7 @@ async function crearFactura(req, res) {
       valor_total,
       fecha_vencimiento,
       observacion,
+      tipo,
     });
 
     if (error) return errorConsulta(res, error);

@@ -37,13 +37,14 @@ function list({ estado, perfil_id, limit, offset } = {}) {
 }
 
 // Toda factura nueva nace "pendiente" con la fecha de emisión actual.
-function create({ perfil_id, periodo, valor_total, fecha_vencimiento, observacion }) {
+function create({ perfil_id, periodo, valor_total, fecha_vencimiento, observacion, tipo = 'servicio' }) {
   return supabaseAdmin
     .from(TABLE)
     .insert({
       perfil_id,
       periodo,
       valor_total,
+      tipo,
       estado: 'pendiente',
       fecha_emision: new Date().toISOString(),
       fecha_vencimiento: fecha_vencimiento || null,

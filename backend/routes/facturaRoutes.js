@@ -10,9 +10,11 @@ const {
 } = require('../controller/facturaController');
 const { verificarToken } = require('../middleware/authMiddleware');
 const { verificarRol } = require('../middleware/roleMiddleware');
+const { crearFacturaExtraordinaria } = require('../controller/facturaextraordinariaController');
 
 // --- Administrador ---
 router.get('/todas', verificarToken, verificarRol('administrador'), listarFacturas);
+router.post('/factura-extraordinaria', verificarToken, verificarRol('administrador'), crearFacturaExtraordinaria);
 router.post('/', verificarToken, verificarRol('administrador'), crearFactura);
 router.put('/:id', verificarToken, verificarRol('administrador'), actualizarFactura);
 router.delete('/:id', verificarToken, verificarRol('administrador'), eliminarFactura);
