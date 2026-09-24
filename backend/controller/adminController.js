@@ -4,6 +4,7 @@ const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
 const { enviarCorreo } = require('../config/mailer');
 const { notificar } = require('../utils/notificar');
+const { aplicarPaginacion } = require('../utils/paginacion');
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
@@ -114,7 +115,7 @@ async function crearUsuario(req, res) {
 
 // Listar todos los usuarios
 async function verTodosUsuarios(req, res) {
-  const { rol, activo } = req.query;
+  const { rol, activo, limit, offset } = req.query;
 
   try {
     let query = supabaseAdmin
@@ -125,6 +126,7 @@ async function verTodosUsuarios(req, res) {
     if (rol) query = query.eq('rol', rol);
     if (activo === 'true') query = query.eq('activo', true);
     if (activo === 'false') query = query.eq('activo', false);
+    query = aplicarPaginacion(query, { limit, offset });
 
     const { data, error } = await query;
     if (error) return errorConsulta(res, error);
