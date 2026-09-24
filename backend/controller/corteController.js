@@ -1,6 +1,7 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+const { aplicarPaginacion } = require('../utils/paginacion');
 
 // ---------- USUARIO FINAL ----------
 
@@ -54,7 +55,7 @@ async function estadoServicio(req, res) {
 
 // Ver todos los cortes, con filtro opcional ?estado=activo|reconectado
 async function listarCortes(req, res) {
-  const { estado, perfil_id } = req.query;
+  const { estado, perfil_id, limit, offset } = req.query;
 
   try {
     let query = supabaseAdmin
@@ -64,6 +65,7 @@ async function listarCortes(req, res) {
 
     if (estado) query = query.eq('estado', estado);
     if (perfil_id) query = query.eq('perfil_id', perfil_id);
+    query = aplicarPaginacion(query, { limit, offset });
 
     const { data, error } = await query;
     if (error) return errorConsulta(res, error);
@@ -83,6 +85,17 @@ async function crearCorte(req, res) {
   }
 
   try {
+    // Verificamos que el usuario destino exista
+    const { data: perfil, error: perfilError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('id', perfil_id)
+      .single();
+
+    if (perfilError || !perfil) {
+      return res.status(404).json({ error: 'El usuario indicado no existe' });
+    }
+
     // No duplicar un corte activo para el mismo usuario
     const { data: existente, error: existenteError } = await supabaseAdmin
       .from('service_outages')

@@ -2,6 +2,7 @@ const supabaseAdmin = require('../config/supabaseAdminClient');
 const { confirmarPago } = require('../services/pagosService');
 const { calcularFirmaIntegridad } = require('../utils/wompiFirma');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+const { aplicarPaginacion } = require('../utils/paginacion');
 
 const WOMPI_CURRENCY = process.env.WOMPI_CURRENCY || 'COP';
 
@@ -56,6 +57,26 @@ async function registrarPago(req, res) {
 
     if (factura.estado === 'anulada') {
       return res.status(400).json({ error: 'Esta factura está anulada' });
+    }
+
+    // Evita ensuciar el panel de pagos pendientes con duplicados por doble
+    // clic o reintentos del frontend: solo un pago sin confirmar a la vez
+    // por factura.
+    const { data: pagoPendiente, error: errorPendiente } = await req.db
+      .from('payments')
+      .select('id')
+      .eq('factura_id', factura_id)
+      .eq('confirmado', false)
+      .maybeSingle();
+
+    if (errorPendiente) {
+      return errorConsulta(res, errorPendiente);
+    }
+
+    if (pagoPendiente) {
+      return res.status(409).json({
+        error: 'Ya existe un pago pendiente de confirmación para esta factura',
+      });
     }
 
     // El monto NUNCA se toma del cliente: siempre es el valor real de la
@@ -115,7 +136,7 @@ async function registrarPago(req, res) {
 
 // Listar pagos, con filtro opcional ?confirmado=true|false y ?perfil_id=
 async function listarPagos(req, res) {
-  const { confirmado, perfil_id } = req.query;
+  const { confirmado, perfil_id, limit, offset } = req.query;
 
   try {
     let query = supabaseAdmin
@@ -126,6 +147,7 @@ async function listarPagos(req, res) {
     if (confirmado === 'true') query = query.eq('confirmado', true);
     if (confirmado === 'false') query = query.eq('confirmado', false);
     if (perfil_id) query = query.eq('perfil_id', perfil_id);
+    query = aplicarPaginacion(query, { limit, offset });
 
     const { data, error } = await query;
     if (error) return errorConsulta(res, error);

@@ -2,6 +2,7 @@ const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
 const { enviarCorreo } = require('../config/mailer');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+const { aplicarPaginacion } = require('../utils/paginacion');
 
 function formatearMoneda(valor) {
   return Number(valor).toLocaleString('es-CO');
@@ -74,7 +75,7 @@ async function verFactura(req, res) {
 
 // Listar todas las facturas, con filtros opcionales ?estado= y ?perfil_id=
 async function listarFacturas(req, res) {
-  const { estado, perfil_id } = req.query;
+  const { estado, perfil_id, limit, offset } = req.query;
 
   try {
     let query = supabaseAdmin
@@ -84,6 +85,7 @@ async function listarFacturas(req, res) {
 
     if (estado) query = query.eq('estado', estado);
     if (perfil_id) query = query.eq('perfil_id', perfil_id);
+    query = aplicarPaginacion(query, { limit, offset });
 
     const { data, error } = await query;
     if (error) return errorConsulta(res, error);
