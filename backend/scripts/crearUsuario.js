@@ -55,6 +55,27 @@ async function main() {
     process.exit(1);
   }
 
+  // El acueducto contempla un único fontanero a la vez: si ya hay uno
+  // (con otro correo), hay que eliminarlo antes de crear uno nuevo.
+  if (rol === 'fontanero') {
+    const { data: fontaneroExistente, error: errorBusqueda } = await supabaseAdmin
+      .from('profiles')
+      .select('correo')
+      .eq('rol', 'fontanero')
+      .neq('correo', correo)
+      .maybeSingle();
+
+    if (errorBusqueda) throw errorBusqueda;
+    if (fontaneroExistente) {
+      console.error(
+        `Ya existe un fontanero registrado (${fontaneroExistente.correo}). ` +
+        `Elimínalo primero con: node scripts/eliminarUsuario.js ${fontaneroExistente.correo}`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   let userId;
 
   const { data: creado, error: crearError } =

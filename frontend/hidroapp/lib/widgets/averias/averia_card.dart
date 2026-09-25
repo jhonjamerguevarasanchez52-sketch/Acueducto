@@ -7,10 +7,24 @@ import '../mensaje_estado.dart';
 
 /// Tarjeta de una avería reportada: fecha, estado, descripción y, si el
 /// fontanero la dejó, su nota y la fecha de resolución.
+///
+/// Cuando [onCambiarEstado] no es nulo (vista del fontanero) y la avería
+/// sigue abierta, muestra botones para marcarla "en proceso" o "resuelta".
+/// [actualizando] la controla la pantalla que la contiene: al vivir el flag
+/// fuera de esta tarjeta, no se pierde si la lista se reconstruye con datos
+/// frescos tras guardar el cambio (antes quedaba "pegado" mostrando el
+/// spinner para siempre porque esta tarjeta reutilizaba su propio estado).
 class AveriaCard extends StatelessWidget {
-  const AveriaCard({super.key, required this.averia});
+  const AveriaCard({
+    super.key,
+    required this.averia,
+    this.onCambiarEstado,
+    this.actualizando = false,
+  });
 
   final Averia averia;
+  final void Function(String nuevoEstado)? onCambiarEstado;
+  final bool actualizando;
 
   ({String texto, Color color}) get _estado {
     switch (averia.estado) {
@@ -95,6 +109,39 @@ class AveriaCard extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppTheme.secondaryText,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (onCambiarEstado != null && !averia.cerrada) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  if (averia.estado != 'en_proceso') ...[
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: actualizando
+                            ? null
+                            : () => onCambiarEstado!('en_proceso'),
+                        child: const Text('Trabajando en ello'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: actualizando
+                          ? null
+                          : () => onCambiarEstado!('resuelta'),
+                      child: actualizando
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Solucionada'),
                     ),
                   ),
                 ],

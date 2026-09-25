@@ -146,7 +146,8 @@ async function cambiarRol(req, res) {
     return res.status(400).json({ error: 'Rol inválido. Usa: administrador, usuario o fontanero' });
   }
 
-  // El acueducto contempla un único fontanero: si se asigna, se quita al anterior.
+  // El acueducto contempla un único fontanero a la vez: si ya hay uno asignado
+  // a otro usuario, hay que quitarle el rol (o eliminarlo) antes de asignar uno nuevo.
   try {
     if (rol === 'fontanero') {
       const { error: errorDegradacion } = await profileModel.demotePlumbers(userId);

@@ -20,16 +20,26 @@ class AveriasScreen extends StatefulWidget {
 
 class _AveriasScreenState extends State<AveriasScreen> {
   late Future<List<Averia>> _futuro;
+  late bool _esFontanero;
+
+  // Ids de averías con un cambio de estado en curso. Vive aquí (no dentro de
+  // AveriaCard) para no depender de que Flutter reutilice el State de la
+  // tarjeta tras refrescar la lista: si viviera en la tarjeta, al llegar los
+  // datos nuevos la bandera podía quedar "pegada" en true y el botón se veía
+  // deshabilitado para siempre aunque el cambio ya se hubiera guardado.
+  final Set<String> _actualizandoIds = {};
 
   @override
   void initState() {
     super.initState();
+    final rol = context.read<AuthProvider>().profile?.rol;
+    _esFontanero = rol == 'fontanero' || rol == 'administrador';
     _futuro = _cargar();
   }
 
   Future<List<Averia>> _cargar() async {
-    final data =
-        await context.read<AuthProvider>().api.get('/averias/mis-averias');
+    final ruta = _esFontanero ? '/averias' : '/averias/mis-averias';
+    final data = await context.read<AuthProvider>().api.get(ruta);
     return Averia.listaDesde(data);
   }
 
@@ -37,6 +47,25 @@ class _AveriasScreenState extends State<AveriasScreen> {
     final futuro = _cargar();
     setState(() => _futuro = futuro);
     await futuro.catchError((_) => <Averia>[]);
+  }
+
+  Future<void> _cambiarEstado(Averia averia, String nuevoEstado) async {
+    setState(() => _actualizandoIds.add(averia.id));
+    try {
+      await context.read<AuthProvider>().api.put(
+        '/averias/${averia.id}',
+        body: {'estado': nuevoEstado},
+      );
+      await _refrescar();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _actualizandoIds.remove(averia.id));
+    }
   }
 
   Future<void> _abrirReporte() async {
@@ -57,12 +86,16 @@ class _AveriasScreenState extends State<AveriasScreen> {
   @override
   Widget build(BuildContext context) {
     return GotaScaffold(
-      appBar: AppBar(title: const Text('Averías')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _abrirReporte,
-        icon: const Icon(Icons.add),
-        label: const Text('Reportar'),
+      appBar: AppBar(
+        title: Text(_esFontanero ? 'Averías reportadas' : 'Averías'),
       ),
+      floatingActionButton: _esFontanero
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _abrirReporte,
+              icon: const Icon(Icons.add),
+              label: const Text('Reportar'),
+            ),
       body: RefreshIndicator(
         onRefresh: _refrescar,
         child: FutureBuilder<List<Averia>>(
@@ -88,12 +121,13 @@ class _AveriasScreenState extends State<AveriasScreen> {
             final averias = snap.data ?? const <Averia>[];
             if (averias.isEmpty) {
               return ListView(
-                children: const [
+                children: [
                   MensajeEstado(
                     icono: Icons.build_outlined,
                     titulo: 'Sin averías reportadas',
-                    detalle:
-                        'Usa el botón "Reportar" si tienes un problema con el servicio.',
+                    detalle: _esFontanero
+                        ? 'Por ahora no hay averías pendientes.'
+                        : 'Usa el botón "Reportar" si tienes un problema con el servicio.',
                   ),
                 ],
               );
@@ -102,7 +136,17 @@ class _AveriasScreenState extends State<AveriasScreen> {
             return ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               itemCount: averias.length,
-              itemBuilder: (context, i) => AveriaCard(averia: averias[i]),
+              itemBuilder: (context, i) {
+                final averia = averias[i];
+                return AveriaCard(
+                  key: ValueKey(averia.id),
+                  averia: averia,
+                  actualizando: _actualizandoIds.contains(averia.id),
+                  onCambiarEstado: _esFontanero
+                      ? (nuevoEstado) => _cambiarEstado(averia, nuevoEstado)
+                      : null,
+                );
+              },
             );
           },
         ),
