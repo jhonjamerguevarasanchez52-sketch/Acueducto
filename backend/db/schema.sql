@@ -61,6 +61,8 @@ create table if not exists public.invoices (
   id                uuid primary key default gen_random_uuid(),
   perfil_id         uuid not null references public.profiles (id) on delete cascade,
   periodo           text not null,                 -- ej. '2026-09'
+  tipo              text not null default 'servicio'
+                    check (tipo in ('servicio', 'extraordinaria')),
   valor_total       numeric(12,2) not null check (valor_total > 0),
   estado            text not null default 'pendiente'
                      check (estado in ('pendiente', 'pagada', 'anulada', 'vencida')),
@@ -242,6 +244,7 @@ create policy "cortes: ver los propios"
 --  (Son idempotentes: "if not exists".)
 -- ============================================================================
 alter table public.invoices        add column if not exists periodo           text;
+alter table public.invoices        add column if not exists tipo              text not null default 'servicio';
 alter table public.invoices        add column if not exists fecha_vencimiento date;
 alter table public.invoices        add column if not exists observacion       text;
 

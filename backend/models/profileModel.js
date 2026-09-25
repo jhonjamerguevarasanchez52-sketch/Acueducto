@@ -34,6 +34,10 @@ function listActiveIds() {
   return supabaseAdmin.from(TABLE).select('id').eq('activo', true);
 }
 
+function listActiveForBilling() {
+  return supabaseAdmin.from(TABLE).select('id, nombre, correo').eq('activo', true).eq('rol', 'usuario');
+}
+
 function create(datos) {
   return supabaseAdmin.from(TABLE).insert(datos);
 }
@@ -55,4 +59,14 @@ function demotePlumbers(except) {
   return query;
 }
 
-module.exports = { getById, findByEmail, list, listActiveIds, create, update, saveFields, demotePlumbers };
+module.exports = {
+  getById,
+  findByEmail,
+  list,
+  listActiveIds,
+  listActiveForBilling,
+  create,
+  update,
+  saveFields,
+  demotePlumbers,
+};
