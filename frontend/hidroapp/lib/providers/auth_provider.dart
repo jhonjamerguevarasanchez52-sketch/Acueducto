@@ -120,6 +120,13 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Vuelve a pedir el perfil al backend (p. ej. tras editarlo) y notifica a
+  /// quien esté escuchando (como [PerfilScreen]).
+  Future<void> refreshProfile() async {
+    await _loadProfile();
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     await _clear();
     _setStatus(AuthStatus.unauthenticated);

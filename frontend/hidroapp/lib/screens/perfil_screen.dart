@@ -3,12 +3,19 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/gota_scaffold.dart';
+import 'editar_perfil_screen.dart';
 
-/// Pestaña "Perfil": muestra los datos de la cuenta del usuario y permite
-/// cerrar sesión. Los datos solo los edita el administrador del acueducto, así
-/// que aquí se ven en modo lectura.
+/// Pestaña "Perfil": muestra los datos de la cuenta del usuario, permite
+/// editarlos (una vez cada 30 días) y cerrar sesión.
 class PerfilScreen extends StatelessWidget {
   const PerfilScreen({super.key});
+
+  Future<void> _editarPerfil(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EditarPerfilScreen()),
+    );
+  }
 
   Future<void> _cerrarSesion(BuildContext context) async {
     final confirmar = await showDialog<bool>(
@@ -46,7 +53,7 @@ class PerfilScreen extends StatelessWidget {
     final perfil = context.watch<AuthProvider>().profile;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
+    return GotaScaffold(
       appBar: AppBar(title: const Text('Mi perfil')),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -123,15 +130,21 @@ class PerfilScreen extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => _editarPerfil(context),
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Editar perfil'),
+          ),
           const SizedBox(height: 8),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Text(
-              'Para corregir tus datos, contacta al administrador del acueducto.',
+              'Solo puedes editar tus datos una vez cada 30 días.',
               style: TextStyle(color: AppTheme.secondaryText, fontSize: 12),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () => _cerrarSesion(context),
             icon: const Icon(Icons.logout),

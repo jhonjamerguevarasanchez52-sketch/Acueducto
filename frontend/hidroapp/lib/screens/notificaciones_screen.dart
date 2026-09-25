@@ -8,6 +8,9 @@ import '../theme/app_theme.dart';
 import '../utils/formato.dart';
 import '../widgets/gota_scaffold.dart';
 import '../widgets/mensaje_estado.dart';
+import 'averias_screen.dart';
+import 'estado_servicio_screen.dart';
+import 'facturas_screen.dart';
 
 /// Módulo "Notificaciones": avisos del acueducto (facturas, pagos, averías,
 /// cortes, mensajes generales). Se pueden marcar como leídas una a una o
@@ -67,6 +70,31 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
             x.id == n.id ? x.copyWith(leida: false) : x,
         ];
       });
+    }
+  }
+
+  /// Según el tipo de aviso, abre la pantalla donde el usuario puede ver el
+  /// detalle o actuar sobre lo que causó la notificación (pagar la factura,
+  /// ver el estado de la avería, etc.).
+  void _abrirCausante(Notificacion n) {
+    _marcarUna(n);
+    Widget? destino;
+    switch (n.tipo) {
+      case 'factura':
+      case 'pago':
+      case 'cuota_extraordinaria':
+        destino = const FacturasScreen();
+        break;
+      case 'averia':
+        destino = const AveriasScreen();
+        break;
+      case 'corte':
+        destino = const EstadoServicioScreen();
+        break;
+    }
+    if (destino != null) {
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => destino!));
     }
   }
 
@@ -149,7 +177,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, i) => _NotificacionCard(
                 notificacion: _notificaciones[i],
-                onTap: () => _marcarUna(_notificaciones[i]),
+                onTap: () => _abrirCausante(_notificaciones[i]),
               ),
             );
           },
@@ -182,7 +210,7 @@ class _NotificacionCard extends StatelessWidget {
       color: leida ? Colors.white : AppTheme.surfaceTint,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        onTap: leida ? null : onTap,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.all(14),

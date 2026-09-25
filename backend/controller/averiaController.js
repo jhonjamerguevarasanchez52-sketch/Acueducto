@@ -21,6 +21,7 @@ async function avisarFontaneroPorCorreo(averia) {
 
     const html = `<p>Se reportó una nueva avería:</p>
       <p><strong>Descripción:</strong> ${averia.descripcion}</p>
+      ${averia.direccion ? `<p><strong>Dirección:</strong> ${averia.direccion}</p>` : ''}
       ${averia.zona ? `<p><strong>Zona:</strong> ${averia.zona}</p>` : ''}
       <p><strong>Fecha:</strong> ${new Date(averia.fecha_reporte).toLocaleString('es-CO')}</p>`;
 
@@ -45,14 +46,26 @@ async function reportarAveria(req, res) {
   try {
     const perfilId = req.usuario.id;
     const zonaUsuario = req.usuario.zona;
-    const { descripcion } = req.body;
+    const direccionUsuario = req.usuario.direccion;
+    const { descripcion, ubicacionConfirmada } = req.body;
 
     if (!descripcion || !descripcion.trim()) {
       return res.status(400).json({ error: 'La descripción es obligatoria' });
     }
 
+    // La ubicación siempre se toma de los datos de la cuenta (no la escribe
+    // el usuario), pero debe confirmarla explícitamente antes de reportar.
+    if (!zonaUsuario && !direccionUsuario) {
+      return res.status(400).json({
+        error: 'Tu cuenta no tiene una dirección registrada. Contacta al administrador del acueducto para registrarla antes de reportar.',
+      });
+    }
+    if (ubicacionConfirmada !== true) {
+      return res.status(400).json({ error: 'Debes confirmar que esa es la ubicación de la avería' });
+    }
+
     const { data, error } = await breakdownModel.create(
-      { perfil_id: perfilId, descripcion: descripcion.trim(), zona: zonaUsuario },
+      { perfil_id: perfilId, descripcion: descripcion.trim(), zona: zonaUsuario, direccion: direccionUsuario },
       req.db
     );
 

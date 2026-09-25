@@ -8,6 +8,7 @@ class Averia {
     required this.descripcion,
     required this.estado,
     this.zona,
+    this.direccion,
     this.notaFontanero,
     this.fechaReporte,
     this.fechaResolucion,
@@ -17,6 +18,7 @@ class Averia {
   final String descripcion;
   final String estado; // reportada | en_proceso | resuelta | cancelada
   final String? zona;
+  final String? direccion;
   final String? notaFontanero;
   final DateTime? fechaReporte;
   final DateTime? fechaResolucion;
@@ -31,6 +33,9 @@ class Averia {
       zona: (json['zona']?.toString().trim().isEmpty ?? true)
           ? null
           : json['zona'].toString(),
+      direccion: (json['direccion']?.toString().trim().isEmpty ?? true)
+          ? null
+          : json['direccion'].toString(),
       notaFontanero:
           (json['nota_fontanero']?.toString().trim().isEmpty ?? true)
               ? null

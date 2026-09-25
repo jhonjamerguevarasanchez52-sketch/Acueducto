@@ -42,7 +42,10 @@ function create(datos) {
   return supabaseAdmin.from(TABLE).insert(datos);
 }
 
-// Actualiza y devuelve el perfil con sus columnas públicas.
+// Actualiza y devuelve el perfil con sus columnas públicas. `cambios` debe
+// incluir `updated_at` si el llamador quiere sellar la hora del cambio (lo
+// hace editarPerfil, para el límite mensual de autoedición; la edición hecha
+// por un administrador no lo sella, así no consume el cupo del usuario).
 function update(id, cambios, db = supabaseAdmin) {
   return db.from(TABLE).update(cambios).eq('id', id).select(COLUMNAS_PERFIL_PUBLICO).single();
 }

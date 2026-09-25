@@ -38,7 +38,10 @@ create table if not exists public.profiles (
   ocupacion                      text,
   zona                           text,
 
-  created_at                     timestamptz not null default now()
+  created_at                     timestamptz not null default now(),
+  -- se actualiza cada vez que el propio usuario edita sus datos; sirve para
+  -- limitar la edición del perfil a una vez cada 30 días.
+  updated_at                     timestamptz
 );
 
 -- ----------------------------------------------------------------------------
@@ -104,6 +107,7 @@ create table if not exists public.breakdowns (
   fontanero_id     uuid references public.profiles (id),
   descripcion      text not null,
   zona             text,
+  direccion        text,
   estado           text not null default 'reportada'
                     check (estado in ('reportada', 'en_proceso', 'resuelta', 'cancelada')),
   nota_fontanero   text,
@@ -256,9 +260,11 @@ alter table public.payments        add column if not exists transaccion_id      
 
 alter table public.breakdowns      add column if not exists nota_fontanero    text;
 alter table public.breakdowns      add column if not exists fontanero_id      uuid references public.profiles (id);
+alter table public.breakdowns      add column if not exists direccion         text;
 
 alter table public.service_outages add column if not exists factura_id        uuid references public.invoices (id) on delete set null;
 alter table public.service_outages add column if not exists fecha_reconexion  timestamptz;
 
 alter table public.profiles        add column if not exists activo            boolean not null default true;
 alter table public.profiles        add column if not exists debe_cambiar_password boolean not null default false;
+alter table public.profiles        add column if not exists updated_at         timestamptz;

@@ -24,7 +24,7 @@ async function verificarToken(req, res, next) {
 
     // Traer el perfil (rol, zona, nombre, etc.) desde la tabla profiles
     const { data: perfil, error: errorPerfil } = await profileModel.getById(data.user.id, {
-      columns: 'id, rol, zona, nombre, apellido, activo, is_verified, debe_cambiar_password',
+      columns: 'id, rol, zona, direccion, nombre, apellido, activo, is_verified, debe_cambiar_password',
       db: req.db,
     });
 
