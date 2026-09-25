@@ -14,12 +14,23 @@
       "problemMatcher": []
     },
     {
+      "label": "Iniciar Emulador Pixel 10a",
+      "type": "shell",
+      "command": "if (-not (adb devices | Select-String 'emulator')) { flutter emulators --launch Pixel_10a; do { Start-Sleep -Seconds 2 } until ((adb shell getprop sys.boot_completed 2>$null) -eq '1') }",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend/hidroapp"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Iniciar Frontend Flutter",
       "type": "shell",
       "command": "flutter run",
       "options": {
         "cwd": "${workspaceFolder}/frontend/hidroapp"
       },
+      "dependsOn": ["Iniciar Emulador Pixel 10a"],
+      "dependsOrder": "sequence",
       "runOptions": {
         "runOn": "folderOpen"
       },
