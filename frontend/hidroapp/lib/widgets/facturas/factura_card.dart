@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../models/factura.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
-import '../fila_detalle.dart';
-import '../mensaje_estado.dart';
+import '../core/fila_detalle.dart';
+import '../core/mensaje_estado.dart';
 
 /// Tarjeta de una factura: periodo, valor, fechas y observación. Si está
 /// pendiente muestra los botones "Pagar" y "Mis pagos".
@@ -20,24 +20,25 @@ class FacturaCard extends StatelessWidget {
   final VoidCallback onPagar;
   final VoidCallback onVerPagos;
 
-  ({String texto, Color color}) get _estado {
+  ({String texto, Color color}) _estado(AppColors colores) {
     switch (factura.estado) {
       case 'pagada':
-        return (texto: 'Pagada', color: AppTheme.success);
+        return (texto: 'Pagada', color: colores.success);
       case 'anulada':
-        return (texto: 'Anulada', color: AppTheme.secondaryText);
+        return (texto: 'Anulada', color: colores.secondaryText);
       case 'vencida':
-        return (texto: 'Vencida', color: AppTheme.danger);
+        return (texto: 'Vencida', color: colores.danger);
       default:
         return factura.estaVencida
-            ? (texto: 'Vencida', color: AppTheme.danger)
-            : (texto: 'Pendiente', color: AppTheme.warning);
+            ? (texto: 'Vencida', color: colores.danger)
+            : (texto: 'Pendiente', color: colores.warning);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final estado = _estado;
+    final colores = AppColors.of(context);
+    final estado = _estado(colores);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -61,10 +62,10 @@ class FacturaCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               Formato.pesos(factura.valorTotal),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
-                color: AppTheme.primaryDark,
+                color: colores.info,
               ),
             ),
             const SizedBox(height: 8),

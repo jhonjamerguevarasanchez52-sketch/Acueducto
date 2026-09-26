@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/corte.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
-import '../fila_detalle.dart';
+import '../core/fila_detalle.dart';
 
 /// Tarjeta principal del módulo "Estado del servicio": en verde si el agua
 /// está activa, en rojo si está suspendida, con el motivo y la fecha del corte
@@ -20,12 +20,13 @@ class TarjetaEstadoServicio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = cortado ? AppTheme.danger : AppTheme.success;
+    final colores = AppColors.of(context);
+    final color = cortado ? colores.danger : colores.success;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
         border: Border.all(color: color.withValues(alpha: 0.30)),
       ),
       child: Column(

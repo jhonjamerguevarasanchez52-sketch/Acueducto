@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import '../core/entrada_animada.dart';
 
 /// Cabecera azul con degradado de la pestaña "Inicio": saludo, bienvenida a
 /// HidroApp y un par de etiquetas de estado. Imita la tarjeta superior del
@@ -37,42 +38,44 @@ class HomeCabecera extends StatelessWidget {
           bottomRight: Radius.circular(28),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            saludo,
-            style: const TextStyle(
-              color: AppTheme.skyText,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+      child: EntradaAnimada(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              saludo,
+              style: const TextStyle(
+                color: AppTheme.skyText,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Bienvenido a HidroApp',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              height: 1.15,
+            const SizedBox(height: 6),
+            const Text(
+              'Bienvenido a HidroApp',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                height: 1.15,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Tu acueducto veredal, siempre a la mano.',
-            style: TextStyle(color: Colors.white70, fontSize: 13.5),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              const _Etiqueta(texto: 'Servicio activo', conPunto: true),
-              if (tieneZona) _Etiqueta(texto: 'Zona ${zona!.trim()}'),
-            ],
-          ),
-        ],
+            const SizedBox(height: 8),
+            const Text(
+              'Tu acueducto veredal, siempre a la mano.',
+              style: TextStyle(color: Colors.white70, fontSize: 13.5),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                const _Etiqueta(texto: 'Servicio activo', conPunto: true),
+                if (tieneZona) _Etiqueta(texto: 'Zona ${zona!.trim()}'),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

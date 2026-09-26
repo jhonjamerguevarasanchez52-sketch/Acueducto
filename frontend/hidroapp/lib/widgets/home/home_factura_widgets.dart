@@ -11,13 +11,14 @@ class CajaBlanca extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colores.cardBackground,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE3EEF4)),
+        border: Border.all(color: colores.cardBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),

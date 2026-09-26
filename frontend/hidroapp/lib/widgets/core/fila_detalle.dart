@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Fila de detalle "ícono + texto" usada en las tarjetas de los módulos
 /// (facturas, pagos, cortes, estado del servicio). Un ícono pequeño en gris
@@ -14,19 +14,20 @@ class FilaDetalle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final secundario = AppColors.of(context).secondaryText;
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icono, size: 15, color: AppTheme.secondaryText),
+          Icon(icono, size: 15, color: secundario),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               texto,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: AppTheme.secondaryText,
+                color: secundario,
               ),
             ),
           ),

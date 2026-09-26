@@ -5,12 +5,8 @@ import '../models/factura.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/formato.dart';
-import '../widgets/gota_scaffold.dart';
-import '../widgets/home/home_cabecera.dart';
-import '../widgets/home/home_mensaje_destacado.dart';
-import '../widgets/home/home_modulo_tile.dart';
-import '../widgets/home/home_proxima_factura.dart';
-import '../widgets/pagar_sheet.dart';
+import '../widgets/core/core.dart';
+import '../widgets/home/home.dart';
 import 'estado_servicio_screen.dart';
 import 'pagos_screen.dart';
 
@@ -59,17 +55,11 @@ class _HomeScreenState extends State<HomeScreen> {
         if (eleccion.referencia != null) 'referencia': eleccion.referencia,
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pago registrado. Queda pendiente de confirmación.'),
-        ),
-      );
+      AppSnackbar.success(context, 'Pago registrado. Queda pendiente de confirmación.');
       _refrescar();
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      AppSnackbar.error(context, e.message);
     }
   }
 

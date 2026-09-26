@@ -6,8 +6,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formato.dart';
-import '../widgets/gota_scaffold.dart';
-import '../widgets/mensaje_estado.dart';
+import '../widgets/core/core.dart';
 import 'averias_screen.dart';
 import 'estado_servicio_screen.dart';
 import 'facturas_screen.dart';
@@ -115,9 +114,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _notificaciones = previas);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      AppSnackbar.error(context, e.message);
     } finally {
       if (mounted) setState(() => _marcandoTodas = false);
     }
@@ -126,8 +123,8 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
   @override
   Widget build(BuildContext context) {
     return GotaScaffold(
-      appBar: AppBar(
-        title: const Text('Notificaciones'),
+      appBar: HidroAppBar(
+        title: 'Notificaciones',
         actions: [
           if (_noLeidas > 0)
             TextButton(
@@ -143,7 +140,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
           future: _futuro,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const SkeletonLista();
             }
 
             if (snap.hasError) {
@@ -175,9 +172,12 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
               padding: const EdgeInsets.all(16),
               itemCount: _notificaciones.length,
               separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, i) => _NotificacionCard(
-                notificacion: _notificaciones[i],
-                onTap: () => _abrirCausante(_notificaciones[i]),
+              itemBuilder: (context, i) => EntradaAnimada(
+                retraso: AppTheme.motionEscalon * i,
+                child: _NotificacionCard(
+                  notificacion: _notificaciones[i],
+                  onTap: () => _abrirCausante(_notificaciones[i]),
+                ),
               ),
             );
           },
@@ -205,19 +205,20 @@ class _NotificacionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final leida = notificacion.leida;
     final icono = _iconos[notificacion.tipo] ?? Icons.notifications_none;
+    final colores = AppColors.of(context);
 
     return Material(
-      color: leida ? Colors.white : AppTheme.surfaceTint,
-      borderRadius: BorderRadius.circular(18),
+      color: leida ? colores.cardBackground : colores.chipBackground,
+      borderRadius: BorderRadius.circular(AppTheme.cardRadius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(AppTheme.cardRadius),
             border: Border.all(
-              color: leida ? const Color(0xFFE3EEF4) : AppTheme.accent,
+              color: leida ? colores.cardBorder : AppTheme.accent,
             ),
           ),
           child: Row(
@@ -226,10 +227,10 @@ class _NotificacionCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: leida ? AppTheme.surfaceTint : Colors.white,
+                  color: leida ? colores.chipBackground : colores.cardBackground,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icono, size: 20, color: AppTheme.primaryDark),
+                child: Icon(icono, size: 20, color: colores.info),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -248,9 +249,9 @@ class _NotificacionCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       Formato.fechaHora(notificacion.fecha),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.secondaryText,
+                        color: colores.secondaryText,
                       ),
                     ),
                   ],

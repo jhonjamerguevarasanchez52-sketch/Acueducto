@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../screens/verificar_cuenta_screen.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../core/app_snackbar.dart';
 import 'auth_style.dart';
 
 /// Tarjeta blanca con el formulario de inicio de sesión: correo, contraseña y
@@ -58,21 +59,16 @@ class _LoginFormState extends State<LoginForm> {
         );
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      AppSnackbar.error(context, e.message);
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
   }
 
   void _recuperarPassword() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Para restablecer tu contraseña, contacta al administrador del acueducto.',
-        ),
-      ),
+    AppSnackbar.info(
+      context,
+      'Para restablecer tu contraseña, contacta al administrador del acueducto.',
     );
   }
 
@@ -95,18 +91,19 @@ class _LoginFormState extends State<LoginForm> {
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Ingresa con tu correo y contraseña',
-              style: TextStyle(fontSize: 13.5, color: authMuted),
+              style: TextStyle(fontSize: 13.5, color: authMutedDe(context)),
             ),
             const SizedBox(height: 22),
-            authFieldLabel('CORREO ELECTRÓNICO'),
+            authFieldLabel(context, 'CORREO ELECTRÓNICO'),
             TextFormField(
               controller: _correoCtrl,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
               textInputAction: TextInputAction.next,
               decoration: authInputDecoration(
+                context,
                 hint: 'tucorreo@ejemplo.com',
                 icon: Icons.mail_outline,
               ),
@@ -120,13 +117,14 @@ class _LoginFormState extends State<LoginForm> {
               },
             ),
             const SizedBox(height: 16),
-            authFieldLabel('CONTRASEÑA'),
+            authFieldLabel(context, 'CONTRASEÑA'),
             TextFormField(
               controller: _passwordCtrl,
               obscureText: !_verPassword,
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => _cargando ? null : _entrar(),
               decoration: authInputDecoration(
+                context,
                 hint: '••••••••',
                 icon: Icons.lock_outline,
                 suffix: IconButton(
@@ -135,7 +133,7 @@ class _LoginFormState extends State<LoginForm> {
                     _verPassword
                         ? Icons.visibility_off_outlined
                         : Icons.visibility_outlined,
-                    color: authMuted,
+                    color: authMutedDe(context),
                     size: 20,
                   ),
                   onPressed: () =>

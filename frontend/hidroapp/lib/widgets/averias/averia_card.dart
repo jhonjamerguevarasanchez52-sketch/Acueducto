@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/averia.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
-import '../mensaje_estado.dart';
+import '../core/mensaje_estado.dart';
 
 /// Tarjeta de una avería reportada: fecha, estado, descripción y, si el
 /// fontanero la dejó, su nota y la fecha de resolución.
@@ -26,22 +26,23 @@ class AveriaCard extends StatelessWidget {
   final void Function(String nuevoEstado)? onCambiarEstado;
   final bool actualizando;
 
-  ({String texto, Color color}) get _estado {
+  ({String texto, Color color}) _estado(AppColors colores) {
     switch (averia.estado) {
       case 'en_proceso':
-        return (texto: 'En proceso', color: AppTheme.info);
+        return (texto: 'En proceso', color: colores.info);
       case 'resuelta':
-        return (texto: 'Resuelta', color: AppTheme.success);
+        return (texto: 'Resuelta', color: colores.success);
       case 'cancelada':
-        return (texto: 'Cancelada', color: AppTheme.secondaryText);
+        return (texto: 'Cancelada', color: colores.secondaryText);
       default:
-        return (texto: 'Reportada', color: AppTheme.warning);
+        return (texto: 'Reportada', color: colores.warning);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final estado = _estado;
+    final colores = AppColors.of(context);
+    final estado = _estado(colores);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -53,9 +54,9 @@ class AveriaCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     Formato.fecha(averia.fechaReporte),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppTheme.secondaryText,
+                      color: colores.secondaryText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -73,19 +74,19 @@ class AveriaCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceTint,
+                  color: colores.chipBackground,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Nota del fontanero',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.5,
-                        color: AppTheme.primaryDark,
+                        color: colores.info,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -101,14 +102,14 @@ class AveriaCard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.check_circle_outline,
-                      size: 15, color: AppTheme.secondaryText),
+                  Icon(Icons.check_circle_outline,
+                      size: 15, color: colores.secondaryText),
                   const SizedBox(width: 6),
                   Text(
                     'Resuelta: ${Formato.fecha(averia.fechaResolucion)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppTheme.secondaryText,
+                      color: colores.secondaryText,
                     ),
                   ),
                 ],

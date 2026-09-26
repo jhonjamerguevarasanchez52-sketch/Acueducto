@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Frases cortas que GOTA muestra de vez en cuando en su burbuja de texto,
 /// para darle personalidad al asistente sin ser invasivo.

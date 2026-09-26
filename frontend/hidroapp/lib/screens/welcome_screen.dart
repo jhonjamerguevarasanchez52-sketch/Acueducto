@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../widgets/welcome/welcome_background.dart';
-import '../widgets/welcome/welcome_common.dart';
-import '../widgets/welcome/welcome_drop.dart';
-import '../widgets/welcome/welcome_loading_dots.dart';
-import '../widgets/welcome/welcome_ring.dart';
-import '../widgets/welcome/welcome_textos.dart';
+import '../widgets/welcome/welcome.dart';
 
 /// Pantalla de bienvenida animada (splash) de HIDRO-APP.
 ///

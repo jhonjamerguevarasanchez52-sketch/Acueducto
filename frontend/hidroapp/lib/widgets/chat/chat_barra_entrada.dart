@@ -19,13 +19,14 @@ class ChatBarraEntrada extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
     return SafeArea(
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE3EEF4))),
+        decoration: BoxDecoration(
+          color: colores.cardBackground,
+          border: Border(top: BorderSide(color: colores.cardBorder)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,

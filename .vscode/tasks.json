@@ -16,9 +16,13 @@
     {
       "label": "Iniciar Emulador Pixel 10a",
       "type": "shell",
-      "command": "if (-not (adb devices | Select-String 'emulator')) { flutter emulators --launch Pixel_10a; do { Start-Sleep -Seconds 2 } until ((adb shell getprop sys.boot_completed 2>$null) -eq '1') }",
+      "command": "$serial = (adb devices | Select-String 'emulator-\\d+\\s+device' | ForEach-Object { ($_ -split '\\s+')[0] } | Select-Object -First 1); if (-not $serial) { flutter emulators --launch Pixel_10a; do { Start-Sleep -Seconds 2; $serial = (adb devices | Select-String 'emulator-\\d+\\s+device' | ForEach-Object { ($_ -split '\\s+')[0] } | Select-Object -First 1) } until ($serial -and ((adb -s $serial shell getprop sys.boot_completed 2>$null) -eq '1')) }",
       "options": {
-        "cwd": "${workspaceFolder}/frontend/hidroapp"
+        "cwd": "${workspaceFolder}/frontend/hidroapp",
+        "shell": {
+          "executable": "powershell.exe",
+          "args": ["-NoProfile", "-Command"]
+        }
       },
       "problemMatcher": []
     },

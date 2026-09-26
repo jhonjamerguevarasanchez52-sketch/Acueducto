@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../core/app_snackbar.dart';
 import 'auth_style.dart';
 
 /// Tarjeta blanca con el formulario de verificación de cuenta: el campo del
@@ -50,11 +51,7 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
       // salir de la pila, la pantalla de login que quedó debajo también se va.
       if (mounted) Navigator.of(context).pop();
     } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
+      if (mounted) AppSnackbar.error(context, e.message);
     } finally {
       if (mounted) setState(() => _verificando = false);
     }
@@ -68,20 +65,13 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
           .read<AuthProvider>()
           .reenviarCodigoVerificacion(widget.correo);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Si la cuenta no está verificada, te enviamos un código nuevo.',
-            ),
-          ),
+        AppSnackbar.info(
+          context,
+          'Si la cuenta no está verificada, te enviamos un código nuevo.',
         );
       }
     } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
+      if (mounted) AppSnackbar.error(context, e.message);
     } finally {
       if (mounted) setState(() => _reenviando = false);
     }
@@ -108,17 +98,17 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
             const SizedBox(height: 6),
             Text.rich(
               TextSpan(
-                style: const TextStyle(
-                    fontSize: 13.5, color: authMuted, height: 1.4),
+                style: TextStyle(
+                    fontSize: 13.5, color: authMutedDe(context), height: 1.4),
                 children: [
                   const TextSpan(
                     text: 'Enviamos un código de 6 dígitos a\n',
                   ),
                   TextSpan(
                     text: widget.correo,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: authLabel,
+                      color: authLabelDe(context),
                     ),
                   ),
                   const TextSpan(
@@ -127,7 +117,7 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
               ),
             ),
             const SizedBox(height: 22),
-            authFieldLabel('CÓDIGO DE VERIFICACIÓN'),
+            authFieldLabel(context, 'CÓDIGO DE VERIFICACIÓN'),
             TextFormField(
               controller: _codigoCtrl,
               keyboardType: TextInputType.number,
@@ -146,6 +136,7 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
               ),
               textAlign: TextAlign.center,
               decoration: authInputDecoration(
+                context,
                 hint: '000000',
                 counterText: '',
                 hintStyle: const TextStyle(

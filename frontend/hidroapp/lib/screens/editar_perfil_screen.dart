@@ -6,7 +6,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formato.dart';
-import '../widgets/gota_scaffold.dart';
+import '../widgets/core/core.dart';
 
 /// Formulario para que el propio usuario edite sus datos de perfil. El
 /// backend solo permite un cambio cada [diasLimiteEdicionPerfil] días; si el
@@ -75,16 +75,12 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
       if (!mounted) return;
       await context.read<AuthProvider>().refreshProfile();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Perfil actualizado')),
-      );
+      AppSnackbar.success(context, 'Perfil actualizado');
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       if (mounted) {
         setState(() => _guardando = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        AppSnackbar.error(context, e.message);
       }
     }
   }
@@ -95,7 +91,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
     final proximaEdicion = perfil?.proximaEdicionDisponible;
 
     return GotaScaffold(
-      appBar: AppBar(title: const Text('Editar perfil')),
+      appBar: const HidroAppBar(title: 'Editar perfil'),
       body: proximaEdicion != null
           ? _BloqueadoPorLimite(proximaEdicion: proximaEdicion)
           : ListView(
@@ -104,14 +100,14 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppTheme.surfaceTint,
+                    color: AppColors.of(context).chipBackground,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: AppTheme.primaryDark),
-                      SizedBox(width: 10),
-                      Expanded(
+                      Icon(Icons.info_outline, color: AppColors.of(context).info),
+                      const SizedBox(width: 10),
+                      const Expanded(
                         child: Text(
                           'Solo puedes editar tus datos una vez cada 30 días. '
                           'Revísalos bien antes de guardar.',
@@ -202,14 +198,14 @@ class _BloqueadoPorLimite extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final secundario = AppColors.of(context).secondaryText;
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.lock_clock_outlined,
-                size: 56, color: AppTheme.secondaryText),
+            Icon(Icons.lock_clock_outlined, size: 56, color: secundario),
             const SizedBox(height: 16),
             const Text(
               'Ya editaste tu perfil este mes',
@@ -219,7 +215,7 @@ class _BloqueadoPorLimite extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Podrás volver a editarlo a partir del ${Formato.fecha(proximaEdicion)}.',
-              style: const TextStyle(color: AppTheme.secondaryText),
+              style: TextStyle(color: secundario),
               textAlign: TextAlign.center,
             ),
           ],

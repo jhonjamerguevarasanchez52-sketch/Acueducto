@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../widgets/auth/auth_style.dart';
-import '../widgets/auth/login_form.dart';
-import '../widgets/hidro_logo.dart';
+import '../widgets/auth/auth.dart';
+import '../widgets/core/hidro_logo.dart';
 
 /// Pantalla de inicio de sesión de HIDRO-APP.
 ///

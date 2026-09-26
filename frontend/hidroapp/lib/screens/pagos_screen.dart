@@ -4,11 +4,10 @@ import 'package:provider/provider.dart';
 import '../models/pago.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 import '../utils/formato.dart';
-import '../widgets/gota_scaffold.dart';
-import '../widgets/mensaje_estado.dart';
-import '../widgets/pagar_sheet.dart';
-import '../widgets/pagos/pago_card.dart';
+import '../widgets/core/core.dart';
+import '../widgets/pagos/pagos.dart';
 
 /// Módulo "Mis pagos": historial de los pagos registrados por el usuario,
 /// con su método y si ya fueron confirmados por el acueducto o Wompi.
@@ -55,31 +54,25 @@ class _PagosScreenState extends State<PagosScreen> {
         if (eleccion.referencia != null) 'referencia': eleccion.referencia,
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pago registrado. Queda pendiente de confirmación.'),
-        ),
-      );
+      AppSnackbar.success(context, 'Pago registrado. Queda pendiente de confirmación.');
       _refrescar();
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      AppSnackbar.error(context, e.message);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return GotaScaffold(
-      appBar: AppBar(title: const Text('Mis pagos')),
+      appBar: const HidroAppBar(title: 'Mis pagos'),
       body: RefreshIndicator(
         onRefresh: _refrescar,
         child: FutureBuilder<List<Pago>>(
           future: _futuro,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const SkeletonLista();
             }
 
             if (snap.hasError) {
@@ -111,9 +104,12 @@ class _PagosScreenState extends State<PagosScreen> {
             return ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: pagos.length,
-              itemBuilder: (context, i) => PagoCard(
-                pago: pagos[i],
-                onPagar: () => _pagar(pagos[i]),
+              itemBuilder: (context, i) => EntradaAnimada(
+                retraso: AppTheme.motionEscalon * i,
+                child: PagoCard(
+                  pago: pagos[i],
+                  onPagar: () => _pagar(pagos[i]),
+                ),
               ),
             );
           },

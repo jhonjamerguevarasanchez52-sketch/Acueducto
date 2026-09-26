@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
-import '../widgets/gota_scaffold.dart';
+import '../widgets/core/core.dart';
 import 'editar_perfil_screen.dart';
 
 /// Pestaña "Perfil": muestra los datos de la cuenta del usuario, permite
@@ -41,9 +42,7 @@ class PerfilScreen extends StatelessWidget {
       await context.read<AuthProvider>().logout();
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo cerrar sesión. Intenta de nuevo.')),
-        );
+        AppSnackbar.error(context, 'No se pudo cerrar sesión. Intenta de nuevo.');
       }
     }
   }
@@ -52,9 +51,11 @@ class PerfilScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final perfil = context.watch<AuthProvider>().profile;
     final textTheme = Theme.of(context).textTheme;
+    final colores = AppColors.of(context);
+    final modoTema = context.watch<ThemeProvider>().modo;
 
     return GotaScaffold(
-      appBar: AppBar(title: const Text('Mi perfil')),
+      appBar: const HidroAppBar(title: 'Mi perfil'),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -63,7 +64,7 @@ class PerfilScreen extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 40,
-                  backgroundColor: AppTheme.surfaceTint,
+                  backgroundColor: colores.chipBackground,
                   child: const Icon(Icons.person,
                       color: Color.fromARGB(255, 91, 153, 247), size: 44),
                 ),
@@ -77,20 +78,20 @@ class PerfilScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   perfil?.correo ?? '',
-                  style: const TextStyle(color: AppTheme.secondaryText),
+                  style: TextStyle(color: colores.secondaryText),
                 ),
                 const SizedBox(height: 8),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
-                    color: AppTheme.surfaceTint,
+                    color: colores.chipBackground,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     (perfil?.rol ?? '-').toUpperCase(),
-                    style: const TextStyle(
-                      color: AppTheme.primaryDark,
+                    style: TextStyle(
+                      color: colores.info,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
@@ -131,17 +132,62 @@ class PerfilScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Apariencia',
+                    style: textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Elige cómo se ve la app en este dispositivo.',
+                    style: TextStyle(fontSize: 12.5, color: colores.secondaryText),
+                  ),
+                  const SizedBox(height: 14),
+                  SegmentedButton<ThemeMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: ThemeMode.light,
+                        icon: Icon(Icons.light_mode_outlined),
+                        label: Text('Claro'),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.dark,
+                        icon: Icon(Icons.dark_mode_outlined),
+                        label: Text('Oscuro'),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.system,
+                        icon: Icon(Icons.settings_suggest_outlined),
+                        label: Text('Auto'),
+                      ),
+                    ],
+                    selected: {modoTema},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (seleccion) =>
+                        context.read<ThemeProvider>().cambiar(seleccion.first),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () => _editarPerfil(context),
             icon: const Icon(Icons.edit_outlined),
             label: const Text('Editar perfil'),
           ),
           const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               'Solo puedes editar tus datos una vez cada 30 días.',
-              style: TextStyle(color: AppTheme.secondaryText, fontSize: 12),
+              style: TextStyle(color: colores.secondaryText, fontSize: 12),
             ),
           ),
           const SizedBox(height: 16),
@@ -150,8 +196,8 @@ class PerfilScreen extends StatelessWidget {
             icon: const Icon(Icons.logout),
             label: const Text('Cerrar sesión'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppTheme.danger,
-              side: const BorderSide(color: AppTheme.danger),
+              foregroundColor: colores.danger,
+              side: BorderSide(color: colores.danger),
             ),
           ),
         ],
@@ -171,15 +217,18 @@ class _Dato extends StatelessWidget {
   Widget build(BuildContext context) {
     final texto = (valor == null || valor!.trim().isEmpty) ? 'Sin registrar' : valor!;
     final sinDato = texto == 'Sin registrar';
+    final colores = AppColors.of(context);
     return ListTile(
-      leading: Icon(icono, color: AppTheme.primaryDark),
-      title: Text(etiqueta, style: const TextStyle(fontSize: 13, color: AppTheme.secondaryText)),
+      leading: Icon(icono, color: colores.info),
+      title: Text(etiqueta, style: TextStyle(fontSize: 13, color: colores.secondaryText)),
       subtitle: Text(
         texto,
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w600,
-          color: sinDato ? AppTheme.secondaryText : Colors.black87,
+          color: sinDato
+              ? colores.secondaryText
+              : Theme.of(context).colorScheme.onSurface,
         ),
       ),
     );

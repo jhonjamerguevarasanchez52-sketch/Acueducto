@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../hidro_logo.dart';
+import '../core/hidro_logo.dart';
 import 'half_clipper.dart';
 import 'welcome_common.dart';
 
