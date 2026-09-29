@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'cambiar_password_screen.dart';
 
 /// Pestaña "Perfil": muestra los datos de la cuenta del usuario y permite
-/// cerrar sesión. Los datos solo los edita el administrador del acueducto, así
+/// cambiar la contraseña o cerrar sesión. Los datos solo los edita el administrador del acueducto, así
 /// que aquí se ven en modo lectura.
 class PerfilScreen extends StatelessWidget {
   const PerfilScreen({super.key});
@@ -132,6 +133,18 @@ class PerfilScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CambiarPasswordScreen()),
+            ),
+            icon: const Icon(Icons.lock_reset),
+            label: const Text('Cambiar contraseña'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.primary,
+              side: const BorderSide(color: AppTheme.primary),
+            ),
+          ),
+          const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => _cerrarSesion(context),
             icon: const Icon(Icons.logout),

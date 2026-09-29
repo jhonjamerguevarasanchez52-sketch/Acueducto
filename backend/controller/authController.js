@@ -228,7 +228,7 @@ async function cambiarPasswordPropio(req, res) {
     const { error: authError } = await authModel.signIn(correo, passwordActual);
 
     if (authError) {
-      return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+      return res.status(400).json({ error: 'La contraseña actual es incorrecta' });
     }
 
     const { error: updateAuthError } = await authModel.changePassword(userId, passwordNueva);
