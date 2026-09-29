@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../screens/recuperar_password_screen.dart';
 import '../../screens/verificar_cuenta_screen.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
@@ -67,11 +68,10 @@ class _LoginFormState extends State<LoginForm> {
   }
 
   void _recuperarPassword() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Para restablecer tu contraseña, contacta al administrador del acueducto.',
-        ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            RecuperarPasswordScreen(correoInicial: _correoCtrl.text.trim()),
       ),
     );
   }
