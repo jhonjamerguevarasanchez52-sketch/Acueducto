@@ -193,7 +193,6 @@ class PerfilScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(
-          OutlinedButton.icon(
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CambiarPasswordScreen()),
             ),
@@ -205,6 +204,7 @@ class PerfilScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          OutlinedButton.icon(
             onPressed: () => _cerrarSesion(context),
             icon: const Icon(Icons.logout),
             label: const Text('Cerrar sesión'),
