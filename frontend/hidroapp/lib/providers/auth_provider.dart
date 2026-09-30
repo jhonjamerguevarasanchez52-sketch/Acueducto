@@ -107,6 +107,26 @@ class AuthProvider extends ChangeNotifier {
     await _api.post('/auth/reenviar-codigo', body: {'correo': correo.trim()});
   }
 
+  /// Pide al backend que envíe un código de recuperación de contraseña al
+  /// correo. Por seguridad responde igual exista o no la cuenta.
+  Future<void> solicitarRecuperacion(String correo) async {
+    await _api.post('/auth/solicitar-recuperacion',
+        body: {'correo': correo.trim()});
+  }
+
+  /// Restablece la contraseña (sin sesión) con el código recibido por correo.
+  Future<void> resetearPassword(
+    String correo,
+    String codigo,
+    String nuevaPassword,
+  ) async {
+    await _api.post('/auth/resetear-password', body: {
+      'correo': correo.trim(),
+      'codigo': codigo.trim(),
+      'nuevaPassword': nuevaPassword,
+    });
+  }
+
   /// Cambia la contraseña de la cuenta ya autenticada. Se usa para el cambio
   /// obligatorio tras el primer login con una contraseña temporal, pero sirve
   /// igual para un cambio voluntario. Al terminar, refresca el perfil para
