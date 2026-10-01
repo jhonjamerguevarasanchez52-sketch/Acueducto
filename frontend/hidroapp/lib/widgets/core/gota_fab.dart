@@ -25,22 +25,31 @@ const _frasesGota = [
 /// corta. Si el asset no está disponible, cae a un icono de gota para no
 /// romper la pantalla.
 class GotaFab extends StatefulWidget {
-  const GotaFab({super.key, required this.onTap});
+  const GotaFab({
+    super.key,
+    required this.onTap,
+    this.onDragStart,
+    this.onDragUpdate,
+    this.onDragEnd,
+  });
 
   final VoidCallback onTap;
+  final VoidCallback? onDragStart;
+  final ValueChanged<Offset>? onDragUpdate;
+  final VoidCallback? onDragEnd;
 
   @override
   State<GotaFab> createState() => _GotaFabState();
 }
 
-class _GotaFabState extends State<GotaFab>
-    with SingleTickerProviderStateMixin {
+class _GotaFabState extends State<GotaFab> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _flotar;
   final _random = Random();
   Timer? _timerBurbuja;
   String _frase = _frasesGota.first;
   bool _mostrarBurbuja = false;
+  bool _arrastrando = false;
 
   @override
   void initState() {
@@ -50,9 +59,10 @@ class _GotaFabState extends State<GotaFab>
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
 
-    _flotar = Tween<double>(begin: 0, end: -6).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _flotar = Tween<double>(
+      begin: 0,
+      end: -6,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     _programarProximaBurbuja(inicial: true);
   }
@@ -78,6 +88,27 @@ class _GotaFabState extends State<GotaFab>
   void _ocultarBurbuja() {
     if (!mounted) return;
     setState(() => _mostrarBurbuja = false);
+    _programarProximaBurbuja();
+  }
+
+  void _iniciarArrastre(LongPressStartDetails _) {
+    if (widget.onDragUpdate == null) return;
+    _timerBurbuja?.cancel();
+    setState(() {
+      _arrastrando = true;
+      _mostrarBurbuja = false;
+    });
+    widget.onDragStart?.call();
+  }
+
+  void _moverArrastre(LongPressMoveUpdateDetails details) {
+    if (_arrastrando) widget.onDragUpdate?.call(details.offsetFromOrigin);
+  }
+
+  void _terminarArrastre(LongPressEndDetails _) {
+    if (!_arrastrando) return;
+    setState(() => _arrastrando = false);
+    widget.onDragEnd?.call();
     _programarProximaBurbuja();
   }
 
@@ -111,38 +142,51 @@ class _GotaFabState extends State<GotaFab>
         ),
         GestureDetector(
           onTap: widget.onTap,
+          onLongPressStart: widget.onDragUpdate == null
+              ? null
+              : _iniciarArrastre,
+          onLongPressMoveUpdate: widget.onDragUpdate == null
+              ? null
+              : _moverArrastre,
+          onLongPressEnd: widget.onDragUpdate == null
+              ? null
+              : _terminarArrastre,
           child: AnimatedBuilder(
             animation: _flotar,
             builder: (context, child) => Transform.translate(
-              offset: Offset(0, _flotar.value),
+              offset: Offset(0, _arrastrando ? 0 : _flotar.value),
               child: child,
             ),
-            child: Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.surfaceTint,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              // ClipOval recorta la imagen al círculo del botón (la imagen es
-              // casi cuadrada, así que sin esto se saldría del borde) y
-              // BoxFit.cover hace que la mascota llene todo el círculo en vez
-              // de quedar pequeña con margen alrededor.
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/images/gota_mascota.png',
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.water_drop,
-                    color: AppTheme.primary,
-                    size: 34,
+            child: AnimatedScale(
+              scale: _arrastrando ? 0.92 : 1,
+              duration: const Duration(milliseconds: 140),
+              child: Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.surfaceTint,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                // ClipOval recorta la imagen al círculo del botón (la imagen es
+                // casi cuadrada, así que sin esto se saldría del borde) y
+                // BoxFit.cover hace que la mascota llene todo el círculo en vez
+                // de quedar pequeña con margen alrededor.
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/gota_mascota.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.water_drop,
+                      color: AppTheme.primary,
+                      size: 34,
+                    ),
                   ),
                 ),
               ),

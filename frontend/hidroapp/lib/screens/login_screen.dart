@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../widgets/auth/auth.dart';
 import '../widgets/core/hidro_logo.dart';
+import '../theme/app_theme.dart';
 
 /// Pantalla de inicio de sesión de HIDRO-APP.
 ///
@@ -14,26 +15,30 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF4F8FB),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SingleChildScrollView(
           child: Column(
             children: [
               const AuthHeader(child: _Encabezado()),
               Transform.translate(
                 offset: const Offset(0, -28),
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
                   child: Column(
                     children: [
-                      LoginForm(),
-                      SizedBox(height: 18),
+                      const LoginForm(),
+                      const SizedBox(height: 18),
                       Text(
                         '¿Sin cuenta? Solicítala al administrador del acueducto.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: authMuted),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colores.secondaryText,
+                        ),
                       ),
                     ],
                   ),

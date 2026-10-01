@@ -88,7 +88,10 @@ async function reportarAveria(req, res) {
 
     if (error) return errorConsulta(res, error);
 
-    await avisarFontaneroPorCorreo(data);
+    // El reporte ya quedó guardado. Correo y aviso al fontanero son tareas
+    // secundarias: no dejamos al usuario esperando ni convertimos un fallo de
+    // correo en un falso error de reporte.
+    void avisarFontaneroPorCorreo(data);
 
     res.status(201).json({ data });
   } catch (err) {
@@ -176,9 +179,9 @@ async function actualizarAveria(req, res) {
       reportada: 'El estado de tu avería cambió a reportada.',
       cancelada: 'Tu avería fue cancelada.',
     };
-    await notificar(data.perfil_id, mensajes[estado], 'averia');
+    const notificacionEnviada = await notificar(data.perfil_id, mensajes[estado], 'averia');
 
-    res.status(200).json({ data });
+    res.status(200).json({ data, notificacionEnviada });
   } catch (err) {
     return errorInesperado(res, err);
   }
