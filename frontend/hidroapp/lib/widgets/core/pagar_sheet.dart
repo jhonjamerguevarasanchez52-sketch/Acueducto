@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Hoja inferior para elegir cómo se paga una factura. Devuelve por
 /// `Navigator.pop` el método elegido y una referencia opcional; quien la
@@ -84,6 +84,7 @@ class _PagarSheetState extends State<_PagarSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final secundario = AppColors.of(context).secondaryText;
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -102,7 +103,7 @@ class _PagarSheetState extends State<_PagarSheet> {
           const SizedBox(height: 2),
           Text(
             widget.subtitulo,
-            style: const TextStyle(color: AppTheme.secondaryText),
+            style: TextStyle(color: secundario),
           ),
           const SizedBox(height: 14),
           for (final m in _metodos)
@@ -124,9 +125,9 @@ class _PagarSheetState extends State<_PagarSheet> {
             ),
           ],
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'El pago quedará pendiente hasta que el acueducto lo confirme.',
-            style: TextStyle(fontSize: 12, color: AppTheme.secondaryText),
+            style: TextStyle(fontSize: 12, color: secundario),
           ),
           const SizedBox(height: 12),
           FilledButton(
@@ -154,10 +155,11 @@ class _MetodoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: seleccionado ? AppTheme.surfaceTint : Colors.white,
+        color: seleccionado ? colores.chipBackground : colores.cardBackground,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
@@ -167,13 +169,13 @@ class _MetodoTile extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: seleccionado ? AppTheme.primary : const Color(0xFFE3EEF4),
+                color: seleccionado ? AppTheme.primary : colores.cardBorder,
                 width: seleccionado ? 1.4 : 1,
               ),
             ),
             child: Row(
               children: [
-                Icon(icono, size: 20, color: AppTheme.primaryDark),
+                Icon(icono, size: 20, color: colores.info),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -189,9 +191,7 @@ class _MetodoTile extends StatelessWidget {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_off,
                   size: 20,
-                  color: seleccionado
-                      ? AppTheme.primary
-                      : AppTheme.secondaryText,
+                  color: seleccionado ? AppTheme.primary : colores.secondaryText,
                 ),
               ],
             ),

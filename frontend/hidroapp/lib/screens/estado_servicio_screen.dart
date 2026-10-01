@@ -5,10 +5,8 @@ import '../models/corte.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/estado_servicio/corte_card.dart';
-import '../widgets/estado_servicio/tarjeta_estado.dart';
-import '../widgets/gota_scaffold.dart';
-import '../widgets/mensaje_estado.dart';
+import '../widgets/core/core.dart';
+import '../widgets/estado_servicio/estado_servicio.dart';
 
 /// Módulo "Estado del servicio": dice si el agua del usuario está activa o
 /// suspendida ahora mismo y muestra el historial de cortes y reconexiones.
@@ -57,14 +55,14 @@ class _EstadoServicioScreenState extends State<EstadoServicioScreen> {
   @override
   Widget build(BuildContext context) {
     return GotaScaffold(
-      appBar: AppBar(title: const Text('Estado del servicio')),
+      appBar: const HidroAppBar(title: 'Estado del servicio'),
       body: RefreshIndicator(
         onRefresh: _refrescar,
         child: FutureBuilder<_DatosServicio>(
           future: _futuro,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const SkeletonLista();
             }
 
             if (snap.hasError) {
@@ -102,14 +100,19 @@ class _EstadoServicioScreenState extends State<EstadoServicioScreen> {
                       ),
                     ),
                   ),
-                  ...datos.historial.map((c) => CorteCard(corte: c)),
+                  ...datos.historial.indexed.map(
+                    (e) => EntradaAnimada(
+                      retraso: AppTheme.motionEscalon * e.$1,
+                      child: CorteCard(corte: e.$2),
+                    ),
+                  ),
                 ] else
-                  const Padding(
-                    padding: EdgeInsets.only(top: 24),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 24),
                     child: Text(
                       'No hay cortes registrados en tu historial.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppTheme.secondaryText),
+                      style: TextStyle(color: AppColors.of(context).secondaryText),
                     ),
                   ),
               ],

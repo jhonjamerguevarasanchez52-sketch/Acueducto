@@ -96,12 +96,13 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                         fontSize: 13.5, color: authMuted, height: 1.4),
                   ),
                   const SizedBox(height: 22),
-                  authFieldLabel('CONTRASEÑA ACTUAL'),
+                  authFieldLabel(context, 'CONTRASEÑA ACTUAL'),
                   TextFormField(
                     controller: _actualCtrl,
                     obscureText: !_verActual,
                     textInputAction: TextInputAction.next,
                     decoration: authInputDecoration(
+                      context,
                       hint: 'Tu contraseña actual',
                       icon: Icons.lock_clock_outlined,
                       suffix: _botonVer(_verActual,
@@ -112,12 +113,13 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                         : null,
                   ),
                   const SizedBox(height: 16),
-                  authFieldLabel('NUEVA CONTRASEÑA'),
+                  authFieldLabel(context, 'NUEVA CONTRASEÑA'),
                   TextFormField(
                     controller: _nuevaCtrl,
                     obscureText: !_verNueva,
                     textInputAction: TextInputAction.next,
                     decoration: authInputDecoration(
+                      context,
                       hint: 'Mínimo 8 caracteres',
                       icon: Icons.lock_outline,
                       suffix: _botonVer(_verNueva,
@@ -133,13 +135,14 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  authFieldLabel('CONFIRMAR NUEVA CONTRASEÑA'),
+                  authFieldLabel(context, 'CONFIRMAR NUEVA CONTRASEÑA'),
                   TextFormField(
                     controller: _confirmarCtrl,
                     obscureText: !_verNueva,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _guardando ? null : _guardar(),
                     decoration: authInputDecoration(
+                      context,
                       hint: 'Repite la nueva contraseña',
                       icon: Icons.lock_outline,
                     ),

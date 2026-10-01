@@ -16,6 +16,8 @@ class ChatBurbuja extends StatelessWidget {
   Widget build(BuildContext context) {
     final esUsuario = mensaje.autor == ChatAutor.usuario;
     final esError = mensaje.autor == ChatAutor.error;
+    final colores = AppColors.of(context);
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
 
     final Color fondo;
     final Color texto;
@@ -23,11 +25,11 @@ class ChatBurbuja extends StatelessWidget {
       fondo = AppTheme.primary;
       texto = Colors.white;
     } else if (esError) {
-      fondo = const Color(0xFFFDECEA);
-      texto = AppTheme.danger;
+      fondo = esOscuro ? const Color(0xFF3B211F) : const Color(0xFFFDECEA);
+      texto = colores.danger;
     } else {
-      fondo = Colors.white;
-      texto = Colors.black87;
+      fondo = colores.cardBackground;
+      texto = Theme.of(context).colorScheme.onSurface;
     }
 
     return Align(
@@ -50,8 +52,8 @@ class ChatBurbuja extends StatelessWidget {
               ? null
               : Border.all(
                   color: esError
-                      ? const Color(0xFFF5C6C0)
-                      : const Color(0xFFE3EEF4),
+                      ? colores.danger.withValues(alpha: 0.35)
+                      : colores.cardBorder,
                 ),
         ),
         child: Column(
@@ -65,15 +67,15 @@ class ChatBurbuja extends StatelessWidget {
               const SizedBox(height: 6),
               GestureDetector(
                 onTap: onReintentar,
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.refresh, size: 16, color: AppTheme.danger),
-                    SizedBox(width: 4),
+                    Icon(Icons.refresh, size: 16, color: colores.danger),
+                    const SizedBox(width: 4),
                     Text(
                       'Reintentar',
                       style: TextStyle(
-                        color: AppTheme.danger,
+                        color: colores.danger,
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
@@ -96,25 +98,26 @@ class ChatBurbujaEscribiendo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colores.cardBackground,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(16),
             topRight: Radius.circular(16),
             bottomLeft: Radius.circular(4),
             bottomRight: Radius.circular(16),
           ),
-          border: Border.all(color: const Color(0xFFE3EEF4)),
+          border: Border.all(color: colores.cardBorder),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
+            const SizedBox(
               height: 16,
               width: 16,
               child: CircularProgressIndicator(
@@ -122,10 +125,10 @@ class ChatBurbujaEscribiendo extends StatelessWidget {
                 color: AppTheme.primary,
               ),
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Text(
               'GOTA está escribiendo…',
-              style: TextStyle(color: AppTheme.secondaryText, fontSize: 13),
+              style: TextStyle(color: colores.secondaryText, fontSize: 13),
             ),
           ],
         ),

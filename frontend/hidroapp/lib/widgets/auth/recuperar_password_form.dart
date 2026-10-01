@@ -155,7 +155,7 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
   }
 
   List<Widget> _pasoCorreo() => [
-        authFieldLabel('CORREO ELECTRÓNICO'),
+        authFieldLabel(context, 'CORREO ELECTRÓNICO'),
         TextFormField(
           controller: _correoCtrl,
           keyboardType: TextInputType.emailAddress,
@@ -163,6 +163,7 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
           textInputAction: TextInputAction.done,
           onFieldSubmitted: (_) => _cargando ? null : _enviarCodigo(),
           decoration: authInputDecoration(
+            context,
             hint: 'tucorreo@ejemplo.com',
             icon: Icons.mail_outline,
           ),
@@ -181,7 +182,7 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
       ];
 
   List<Widget> _pasoPassword() => [
-        authFieldLabel('CÓDIGO DE RECUPERACIÓN'),
+        authFieldLabel(context, 'CÓDIGO DE RECUPERACIÓN'),
         TextFormField(
           controller: _codigoCtrl,
           keyboardType: TextInputType.number,
@@ -198,17 +199,18 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
             letterSpacing: 8,
           ),
           textAlign: TextAlign.center,
-          decoration: authInputDecoration(hint: '000000', counterText: ''),
+          decoration: authInputDecoration(context, hint: '000000', counterText: ''),
           validator: (v) =>
               (v?.trim().length ?? 0) != 6 ? 'Ingresa los 6 dígitos' : null,
         ),
         const SizedBox(height: 16),
-        authFieldLabel('NUEVA CONTRASEÑA'),
+        authFieldLabel(context, 'NUEVA CONTRASEÑA'),
         TextFormField(
           controller: _passwordCtrl,
           obscureText: !_verPassword,
           textInputAction: TextInputAction.next,
           decoration: authInputDecoration(
+            context,
             hint: 'Mínimo 8 caracteres',
             icon: Icons.lock_outline,
             suffix: IconButton(
@@ -228,13 +230,14 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
               : null,
         ),
         const SizedBox(height: 16),
-        authFieldLabel('CONFIRMAR CONTRASEÑA'),
+        authFieldLabel(context, 'CONFIRMAR CONTRASEÑA'),
         TextFormField(
           controller: _confirmarCtrl,
           obscureText: !_verPassword,
           textInputAction: TextInputAction.done,
           onFieldSubmitted: (_) => _cargando ? null : _cambiarPassword(),
           decoration: authInputDecoration(
+            context,
             hint: 'Repite la contraseña',
             icon: Icons.lock_outline,
           ),

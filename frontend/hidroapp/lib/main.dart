@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/cambiar_password_obligatorio_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
@@ -17,15 +18,26 @@ class AcueductoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthProvider()..bootstrap(),
-      child: MaterialApp(
-        title: 'Acueducto Campo Amor',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        // Splash animado; al terminar navega a AuthGate, que decide entre el
-        // login (sin sesión) y la pantalla principal (con sesión guardada).
-        home: const WelcomeScreen(nextRoute: AuthGate()),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()..bootstrap()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      ],
+      child: Builder(
+        builder: (context) {
+          final temaProvider = context.watch<ThemeProvider>();
+          return MaterialApp(
+            title: 'Acueducto Campo Amor',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: temaProvider.modo,
+            // Splash animado; al terminar navega a AuthGate, que decide entre
+            // el login (sin sesión) y la pantalla principal (con sesión
+            // guardada).
+            home: const WelcomeScreen(nextRoute: AuthGate()),
+          );
+        },
       ),
     );
   }

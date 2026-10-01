@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/pago.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
-import '../fila_detalle.dart';
+import '../core/fila_detalle.dart';
 
 /// Tarjeta de un pago del historial: monto, método, estado de confirmación y,
 /// mientras no esté confirmado, un botón para volver a intentarlo.
@@ -25,31 +25,32 @@ class PagoCard extends StatelessWidget {
     'wompi': 'Wompi',
   };
 
-  ({String texto, Color color, IconData icono}) get _estado {
+  ({String texto, Color color, IconData icono}) _estado(AppColors colores) {
     if (pago.confirmado) {
       return (
         texto: 'Confirmado',
-        color: AppTheme.success,
+        color: colores.success,
         icono: Icons.check_circle,
       );
     }
     if (pago.rechazado) {
       return (
         texto: 'Rechazado',
-        color: AppTheme.danger,
+        color: colores.danger,
         icono: Icons.cancel,
       );
     }
     return (
       texto: 'Pendiente de confirmación',
-      color: AppTheme.warning,
+      color: colores.warning,
       icono: Icons.hourglass_bottom,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final estado = _estado;
+    final colores = AppColors.of(context);
+    final estado = _estado(colores);
     final metodo = _metodos[pago.metodo] ?? Formato.etiqueta(pago.metodo);
 
     return Card(
@@ -63,18 +64,18 @@ class PagoCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     Formato.pesos(pago.monto),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: AppTheme.primaryDark,
+                      color: colores.info,
                     ),
                   ),
                 ),
                 Text(
                   metodo,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.secondaryText,
+                    color: colores.secondaryText,
                   ),
                 ),
               ],

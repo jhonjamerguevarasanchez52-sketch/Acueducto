@@ -8,13 +8,14 @@ const { crudBase } = require('./baseModel');
 const TABLE = 'breakdowns';
 
 // Toda avería nueva nace "reportada" con la fecha actual.
-function create({ perfil_id, descripcion, zona }, db = supabaseAdmin) {
+function create({ perfil_id, descripcion, zona, direccion }, db = supabaseAdmin) {
   return db
     .from(TABLE)
     .insert({
       perfil_id,
       descripcion,
       zona: zona || null,
+      direccion: direccion || null,
       estado: 'reportada',
       fecha_reporte: new Date().toISOString(),
     })

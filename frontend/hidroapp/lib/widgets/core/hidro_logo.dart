@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Logo estático de HIDRO-APP: un anillo con 4 puntos cardinales y, dentro,
 /// una gota de agua con la flecha de "enviar ubicación".

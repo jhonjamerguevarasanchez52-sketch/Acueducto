@@ -28,7 +28,7 @@ class FacturasResumen extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [AppTheme.midBlue, AppTheme.deepBlue],
         ),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

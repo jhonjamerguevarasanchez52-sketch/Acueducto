@@ -4,12 +4,10 @@ import 'package:provider/provider.dart';
 import '../models/factura.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 import '../utils/formato.dart';
-import '../widgets/facturas/factura_card.dart';
-import '../widgets/facturas/facturas_resumen.dart';
-import '../widgets/gota_scaffold.dart';
-import '../widgets/mensaje_estado.dart';
-import '../widgets/pagar_sheet.dart';
+import '../widgets/core/core.dart';
+import '../widgets/facturas/facturas.dart';
 import 'pagos_screen.dart';
 
 /// Módulo "Mis facturas": lista las facturas del usuario, de la más reciente
@@ -58,17 +56,11 @@ class _FacturasScreenState extends State<FacturasScreen> {
         if (eleccion.referencia != null) 'referencia': eleccion.referencia,
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pago registrado. Queda pendiente de confirmación.'),
-        ),
-      );
+      AppSnackbar.success(context, 'Pago registrado. Queda pendiente de confirmación.');
       _refrescar();
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      AppSnackbar.error(context, e.message);
     }
   }
 
@@ -81,14 +73,14 @@ class _FacturasScreenState extends State<FacturasScreen> {
   @override
   Widget build(BuildContext context) {
     return GotaScaffold(
-      appBar: AppBar(title: const Text('Mis facturas')),
+      appBar: const HidroAppBar(title: 'Mis facturas'),
       body: RefreshIndicator(
         onRefresh: _refrescar,
         child: FutureBuilder<List<Factura>>(
           future: _futuro,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const SkeletonLista();
             }
 
             if (snap.hasError) {
@@ -132,10 +124,13 @@ class _FacturasScreenState extends State<FacturasScreen> {
                   );
                 }
                 final factura = facturas[i - 1];
-                return FacturaCard(
-                  factura: factura,
-                  onPagar: () => _pagar(factura),
-                  onVerPagos: _verPagos,
+                return EntradaAnimada(
+                  retraso: AppTheme.motionEscalon * i,
+                  child: FacturaCard(
+                    factura: factura,
+                    onPagar: () => _pagar(factura),
+                    onVerPagos: _verPagos,
+                  ),
                 );
               },
             );

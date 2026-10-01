@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Mensaje centrado a pantalla completa para los estados "vacío" y "error"
 /// de las listas de los módulos (facturas, pagos, averías, etc.).
@@ -32,6 +32,7 @@ class MensajeEstado extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(32, 64, 32, 32),
@@ -40,11 +41,11 @@ class MensajeEstado extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(18),
-              decoration: const BoxDecoration(
-                color: AppTheme.surfaceTint,
+              decoration: BoxDecoration(
+                color: colores.chipBackground,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icono, size: 34, color: AppTheme.primaryDark),
+              child: Icon(icono, size: 34, color: colores.info),
             ),
             const SizedBox(height: 16),
             Text(
@@ -60,7 +61,7 @@ class MensajeEstado extends StatelessWidget {
               Text(
                 detalle!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.secondaryText),
+                style: TextStyle(color: colores.secondaryText),
               ),
             ],
             if (onReintentar != null) ...[

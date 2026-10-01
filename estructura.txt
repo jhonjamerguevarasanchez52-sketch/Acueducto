@@ -201,7 +201,7 @@ Acueducto/
 |   |   |   |   |   |   |   |   |-- ic_launcher.png
 |   |   |   |   |   |   |   |   |-- launcher_icon.png
 |   |   |   |   |   |   |   |-- mipmap-xxhdpi/
-|   |   |   |   |   |   |   |   |-- ic_launcher.png
+|   |   |   |   |   |   |   |   |-- ic_launcher.pngto
 |   |   |   |   |   |   |   |   |-- launcher_icon.png
 |   |   |   |   |   |   |   |-- mipmap-xxxhdpi/
 |   |   |   |   |   |   |   |   |-- ic_launcher.png

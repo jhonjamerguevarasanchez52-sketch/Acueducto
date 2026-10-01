@@ -4,10 +4,9 @@ import 'package:provider/provider.dart';
 import '../models/averia.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import '../widgets/averias/averia_card.dart';
-import '../widgets/averias/formulario_reporte.dart';
-import '../widgets/gota_scaffold.dart';
-import '../widgets/mensaje_estado.dart';
+import '../theme/app_theme.dart';
+import '../widgets/averias/averias.dart';
+import '../widgets/core/core.dart';
 
 /// Módulo "Averías": el usuario reporta una avería del servicio y hace
 /// seguimiento del estado en que la deja el fontanero.
@@ -37,6 +36,17 @@ class _AveriasScreenState extends State<AveriasScreen> {
     _futuro = _cargar();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final rol = Provider.of<AuthProvider>(context).profile?.rol;
+    final esFontanero = rol == 'fontanero' || rol == 'administrador';
+    if (esFontanero != _esFontanero) {
+      _esFontanero = esFontanero;
+      _futuro = _cargar();
+    }
+  }
+
   Future<List<Averia>> _cargar() async {
     final ruta = _esFontanero ? '/averias' : '/averias/mis-averias';
     final data = await context.read<AuthProvider>().api.get(ruta);
@@ -50,19 +60,40 @@ class _AveriasScreenState extends State<AveriasScreen> {
   }
 
   Future<void> _cambiarEstado(Averia averia, String nuevoEstado) async {
+    String? nota;
+    if (nuevoEstado == 'resuelta') {
+      final controlador = TextEditingController();
+      nota = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirmar solución'),
+          content: TextField(
+            controller: controlador,
+            maxLength: 1000,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Mensaje para el usuario (opcional)',
+              hintText: 'Explica brevemente qué se solucionó',
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(context, controlador.text.trim()), child: const Text('Marcar solucionada')),
+          ],
+        ),
+      );
+      controlador.dispose();
+      if (nota == null) return;
+    }
     setState(() => _actualizandoIds.add(averia.id));
     try {
       await context.read<AuthProvider>().api.put(
         '/averias/${averia.id}',
-        body: {'estado': nuevoEstado},
+        body: {'estado': nuevoEstado, if (nota != null) 'nota': nota},
       );
       await _refrescar();
     } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
+      if (mounted) AppSnackbar.error(context, e.message);
     } finally {
       if (mounted) setState(() => _actualizandoIds.remove(averia.id));
     }
@@ -77,17 +108,15 @@ class _AveriasScreenState extends State<AveriasScreen> {
     );
     if (creada == true && mounted) {
       _refrescar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Avería reportada. Gracias por avisar.')),
-      );
+      AppSnackbar.success(context, 'Avería reportada. Gracias por avisar.');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return GotaScaffold(
-      appBar: AppBar(
-        title: Text(_esFontanero ? 'Averías reportadas' : 'Averías'),
+      appBar: HidroAppBar(
+        title: _esFontanero ? 'Averías reportadas' : 'Averías',
       ),
       floatingActionButton: _esFontanero
           ? null
@@ -102,7 +131,7 @@ class _AveriasScreenState extends State<AveriasScreen> {
           future: _futuro,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const SkeletonLista();
             }
 
             if (snap.hasError) {
@@ -138,13 +167,16 @@ class _AveriasScreenState extends State<AveriasScreen> {
               itemCount: averias.length,
               itemBuilder: (context, i) {
                 final averia = averias[i];
-                return AveriaCard(
+                return EntradaAnimada(
                   key: ValueKey(averia.id),
-                  averia: averia,
-                  actualizando: _actualizandoIds.contains(averia.id),
-                  onCambiarEstado: _esFontanero
-                      ? (nuevoEstado) => _cambiarEstado(averia, nuevoEstado)
-                      : null,
+                  retraso: AppTheme.motionEscalon * i,
+                  child: AveriaCard(
+                    averia: averia,
+                    actualizando: _actualizandoIds.contains(averia.id),
+                    onCambiarEstado: _esFontanero
+                        ? (nuevoEstado) => _cambiarEstado(averia, nuevoEstado)
+                        : null,
+                  ),
                 );
               },
             );

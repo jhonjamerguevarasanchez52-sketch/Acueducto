@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auth/auth_style.dart';
 import '../widgets/auth/recuperar_password_form.dart';
-import '../widgets/hidro_logo.dart';
+import '../widgets/core/hidro_logo.dart';
 
 /// Pantalla de recuperación de contraseña, abierta desde el login con
 /// "¿Olvidaste tu contraseña?". Primero pide el correo para enviar un código

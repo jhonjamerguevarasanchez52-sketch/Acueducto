@@ -95,10 +95,13 @@ async function eliminarNotificacion(req, res) {
 
 // Enviar una notificación a un usuario, o a todos (perfil_id: "todos")
 async function enviarNotificacion(req, res) {
-  const { perfil_id, mensaje, tipo } = req.body;
+  const { perfil_id = 'todos', mensaje, tipo = 'general' } = req.body;
 
-  if (!perfil_id || !mensaje) {
-    return res.status(400).json({ error: 'perfil_id y mensaje son obligatorios' });
+  if (typeof mensaje !== 'string' || !mensaje.trim()) {
+    return res.status(400).json({ error: 'El mensaje es obligatorio' });
+  }
+  if (req.usuario.rol === 'fontanero' && perfil_id !== 'todos') {
+    return res.status(403).json({ error: 'El fontanero solo puede enviar avisos generales' });
   }
 
   try {
@@ -109,14 +112,14 @@ async function enviarNotificacion(req, res) {
 
       const { error } = await notificationModel.createMany(
         perfiles.map((p) => p.id),
-        { mensaje, tipo }
+        { mensaje: mensaje.trim(), tipo }
       );
       if (error) return errorConsulta(res, error);
 
       return res.status(201).json({ message: `Notificación enviada a ${perfiles.length} usuarios` });
     }
 
-    const { data, error } = await notificationModel.create({ perfil_id, mensaje, tipo });
+    const { data, error } = await notificationModel.create({ perfil_id, mensaje: mensaje.trim(), tipo });
 
     if (error) return errorConsulta(res, error);
 

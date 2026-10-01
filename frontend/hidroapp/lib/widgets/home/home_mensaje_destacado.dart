@@ -9,10 +9,11 @@ class HomeMensajeDestacado extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceTint,
+        color: colores.chipBackground,
         borderRadius: BorderRadius.circular(16),
         border: const Border(
           left: BorderSide(color: AppTheme.primary, width: 5),
@@ -20,9 +21,9 @@ class HomeMensajeDestacado extends StatelessWidget {
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Icon(Icons.info_outline, color: AppTheme.primaryDark),
-          SizedBox(width: 12),
+        children: [
+          Icon(Icons.info_outline, color: colores.info),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -32,11 +33,11 @@ class HomeMensajeDestacado extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: AppTheme.primaryDark,
+                    color: colores.info,
                   ),
                 ),
-                SizedBox(height: 4),
-                Text(
+                const SizedBox(height: 4),
+                const Text(
                   'Consulta tus facturas, registra pagos, reporta averías y '
                   'revisa el estado del servicio desde tu celular.',
                   style: TextStyle(fontSize: 13, height: 1.35),

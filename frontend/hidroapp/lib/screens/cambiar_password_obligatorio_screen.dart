@@ -5,7 +5,8 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/hidro_logo.dart';
+import '../widgets/core/app_snackbar.dart';
+import '../widgets/core/hidro_logo.dart';
 
 /// Pantalla de cambio de contraseña obligatorio.
 ///
@@ -56,11 +57,7 @@ class _CambiarPasswordObligatorioScreenState
       // AuthGate observa debeCambiarPassword y reconstruye esta ruta como
       // MainShell apenas el perfil se refresque: no hay nada que "pop-ear".
     } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
+      if (mounted) AppSnackbar.error(context, e.message);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -265,7 +262,9 @@ class _CambiarPasswordObligatorioScreenState
             const SizedBox(height: 4),
             TextButton(
               onPressed: _guardando ? null : _cerrarSesion,
-              style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.of(context).danger,
+              ),
               child: const Text('Cerrar sesión'),
             ),
           ],

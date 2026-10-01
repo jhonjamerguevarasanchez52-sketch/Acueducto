@@ -36,6 +36,8 @@ class ProximaFactura extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
+
     if (snap.connectionState == ConnectionState.waiting) {
       return const CajaBlanca(
         child: Row(
@@ -56,7 +58,7 @@ class ProximaFactura extends StatelessWidget {
       return CajaBlanca(
         child: Row(
           children: [
-            const Icon(Icons.cloud_off_outlined, color: AppTheme.secondaryText),
+            Icon(Icons.cloud_off_outlined, color: colores.secondaryText),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -82,7 +84,7 @@ class ProximaFactura extends StatelessWidget {
       return CajaBlanca(
         child: Row(
           children: [
-            const Icon(Icons.check_circle, color: AppTheme.success, size: 30),
+            Icon(Icons.check_circle, color: colores.success, size: 30),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -90,10 +92,10 @@ class ProximaFactura extends StatelessWidget {
                 children: [
                   Text(
                     sinFacturas ? 'Sin facturas' : 'Estás al día',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: AppTheme.success,
+                      color: colores.success,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -118,16 +120,16 @@ class ProximaFactura extends StatelessWidget {
     final Color color;
     final String aviso;
     if (dias < 0) {
-      color = AppTheme.danger;
+      color = colores.danger;
       aviso = dias == -1 ? 'Venció hace 1 día' : 'Venció hace ${-dias} días';
     } else if (dias == 0) {
-      color = AppTheme.warning;
+      color = colores.warning;
       aviso = 'Vence hoy';
     } else if (dias <= 5) {
-      color = AppTheme.warning;
+      color = colores.warning;
       aviso = dias == 1 ? 'Vence mañana' : 'Faltan $dias días';
     } else {
-      color = AppTheme.primaryDark;
+      color = colores.info;
       aviso = 'Faltan $dias días';
     }
 
@@ -144,27 +146,27 @@ class ProximaFactura extends StatelessWidget {
                   children: [
                     Text(
                       Formato.periodo(factura.periodo),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: AppTheme.secondaryText,
+                        color: colores.secondaryText,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       Formato.pesos(factura.valorTotal),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
-                        color: Colors.black87,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Vence: ${Formato.fecha(factura.fechaVencimiento)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
-                        color: AppTheme.secondaryText,
+                        color: colores.secondaryText,
                       ),
                     ),
                   ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import '../core/app_snackbar.dart';
 
 /// Atajo a un módulo desde la pestaña "Inicio". Si [destino] es `null`, el
 /// módulo aún no está implementado y solo muestra un aviso.
@@ -35,9 +36,7 @@ class HomeModuloTile extends StatelessWidget {
         onTap: () {
           final destino = this.destino;
           if (destino == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('"$label" estará disponible pronto')),
-            );
+            AppSnackbar.info(context, '"$label" estará disponible pronto');
             return;
           }
           Navigator.of(context).push(

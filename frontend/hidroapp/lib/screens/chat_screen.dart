@@ -4,9 +4,8 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/chat/chat_barra_entrada.dart';
-import '../widgets/chat/chat_burbuja.dart';
-import '../widgets/chat/chat_mensaje.dart';
+import '../widgets/chat/chat.dart';
+import '../widgets/core/hidro_app_bar.dart';
 
 /// Pantalla del asistente virtual "GOTA". Conversación simple contra el
 /// endpoint `POST /api/chat`, que responde `{ "respuesta": "..." }`.
@@ -108,8 +107,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Row(
+      appBar: const HidroAppBar(
+        titleWidget: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             CircleAvatar(

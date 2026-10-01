@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../models/corte.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
-import '../fila_detalle.dart';
-import '../mensaje_estado.dart';
+import '../core/fila_detalle.dart';
+import '../core/mensaje_estado.dart';
 
 /// Tarjeta de un corte del historial: motivo, si sigue activo o ya se resolvió,
 /// y las fechas de corte y reconexión.
@@ -16,6 +16,7 @@ class CorteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activo = corte.activo;
+    final colores = AppColors.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -35,7 +36,7 @@ class CorteCard extends StatelessWidget {
                 ),
                 EtiquetaEstado(
                   texto: activo ? 'Activo' : 'Resuelto',
-                  color: activo ? AppTheme.danger : AppTheme.success,
+                  color: activo ? colores.danger : colores.success,
                 ),
               ],
             ),

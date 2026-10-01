@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../screens/chat_screen.dart';
+import '../../screens/chat_screen.dart';
 import 'gota_fab.dart';
 
 /// `Scaffold` con el botón flotante del asistente "GOTA" ya incorporado.
