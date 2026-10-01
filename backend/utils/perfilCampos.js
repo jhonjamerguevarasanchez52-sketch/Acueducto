@@ -18,9 +18,14 @@ const DIAS_LIMITE_EDICION_PERFIL = 30;
 // minúsculas). Excepción puntual pedida por el propio dueño de la cuenta.
 const CORREOS_SIN_LIMITE_EDICION = ['tovardeimer71@gmail.com'];
 
+// El plazo comienza cuando la cuenta ya tiene los datos de contacto y
+// ubicación necesarios para identificar el servicio.
+const CAMPOS_REQUERIDOS_PERFIL_COMPLETO = ['telefono', 'numero_lote', 'direccion', 'zona'];
+
 module.exports = {
   CAMPOS_EDITABLES_PERFIL,
   COLUMNAS_PERFIL_PUBLICO,
   DIAS_LIMITE_EDICION_PERFIL,
   CORREOS_SIN_LIMITE_EDICION,
+  CAMPOS_REQUERIDOS_PERFIL_COMPLETO,
 };

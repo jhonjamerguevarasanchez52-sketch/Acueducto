@@ -3,6 +3,7 @@ const {
   CAMPOS_EDITABLES_PERFIL,
   DIAS_LIMITE_EDICION_PERFIL,
   CORREOS_SIN_LIMITE_EDICION,
+  CAMPOS_REQUERIDOS_PERFIL_COMPLETO,
 } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
@@ -51,7 +52,14 @@ async function editarPerfil(req, res) {
     const correoUsuario = (req.usuario.email || '').toLowerCase();
     const exento = CORREOS_SIN_LIMITE_EDICION.includes(correoUsuario);
 
-    if (!exento && actual.updated_at) {
+    const perfilActualIncompleto = CAMPOS_REQUERIDOS_PERFIL_COMPLETO.some((campo) =>
+      !String(actual[campo] ?? '').trim()
+    );
+    const perfilIncompleto = CAMPOS_REQUERIDOS_PERFIL_COMPLETO.some((campo) =>
+      !String(datosActualizar[campo] ?? actual[campo] ?? '').trim()
+    );
+
+    if (!exento && !perfilActualIncompleto && actual.updated_at) {
       const proximaEdicion = new Date(actual.updated_at).getTime() + MS_LIMITE_EDICION_PERFIL;
       if (Date.now() < proximaEdicion) {
         return res.status(429).json({
@@ -61,7 +69,9 @@ async function editarPerfil(req, res) {
       }
     }
 
-    datosActualizar.updated_at = new Date().toISOString();
+    // Mientras falte algún dato base, puede completar el perfil sin consumir
+    // el plazo. El conteo inicia al guardar el primer perfil completo.
+    datosActualizar.updated_at = perfilIncompleto ? null : new Date().toISOString();
 
     const { data, error } = await profileModel.update(userId, datosActualizar, req.db);
 
