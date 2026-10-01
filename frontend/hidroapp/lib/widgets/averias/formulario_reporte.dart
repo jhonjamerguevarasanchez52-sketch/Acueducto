@@ -92,7 +92,7 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Describe qué está pasando: fuga, falta de agua, agua turbia, etc.',
+                  'Sé específico: indica qué ocurre, desde cuándo y en qué punto de la vivienda.',
                   style: TextStyle(color: colores.secondaryText, fontSize: 13),
                 ),
                 const SizedBox(height: 16),
@@ -158,13 +158,13 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                   maxLength: 500,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
-                    hintText: 'Describe la avería…',
+                    hintText: 'Ej.: Desde esta mañana sale agua por la unión del tubo bajo el lavaplatos.',
                     alignLabelWithHint: true,
                   ),
                   validator: (v) {
                     final t = v?.trim() ?? '';
                     if (t.isEmpty) return 'Cuéntanos qué ocurre';
-                    if (t.length < 10) return 'Danos un poco más de detalle';
+                    if (t.length < 20) return 'Describe el problema con más detalle (mínimo 20 caracteres)';
                     return null;
                   },
                 ),

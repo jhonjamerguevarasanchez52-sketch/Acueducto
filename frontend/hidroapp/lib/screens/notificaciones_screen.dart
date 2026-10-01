@@ -25,6 +25,69 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
   late Future<List<Notificacion>> _futuro;
   List<Notificacion> _notificaciones = const [];
   bool _marcandoTodas = false;
+  bool _enviandoAviso = false;
+
+  Future<void> _publicarAviso() async {
+    final mensajeCtrl = TextEditingController();
+    var tipo = 'corte';
+    final enviar = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Aviso para todos'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'corte', label: Text('Corte o daño')),
+                  ButtonSegment(value: 'general', label: Text('General')),
+                ],
+                selected: {tipo},
+                onSelectionChanged: (seleccion) =>
+                    setDialogState(() => tipo = seleccion.first),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: mensajeCtrl,
+                maxLength: 1000,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Mensaje',
+                  hintText: 'Indica la zona afectada y la duración estimada',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Enviar aviso'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final mensaje = mensajeCtrl.text.trim();
+    mensajeCtrl.dispose();
+    if (enviar != true || mensaje.isEmpty) return;
+    setState(() => _enviandoAviso = true);
+    try {
+      await context.read<AuthProvider>().api.post('/notificaciones', body: {
+        'perfil_id': 'todos', 'mensaje': mensaje, 'tipo': tipo,
+      });
+      await _refrescar();
+      if (mounted) AppSnackbar.success(context, 'Aviso enviado a todos los perfiles activos.');
+    } on ApiException catch (e) {
+      if (mounted) AppSnackbar.error(context, e.message);
+    } finally {
+      if (mounted) setState(() => _enviandoAviso = false);
+    }
+  }
 
   @override
   void initState() {
@@ -122,10 +185,20 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final rol = context.watch<AuthProvider>().profile?.rol;
+    final puedePublicar = rol == 'fontanero' || rol == 'administrador';
     return GotaScaffold(
       appBar: HidroAppBar(
         title: 'Notificaciones',
         actions: [
+          if (puedePublicar)
+            IconButton(
+              tooltip: 'Avisar a todos',
+              onPressed: _enviandoAviso ? null : _publicarAviso,
+              icon: _enviandoAviso
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.campaign_outlined),
+            ),
           if (_noLeidas > 0)
             TextButton(
               onPressed: _marcandoTodas ? null : _marcarTodas,

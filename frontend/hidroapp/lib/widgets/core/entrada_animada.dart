@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
@@ -24,6 +26,8 @@ class _EntradaAnimadaState extends State<EntradaAnimada>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _curva;
+  late final Animation<Offset> _desplazamiento;
+  Timer? _temporizador;
 
   @override
   void initState() {
@@ -33,29 +37,31 @@ class _EntradaAnimadaState extends State<EntradaAnimada>
       duration: AppTheme.motionEntrada,
     );
     _curva = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
-    Future.delayed(widget.retraso, () {
+    _desplazamiento = Tween<Offset>(
+      begin: const Offset(0, 0.035),
+      end: Offset.zero,
+    ).animate(_curva);
+    final retrasoMs = widget.retraso.inMilliseconds.clamp(0, 180).toInt();
+    _temporizador = Timer(Duration(milliseconds: retrasoMs), () {
       if (mounted) _controller.forward();
     });
   }
 
   @override
   void dispose() {
+    _temporizador?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _curva,
-      builder: (context, hijo) => Opacity(
-        opacity: _curva.value,
-        child: Transform.translate(
-          offset: Offset(0, (1 - _curva.value) * 20),
-          child: hijo,
-        ),
+    return FadeTransition(
+      opacity: _curva,
+      child: SlideTransition(
+        position: _desplazamiento,
+        child: widget.child,
       ),
-      child: widget.child,
     );
   }
 }

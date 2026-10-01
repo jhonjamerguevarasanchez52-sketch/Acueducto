@@ -1,4 +1,5 @@
 const breakdownModel = require('../models/breakdownModel');
+const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
 const { enviarCorreo } = require('../config/mailer');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
@@ -10,29 +11,45 @@ const ESTADOS_VALIDOS = ['reportada', 'en_proceso', 'resuelta', 'cancelada'];
 // tumbar el reporte de la avería por un problema de correo.
 async function avisarFontaneroPorCorreo(averia) {
   try {
-    const { data: fontaneros, error } = await supabaseAdmin
+    const [{ data: fontaneros, error }, { data: reportante }] = await Promise.all([
+      supabaseAdmin
       .from('profiles')
-      .select('correo')
+      .select('id,correo')
       .eq('rol', 'fontanero')
-      .eq('activo', true);
+      .eq('activo', true),
+      supabaseAdmin
+        .from('profiles')
+        .select('nombre,apellido,correo,telefono,zona,direccion')
+        .eq('id', averia.perfil_id)
+        .maybeSingle(),
+    ]);
 
     if (error) throw error;
     if (!fontaneros || fontaneros.length === 0) return;
 
+    const escapar = (valor) => String(valor || '').replace(/[&<>"']/g, (caracter) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[caracter]);
+    const nombre = [reportante?.nombre, reportante?.apellido].filter(Boolean).join(' ') || 'No disponible';
+    const ubicacion = [averia.direccion || reportante?.direccion, averia.zona || reportante?.zona]
+      .filter(Boolean).join(' · ') || 'No registrada';
     const html = `<p>Se reportó una nueva avería:</p>
-      <p><strong>Descripción:</strong> ${averia.descripcion}</p>
-      ${averia.direccion ? `<p><strong>Dirección:</strong> ${averia.direccion}</p>` : ''}
-      ${averia.zona ? `<p><strong>Zona:</strong> ${averia.zona}</p>` : ''}
+      <p><strong>Reportó:</strong> ${escapar(nombre)}</p>
+      <p><strong>Correo:</strong> ${escapar(reportante?.correo)}</p>
+      <p><strong>Teléfono:</strong> ${escapar(reportante?.telefono)}</p>
+      <p><strong>Ubicación:</strong> ${escapar(ubicacion)}</p>
+      <p><strong>Descripción:</strong> ${escapar(averia.descripcion)}</p>
       <p><strong>Fecha:</strong> ${new Date(averia.fecha_reporte).toLocaleString('es-CO')}</p>`;
 
     await Promise.all(
-      fontaneros.map((f) =>
+      fontaneros.flatMap((f) => [
         enviarCorreo({
           to: f.correo,
           subject: 'Nueva avería reportada - Acueducto Campoamor',
           html,
-        })
-      )
+        }),
+        notificar(f.id, `Nueva avería de ${nombre}, en ${ubicacion}. ${averia.descripcion}`, 'averia'),
+      ])
     );
   } catch (err) {
     console.error('Error avisando al fontanero por correo:', err.message);
@@ -49,8 +66,8 @@ async function reportarAveria(req, res) {
     const direccionUsuario = req.usuario.direccion;
     const { descripcion, ubicacionConfirmada } = req.body;
 
-    if (!descripcion || !descripcion.trim()) {
-      return res.status(400).json({ error: 'La descripción es obligatoria' });
+    if (typeof descripcion !== 'string' || descripcion.trim().length < 20) {
+      return res.status(400).json({ error: 'Describe el problema con más detalle (mínimo 20 caracteres).' });
     }
 
     // La ubicación siempre se toma de los datos de la cuenta (no la escribe
@@ -106,7 +123,19 @@ async function listarAverias(req, res) {
     const { data, error } = await breakdownModel.list({ estado, limit, offset });
     if (error) return errorConsulta(res, error);
 
-    res.status(200).json({ data });
+    const ids = [...new Set((data || []).map((averia) => averia.perfil_id).filter(Boolean))];
+    const { data: perfiles, error: perfilesError } = ids.length
+      ? await supabaseAdmin.from('profiles')
+          .select('id,nombre,apellido,correo,telefono,zona,direccion').in('id', ids)
+      : { data: [], error: null };
+    if (perfilesError) return errorConsulta(res, perfilesError);
+    const porId = new Map((perfiles || []).map((perfil) => [perfil.id, perfil]));
+    const conReportante = (data || []).map((averia) => ({
+      ...averia,
+      reportante: porId.get(averia.perfil_id) || null,
+    }));
+
+    res.status(200).json({ data: conReportante });
   } catch (err) {
     return errorInesperado(res, err);
   }
@@ -125,8 +154,11 @@ async function actualizarAveria(req, res) {
       });
     }
 
+    if (nota !== undefined && (typeof nota !== 'string' || nota.length > 1000)) {
+      return res.status(400).json({ error: 'La nota debe tener máximo 1000 caracteres' });
+    }
     const actualizacion = { estado, fontanero_id: fontaneroId };
-    if (nota !== undefined) actualizacion.nota_fontanero = nota;
+    if (nota !== undefined) actualizacion.nota_fontanero = nota.trim() || null;
     if (estado === 'resuelta') {
       actualizacion.fecha_resolucion = new Date().toISOString();
     }
@@ -138,11 +170,13 @@ async function actualizarAveria(req, res) {
       return res.status(404).json({ error: 'Avería no encontrada' });
     }
 
-    await notificar(
-      data.perfil_id,
-      `El estado de tu avería reportada cambió a "${estado}".`,
-      'averia'
-    );
+    const mensajes = {
+      en_proceso: 'El fontanero aceptó atender tu avería. Está en proceso de solución.',
+      resuelta: `Tu avería fue solucionada con éxito.${data.nota_fontanero ? ` ${data.nota_fontanero}` : ''}`,
+      reportada: 'El estado de tu avería cambió a reportada.',
+      cancelada: 'Tu avería fue cancelada.',
+    };
+    await notificar(data.perfil_id, mensajes[estado], 'averia');
 
     res.status(200).json({ data });
   } catch (err) {

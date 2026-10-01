@@ -36,6 +36,17 @@ class _AveriasScreenState extends State<AveriasScreen> {
     _futuro = _cargar();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final rol = Provider.of<AuthProvider>(context).profile?.rol;
+    final esFontanero = rol == 'fontanero' || rol == 'administrador';
+    if (esFontanero != _esFontanero) {
+      _esFontanero = esFontanero;
+      _futuro = _cargar();
+    }
+  }
+
   Future<List<Averia>> _cargar() async {
     final ruta = _esFontanero ? '/averias' : '/averias/mis-averias';
     final data = await context.read<AuthProvider>().api.get(ruta);
@@ -49,11 +60,36 @@ class _AveriasScreenState extends State<AveriasScreen> {
   }
 
   Future<void> _cambiarEstado(Averia averia, String nuevoEstado) async {
+    String? nota;
+    if (nuevoEstado == 'resuelta') {
+      final controlador = TextEditingController();
+      nota = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirmar solución'),
+          content: TextField(
+            controller: controlador,
+            maxLength: 1000,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Mensaje para el usuario (opcional)',
+              hintText: 'Explica brevemente qué se solucionó',
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(context, controlador.text.trim()), child: const Text('Marcar solucionada')),
+          ],
+        ),
+      );
+      controlador.dispose();
+      if (nota == null) return;
+    }
     setState(() => _actualizandoIds.add(averia.id));
     try {
       await context.read<AuthProvider>().api.put(
         '/averias/${averia.id}',
-        body: {'estado': nuevoEstado},
+        body: {'estado': nuevoEstado, if (nota != null) 'nota': nota},
       );
       await _refrescar();
     } on ApiException catch (e) {

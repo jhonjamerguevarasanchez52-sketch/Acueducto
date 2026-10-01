@@ -114,12 +114,12 @@ class AppTheme {
 
   /// Duración estándar de las animaciones de entrada (fundido + deslizado)
   /// de tarjetas, cabeceras y títulos de AppBar.
-  static const Duration motionEntrada = Duration(milliseconds: 380);
+  static const Duration motionEntrada = Duration(milliseconds: 280);
 
   /// Separación entre la entrada de un ítem de una lista y el siguiente,
   /// para que aparezcan en cascada en vez de todos de golpe. Se multiplica
   /// por el índice del ítem: `AppTheme.motionEscalon * i`.
-  static const Duration motionEscalon = Duration(milliseconds: 40);
+  static const Duration motionEscalon = Duration(milliseconds: 24);
 
   // Paleta extendida, compartida por el splash y las cabeceras.
   static const Color midBlue = Color(0xFF1E5FA0);

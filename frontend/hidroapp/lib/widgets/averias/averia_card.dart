@@ -69,6 +69,19 @@ class AveriaCard extends StatelessWidget {
               averia.descripcion,
               style: const TextStyle(fontSize: 15, height: 1.35),
             ),
+            if (onCambiarEstado != null) ...[
+              const SizedBox(height: 12),
+              _DatoAveria(icono: Icons.person_outline, texto: averia.reportanteNombre ?? 'Reportante no disponible'),
+              if (averia.reportanteTelefono?.isNotEmpty == true)
+                _DatoAveria(icono: Icons.phone_outlined, texto: averia.reportanteTelefono!),
+              if (averia.reportanteCorreo?.isNotEmpty == true)
+                _DatoAveria(icono: Icons.email_outlined, texto: averia.reportanteCorreo!),
+              if (averia.direccion?.isNotEmpty == true || averia.zona?.isNotEmpty == true)
+                _DatoAveria(
+                  icono: Icons.location_on_outlined,
+                  texto: [averia.direccion, averia.zona].where((parte) => parte?.isNotEmpty == true).join(' · '),
+                ),
+            ],
             if (averia.notaFontanero != null) ...[
               const SizedBox(height: 12),
               Container(
@@ -117,40 +130,41 @@ class AveriaCard extends StatelessWidget {
             ],
             if (onCambiarEstado != null && !averia.cerrada) ...[
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  if (averia.estado != 'en_proceso') ...[
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: actualizando
-                            ? null
-                            : () => onCambiarEstado!('en_proceso'),
-                        child: const Text('Trabajando en ello'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: actualizando
-                          ? null
-                          : () => onCambiarEstado!('resuelta'),
-                      child: actualizando
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Solucionada'),
-                    ),
-                  ),
-                ],
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: actualizando
+                      ? null
+                      : () => onCambiarEstado!(averia.estado == 'en_proceso' ? 'resuelta' : 'en_proceso'),
+                  icon: actualizando
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Icon(averia.estado == 'en_proceso' ? Icons.check_circle_outline : Icons.play_arrow_rounded),
+                  label: Text(averia.estado == 'en_proceso' ? 'Marcar como solucionada' : 'Aceptar y comenzar'),
+                ),
               ),
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _DatoAveria extends StatelessWidget {
+  const _DatoAveria({required this.icono, required this.texto});
+  final IconData icono;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppColors.of(context).secondaryText;
+    return Padding(
+      padding: const EdgeInsets.only(top: 5),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icono, size: 16, color: color),
+        const SizedBox(width: 7),
+        Expanded(child: Text(texto, style: TextStyle(fontSize: 13, color: color))),
+      ]),
     );
   }
 }
