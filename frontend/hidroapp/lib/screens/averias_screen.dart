@@ -89,13 +89,13 @@ class _AveriasScreenState extends State<AveriasScreen> {
         ),
       );
       controlador.dispose();
-      if (nota == null) return;
+      if (!mounted || nota == null) return;
     }
     setState(() => _actualizandoIds.add(averia.id));
     try {
       final respuesta = await context.read<AuthProvider>().api.put(
         '/averias/${averia.id}',
-        body: {'estado': nuevoEstado, if (nota != null) 'nota': nota},
+        body: {'estado': nuevoEstado, 'nota': ?nota},
       );
       await _refrescar();
       if (mounted) {
