@@ -59,11 +59,15 @@ class Profile {
   /// Fecha desde la que el usuario podrá volver a editar su perfil, o `null`
   /// si puede hacerlo ahora mismo.
   DateTime? get proximaEdicionDisponible {
+    if (!perfilCompleto) return null;
     if (updatedAt == null) return null;
     if (_correosSinLimiteEdicion.contains(correo.toLowerCase())) return null;
     final limite = updatedAt!.add(const Duration(days: diasLimiteEdicionPerfil));
     return limite.isAfter(DateTime.now()) ? limite : null;
   }
+
+  bool get perfilCompleto => [telefono, numeroLote, direccion, zona]
+      .every((valor) => valor != null && valor.trim().isNotEmpty);
 
   bool get puedeEditarPerfil => proximaEdicionDisponible == null;
 

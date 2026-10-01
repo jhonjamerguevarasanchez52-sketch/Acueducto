@@ -187,7 +187,9 @@ class PerfilScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
-              'Solo puedes editar tus datos una vez cada 30 días.',
+              perfil?.perfilCompleto == true
+                  ? 'Solo puedes editar tus datos una vez cada 30 días.'
+                  : 'Completa los datos faltantes; el plazo de 30 días comenzará cuando estén registrados.',
               style: TextStyle(color: colores.secondaryText, fontSize: 12),
             ),
           ),
