@@ -37,6 +37,7 @@ class AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oscuro = _esOscuro(context);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
@@ -45,11 +46,13 @@ class AuthHeader extends StatelessWidget {
         24,
         52,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppTheme.midBlue, AppTheme.deepBlue],
+          colors: oscuro
+              ? const [Color(0xFF15334A), Color(0xFF091D2A)]
+              : const [AppTheme.midBlue, AppTheme.deepBlue],
         ),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
       ),
@@ -73,7 +76,11 @@ class AuthCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.deepBlue.withValues(alpha: 0.10),
+            color:
+                (Theme.of(context).brightness == Brightness.dark
+                        ? Colors.black
+                        : AppTheme.deepBlue)
+                    .withValues(alpha: 0.18),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -86,17 +93,17 @@ class AuthCard extends StatelessWidget {
 
 /// Etiqueta pequeña en mayúsculas que va encima de cada campo.
 Widget authFieldLabel(BuildContext context, String text) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: authLabelDe(context),
-        ),
-      ),
-    );
+  padding: const EdgeInsets.only(bottom: 8),
+  child: Text(
+    text,
+    style: TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.8,
+      color: authLabelDe(context),
+    ),
+  ),
+);
 
 /// `InputDecoration` común a los campos de las pantallas de sesión.
 InputDecoration authInputDecoration(
@@ -120,8 +127,11 @@ InputDecoration authInputDecoration(
   return InputDecoration(
     hintText: hint,
     counterText: counterText,
-    hintStyle: hintStyle ??
-        TextStyle(color: oscuro ? const Color(0xFF7C93A0) : const Color(0xFF9FB4C2)),
+    hintStyle:
+        hintStyle ??
+        TextStyle(
+          color: oscuro ? const Color(0xFF7C93A0) : const Color(0xFF9FB4C2),
+        ),
     prefixIcon: icon == null
         ? null
         : Icon(icon, color: AppTheme.primary, size: 20),
