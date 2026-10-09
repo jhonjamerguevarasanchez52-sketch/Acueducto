@@ -261,6 +261,7 @@ alter table public.payments        add column if not exists transaccion_id      
 alter table public.breakdowns      add column if not exists nota_fontanero    text;
 alter table public.breakdowns      add column if not exists fontanero_id      uuid references public.profiles (id);
 alter table public.breakdowns      add column if not exists direccion         text;
+alter table public.breakdowns      add column if not exists fecha_resolucion timestamptz;
 
 alter table public.service_outages add column if not exists factura_id        uuid references public.invoices (id) on delete set null;
 alter table public.service_outages add column if not exists fecha_reconexion  timestamptz;

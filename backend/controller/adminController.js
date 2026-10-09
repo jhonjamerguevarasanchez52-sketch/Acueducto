@@ -74,9 +74,9 @@ async function crearUsuario(req, res) {
     try {
       await enviarCorreo({
         to: correo,
-        subject: 'Tu cuenta en Acueducto Campoamor',
+        subject: 'Tu cuenta en Acueducto Campo Amor',
         html: `<p>Hola ${nombre},</p>
-               <p>Un administrador creó tu cuenta en Acueducto Campoamor. Esta es tu contraseña temporal:</p>
+               <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
                <h2>${passwordTemporal}</h2>
                <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
       });

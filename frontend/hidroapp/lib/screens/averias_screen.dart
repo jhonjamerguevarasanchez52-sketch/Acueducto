@@ -62,33 +62,10 @@ class _AveriasScreenState extends State<AveriasScreen> {
   Future<void> _cambiarEstado(Averia averia, String nuevoEstado) async {
     String? nota;
     if (nuevoEstado == 'resuelta') {
-      final controlador = TextEditingController();
       nota = await showDialog<String>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Confirmar solución'),
-          content: TextField(
-            controller: controlador,
-            maxLength: 1000,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Mensaje para el usuario (opcional)',
-              hintText: 'Explica brevemente qué se solucionó',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, controlador.text.trim()),
-              child: const Text('Marcar solucionada'),
-            ),
-          ],
-        ),
+        builder: (_) => const _ConfirmarSolucionDialog(),
       );
-      controlador.dispose();
       if (nota == null) return;
     }
     setState(() => _actualizandoIds.add(averia.id));
@@ -221,6 +198,53 @@ class _AveriasScreenState extends State<AveriasScreen> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// El diálogo conserva su controlador durante la animación de cierre y lo
+/// libera cuando la ruta ya desmontó el campo de texto.
+class _ConfirmarSolucionDialog extends StatefulWidget {
+  const _ConfirmarSolucionDialog();
+
+  @override
+  State<_ConfirmarSolucionDialog> createState() =>
+      _ConfirmarSolucionDialogState();
+}
+
+class _ConfirmarSolucionDialogState extends State<_ConfirmarSolucionDialog> {
+  final _controlador = TextEditingController();
+
+  @override
+  void dispose() {
+    _controlador.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Confirmar solución'),
+      content: TextField(
+        controller: _controlador,
+        maxLength: 1000,
+        maxLines: 3,
+        decoration: const InputDecoration(
+          labelText: 'Mensaje para el usuario (opcional)',
+          hintText: 'Explica brevemente qué se solucionó',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () =>
+              Navigator.pop(context, _controlador.text.trim()),
+          child: const Text('Marcar solucionada'),
+        ),
+      ],
     );
   }
 }
