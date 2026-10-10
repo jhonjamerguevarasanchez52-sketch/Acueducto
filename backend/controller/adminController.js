@@ -76,9 +76,9 @@ async function crearUsuario(req, res) {
         to: correo,
         subject: 'Tu cuenta en Acueducto Campoamor',
         html: `<p>Hola ${nombre},</p>
-               <p>Un administrador creó tu cuenta en Acueducto Campoamor. Esta es tu contraseña temporal:</p>
-               <h2>${passwordTemporal}</h2>
-               <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
+              <p>Un administrador creó tu cuenta en Acueducto Campoamor. Esta es tu contraseña temporal:</p>
+              <h2>${passwordTemporal}</h2>
+              <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
       });
     } catch (mailErr) {
       console.error('Error enviando correo de cuenta creada:', mailErr.message);

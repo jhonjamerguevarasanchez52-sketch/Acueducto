@@ -295,8 +295,8 @@ async function solicitarRecuperacion(req, res) {
         to: correo,
         subject: 'Recuperación de contraseña - Acueducto Campoamor',
         html: `<p>Tu código de recuperación es:</p>
-               <h2>${codigoRecuperacion}</h2>
-               <p>Este código expira en 15 minutos. Si no solicitaste esto, ignora este correo.</p>`,
+              <h2>${codigoRecuperacion}</h2>
+              <p>Este código expira en 15 minutos. Si no solicitaste esto, ignora este correo.</p>`,
       });
     } catch (mailErr) {
       console.error('Error enviando correo de recuperación:', mailErr.message);
