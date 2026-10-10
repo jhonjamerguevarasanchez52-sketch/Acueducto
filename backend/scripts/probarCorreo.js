@@ -26,7 +26,7 @@ async function main() {
   try {
     const respuesta = await enviarCorreo({
       to: destino,
-      subject: 'Prueba de correo - Acueducto Campoamor',
+      subject: 'Prueba de correo - Acueducto Campo Amor',
       html: `<p>Este es un correo de prueba enviado desde el backend.</p>
              <p>Fecha: ${new Date().toLocaleString('es-CO')}</p>
              <p>Si lo recibes, la configuración de Brevo funciona correctamente. 🚰</p>`,

@@ -74,16 +74,24 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     );
     final mensaje = mensajeCtrl.text.trim();
     mensajeCtrl.dispose();
-    if (enviar != true || mensaje.isEmpty) return;
+    if (!mounted || enviar != true || mensaje.isEmpty) return;
     setState(() => _enviandoAviso = true);
     try {
-      await context.read<AuthProvider>().api.post('/notificaciones', body: {
-        'perfil_id': 'todos', 'mensaje': mensaje, 'tipo': tipo,
-      });
+      await context.read<AuthProvider>().api.post(
+        '/notificaciones',
+        body: {'perfil_id': 'todos', 'mensaje': mensaje, 'tipo': tipo},
+      );
       await _refrescar();
-      if (mounted) AppSnackbar.success(context, 'Aviso enviado a todos los perfiles activos.');
+      if (mounted) {
+        AppSnackbar.success(
+          context,
+          'Aviso enviado a todos los perfiles activos.',
+        );
+      }
     } on ApiException catch (e) {
-      if (mounted) AppSnackbar.error(context, e.message);
+      if (mounted) {
+        AppSnackbar.error(context, e.message);
+      }
     } finally {
       if (mounted) setState(() => _enviandoAviso = false);
     }
@@ -119,10 +127,9 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
       ];
     });
     try {
-      await context
-          .read<AuthProvider>()
-          .api
-          .put('/notificaciones/${n.id}/leida');
+      await context.read<AuthProvider>().api.put(
+        '/notificaciones/${n.id}/leida',
+      );
     } on ApiException {
       // Si falla, revertimos el cambio visual.
       if (!mounted) return;
@@ -155,8 +162,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
         break;
     }
     if (destino != null) {
-      Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => destino!));
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => destino!));
     }
   }
 
@@ -170,10 +176,9 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
       ];
     });
     try {
-      await context
-          .read<AuthProvider>()
-          .api
-          .put('/notificaciones/marcar-todas');
+      await context.read<AuthProvider>().api.put(
+        '/notificaciones/marcar-todas',
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _notificaciones = previas);
@@ -196,7 +201,14 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
               tooltip: 'Avisar a todos',
               onPressed: _enviandoAviso ? null : _publicarAviso,
               icon: _enviandoAviso
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.campaign_outlined),
             ),
           if (_noLeidas > 0)
@@ -300,7 +312,9 @@ class _NotificacionCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: leida ? colores.chipBackground : colores.cardBackground,
+                  color: leida
+                      ? colores.chipBackground
+                      : colores.cardBackground,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icono, size: 20, color: colores.info),
@@ -315,8 +329,7 @@ class _NotificacionCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         height: 1.35,
-                        fontWeight:
-                            leida ? FontWeight.w400 : FontWeight.w600,
+                        fontWeight: leida ? FontWeight.w400 : FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),

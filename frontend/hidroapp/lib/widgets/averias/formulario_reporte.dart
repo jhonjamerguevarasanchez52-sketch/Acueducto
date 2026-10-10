@@ -202,8 +202,9 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                     validator: (v) {
                       final t = v?.trim() ?? '';
                       if (t.isEmpty) return 'Cuéntanos qué ocurre';
-                      if (t.length < 20)
+                      if (t.length < 20) {
                         return 'Describe el problema con más detalle (mínimo 20 caracteres)';
+                      }
                       return null;
                     },
                   ),

@@ -20,6 +20,15 @@ class AveriasScreen extends StatefulWidget {
 class _AveriasScreenState extends State<AveriasScreen> {
   late Future<List<Averia>> _futuro;
   late bool _esFontanero;
+  String _filtroEstado = 'todas';
+
+  static const _filtrosEstado = <(String, String)>[
+    ('todas', 'Todas'),
+    ('reportada', 'Reportadas'),
+    ('en_proceso', 'En proceso'),
+    ('resuelta', 'Resueltas'),
+    ('cancelada', 'Canceladas'),
+  ];
 
   // Ids de averías con un cambio de estado en curso. Vive aquí (no dentro de
   // AveriaCard) para no depender de que Flutter reutilice el State de la
@@ -60,43 +69,33 @@ class _AveriasScreenState extends State<AveriasScreen> {
   }
 
   Future<void> _cambiarEstado(Averia averia, String nuevoEstado) async {
+    final api = context.read<AuthProvider>().api;
     String? nota;
     if (nuevoEstado == 'resuelta') {
-      final controlador = TextEditingController();
       nota = await showDialog<String>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Confirmar solución'),
-          content: TextField(
-            controller: controlador,
-            maxLength: 1000,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Mensaje para el usuario (opcional)',
-              hintText: 'Explica brevemente qué se solucionó',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, controlador.text.trim()),
-              child: const Text('Marcar solucionada'),
-            ),
-          ],
-        ),
+        builder: (_) => const _ConfirmarSolucionDialog(),
       );
+ 
       controlador.dispose();
+      if (!mounted || nota == null) return;
+
       if (nota == null) return;
+
     }
+    if (!mounted) return;
     setState(() => _actualizandoIds.add(averia.id));
     try {
+
       final respuesta = await context.read<AuthProvider>().api.put(
         '/averias/${averia.id}',
-        body: {'estado': nuevoEstado, if (nota != null) 'nota': nota},
+        body: {'estado': nuevoEstado, 'nota': ?nota},
       );
+      
+      final body = <String, dynamic>{'estado': nuevoEstado};
+      if (nota != null) body['nota'] = nota;
+      final respuesta = await api.put('/averias/${averia.id}', body: body);
+
       await _refrescar();
       if (mounted) {
         final usuarioNotificado =
@@ -150,11 +149,41 @@ class _AveriasScreenState extends State<AveriasScreen> {
     }
   }
 
+  Widget _barraFiltros(List<Averia> averias) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final (estado, etiqueta) in _filtrosEstado) ...[
+              if (estado != _filtrosEstado.first.$1) const SizedBox(width: 8),
+              ChoiceChip(
+                label: Text(
+                  '$etiqueta (${estado == 'todas' ? averias.length : averias.where((a) => a.estado == estado).length})',
+                ),
+                selected: _filtroEstado == estado,
+                onSelected: (_) => setState(() => _filtroEstado = estado),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GotaScaffold(
       appBar: HidroAppBar(
         title: _esFontanero ? 'Averías reportadas' : 'Averías',
+        actions: [
+          IconButton(
+            tooltip: 'Actualizar averías',
+            onPressed: () => _refrescar(),
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
       floatingActionButton: _esFontanero
           ? null
@@ -168,11 +197,12 @@ class _AveriasScreenState extends State<AveriasScreen> {
         child: FutureBuilder<List<Averia>>(
           future: _futuro,
           builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
+            if (snap.connectionState == ConnectionState.waiting &&
+                !snap.hasData) {
               return const SkeletonLista();
             }
 
-            if (snap.hasError) {
+            if (snap.hasError && !snap.hasData) {
               return ListView(
                 children: [
                   MensajeEstado.error(
@@ -185,10 +215,12 @@ class _AveriasScreenState extends State<AveriasScreen> {
               );
             }
 
-            final averias = snap.data ?? const <Averia>[];
-            if (averias.isEmpty) {
+            final todasLasAverias = snap.data ?? const <Averia>[];
+            if (todasLasAverias.isEmpty) {
               return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                 children: [
+                  _barraFiltros(todasLasAverias),
                   MensajeEstado(
                     icono: Icons.build_outlined,
                     titulo: 'Sin averías reportadas',
@@ -200,17 +232,43 @@ class _AveriasScreenState extends State<AveriasScreen> {
               );
             }
 
+            final averias = _filtroEstado == 'todas'
+                ? todasLasAverias
+                : todasLasAverias
+                      .where((averia) => averia.estado == _filtroEstado)
+                      .toList();
+
             return ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-              itemCount: averias.length,
+              itemCount: averias.isEmpty ? 2 : averias.length + 1,
               itemBuilder: (context, i) {
-                final averia = averias[i];
+                if (i == 0) {
+                  return _barraFiltros(todasLasAverias);
+                }
+
+                if (averias.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 48),
+                    child: MensajeEstado(
+                      icono: Icons.filter_list_off,
+                      titulo:
+                          'No hay averías ${_filtrosEstado.firstWhere((f) => f.$1 == _filtroEstado).$2.toLowerCase()}',
+                      detalle: 'Prueba otro filtro para ver más averías.',
+                    ),
+                  );
+                }
+
+                final averia = averias[i - 1];
+                final hayOtraEnProceso = todasLasAverias.any(
+                  (otra) => otra.estado == 'en_proceso' && otra.id != averia.id,
+                );
                 return EntradaAnimada(
                   key: ValueKey(averia.id),
-                  retraso: AppTheme.motionEscalon * i,
+                  retraso: AppTheme.motionEscalon * (i - 1),
                   child: AveriaCard(
                     averia: averia,
                     actualizando: _actualizandoIds.contains(averia.id),
+                    bloqueadaPorOtra: _esFontanero && hayOtraEnProceso,
                     onCambiarEstado: _esFontanero
                         ? (nuevoEstado) => _cambiarEstado(averia, nuevoEstado)
                         : null,
@@ -221,6 +279,52 @@ class _AveriasScreenState extends State<AveriasScreen> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// El diálogo conserva su controlador durante la animación de cierre y lo
+/// libera cuando la ruta ya desmontó el campo de texto.
+class _ConfirmarSolucionDialog extends StatefulWidget {
+  const _ConfirmarSolucionDialog();
+
+  @override
+  State<_ConfirmarSolucionDialog> createState() =>
+      _ConfirmarSolucionDialogState();
+}
+
+class _ConfirmarSolucionDialogState extends State<_ConfirmarSolucionDialog> {
+  final _controlador = TextEditingController();
+
+  @override
+  void dispose() {
+    _controlador.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Confirmar solución'),
+      content: TextField(
+        controller: _controlador,
+        maxLength: 1000,
+        maxLines: 3,
+        decoration: const InputDecoration(
+          labelText: 'Mensaje para el usuario (opcional)',
+          hintText: 'Explica brevemente qué se solucionó',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controlador.text.trim()),
+          child: const Text('Marcar solucionada'),
+        ),
+      ],
     );
   }
 }

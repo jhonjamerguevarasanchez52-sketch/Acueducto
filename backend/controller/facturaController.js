@@ -14,12 +14,12 @@ async function enviarCorreoFactura({ correo, nombre, periodo, valorTotal, fechaV
   try {
     await enviarCorreo({
       to: correo,
-      subject: `Nueva factura - periodo ${periodo} - Acueducto Campoamor`,
+      subject: `Nueva factura - periodo ${periodo} - Acueducto Campo Amor`,
       html: `<p>Hola ${nombre || ''},</p>
              <p>Se generó tu factura del periodo <strong>${periodo}</strong> por un valor de
              <strong>$${formatearMoneda(valorTotal)}</strong>.</p>
              ${fechaVencimiento ? `<p>Fecha límite de pago: ${new Date(fechaVencimiento).toLocaleDateString('es-CO')}.</p>` : ''}
-             <p>Puedes consultar el detalle desde la aplicación de Acueducto Campoamor.</p>`,
+             <p>Puedes consultar el detalle desde la aplicación de Acueducto Campo Amor.</p>`,
     });
   } catch (mailErr) {
     console.error('Error enviando correo de factura:', mailErr.message);
