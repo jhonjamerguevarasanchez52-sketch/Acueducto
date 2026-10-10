@@ -261,6 +261,7 @@ alter table public.payments        add column if not exists transaccion_id      
 alter table public.breakdowns      add column if not exists nota_fontanero    text;
 alter table public.breakdowns      add column if not exists fontanero_id      uuid references public.profiles (id);
 alter table public.breakdowns      add column if not exists direccion         text;
+alter table public.breakdowns      add column if not exists fecha_resolucion timestamptz;
 
 alter table public.service_outages add column if not exists factura_id        uuid references public.invoices (id) on delete set null;
 alter table public.service_outages add column if not exists fecha_reconexion  timestamptz;
@@ -268,3 +269,19 @@ alter table public.service_outages add column if not exists fecha_reconexion  ti
 alter table public.profiles        add column if not exists activo            boolean not null default true;
 alter table public.profiles        add column if not exists debe_cambiar_password boolean not null default false;
 alter table public.profiles        add column if not exists updated_at         timestamptz;
+
+-- La migraciÃ³n se ejecuta despuÃ©s de aÃ±adir columnas que puedan faltar en
+-- instalaciones existentes, especialmente fontanero_id.
+with averias_en_orden as (
+  select id, row_number() over (order by fecha_reporte asc, id asc) as numero
+  from public.breakdowns
+  where estado = 'en_proceso'
+)
+update public.breakdowns as b
+set estado = 'reportada', fontanero_id = null
+from averias_en_orden as orden
+where b.id = orden.id and orden.numero > 1;
+
+create unique index if not exists idx_breakdowns_un_solo_en_proceso
+  on public.breakdowns (estado)
+  where estado = 'en_proceso';

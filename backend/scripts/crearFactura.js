@@ -115,12 +115,12 @@ async function main() {
   try {
     await enviarCorreo({
       to: perfil.correo,
-      subject: `Nueva factura - periodo ${periodo} - Acueducto Campoamor`,
+      subject: `Nueva factura - periodo ${periodo} - Acueducto Campo Amor`,
       html: `<p>Hola ${perfil.nombre || ''},</p>
              <p>Se generó tu factura del periodo <strong>${periodo}</strong> por un valor de
              <strong>$${valorTotal.toLocaleString('es-CO')}</strong>.</p>
              <p>Fecha límite de pago: ${fechaVencimiento.toLocaleDateString('es-CO')}.</p>
-             <p>Puedes consultar el detalle desde la aplicación de Acueducto Campoamor.</p>`,
+             <p>Puedes consultar el detalle desde la aplicación de Acueducto Campo Amor.</p>`,
     });
     console.log('Correo enviado ✅');
   } catch (mailErr) {

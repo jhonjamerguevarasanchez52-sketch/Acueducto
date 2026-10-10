@@ -2,7 +2,7 @@ const { BrevoClient } = require('@getbrevo/brevo');
 
 const apiKey = process.env.BREVO_API_KEY;
 const remitenteCorreo = process.env.EMAIL_USER;
-const remitenteNombre = process.env.EMAIL_SENDER_NAME || 'Acueducto Campoamor';
+const remitenteNombre = process.env.EMAIL_SENDER_NAME || 'Acueducto Campo Amor';
 
 if (!apiKey) {
   console.warn('[mailer] BREVO_API_KEY no está definido: los correos no se enviarán.');
