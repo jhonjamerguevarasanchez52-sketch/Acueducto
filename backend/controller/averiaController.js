@@ -45,7 +45,7 @@ async function avisarFontaneroPorCorreo(averia) {
       fontaneros.flatMap((f) => [
         enviarCorreo({
           to: f.correo,
-          subject: 'Nueva avería reportada - Acueducto Campoamor',
+          subject: 'Nueva avería reportada - Acueducto Campo Amor',
           html,
         }),
         notificar(f.id, `Nueva avería de ${nombre}, en ${ubicacion}. ${averia.descripcion}`, 'averia'),
@@ -160,6 +160,20 @@ async function actualizarAveria(req, res) {
     if (nota !== undefined && (typeof nota !== 'string' || nota.length > 1000)) {
       return res.status(400).json({ error: 'La nota debe tener máximo 1000 caracteres' });
     }
+    if (estado === 'en_proceso') {
+      const { data: activas, error: errorActivas } = await breakdownModel.list({
+        estado: 'en_proceso',
+      });
+      if (errorActivas) return errorConsulta(res, errorActivas);
+
+      const otraActiva = (activas || []).find((averia) => averia.id !== id);
+      if (otraActiva) {
+        return res.status(409).json({
+          error: 'Termina la averia que esta en proceso antes de empezar otra.',
+        });
+      }
+    }
+
     const actualizacion = { estado, fontanero_id: fontaneroId };
     if (nota !== undefined) actualizacion.nota_fontanero = nota.trim() || null;
     if (estado === 'resuelta') {
@@ -168,14 +182,27 @@ async function actualizarAveria(req, res) {
 
     const { data, error } = await breakdownModel.update(id, actualizacion);
 
+    if (error?.code === '23505') {
+      return res.status(409).json({
+        error: 'Termina la averia que esta en proceso antes de empezar otra.',
+      });
+    }
     if (error) return errorConsulta(res, error);
     if (!data) {
       return res.status(404).json({ error: 'Avería no encontrada' });
     }
 
+    const resumenAveria = (data.descripcion || '').trim();
+    const notaFontanero = (data.nota_fontanero || '').trim();
     const mensajes = {
       en_proceso: 'El fontanero aceptó atender tu avería. Está en proceso de solución.',
-      resuelta: `Tu avería fue solucionada con éxito.${data.nota_fontanero ? ` ${data.nota_fontanero}` : ''}`,
+      // Incluimos el reporte original y la nota para que el usuario reciba el
+      // contexto de qué se solucionó, incluso desde la vista de notificaciones.
+      resuelta: [
+        'Tu avería fue solucionada con éxito.',
+        resumenAveria ? `Avería reportada: ${resumenAveria}` : null,
+        notaFontanero ? `Solución: ${notaFontanero}` : null,
+      ].filter(Boolean).join(' '),
       reportada: 'El estado de tu avería cambió a reportada.',
       cancelada: 'Tu avería fue cancelada.',
     };

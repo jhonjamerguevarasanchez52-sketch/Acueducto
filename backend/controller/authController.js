@@ -186,7 +186,7 @@ async function reenviarCodigoVerificacion(req, res) {
     try {
       await enviarCorreo({
         to: correo,
-        subject: 'Nuevo código de verificación - Acueducto Campoamor',
+        subject: 'Nuevo código de verificación - Acueducto Campo Amor',
         html: `<p>Tu nuevo código de verificación es:</p>
                <h2>${codigoVerificacion}</h2>
                <p>Este código expira en 15 minutos.</p>`,
@@ -293,7 +293,7 @@ async function solicitarRecuperacion(req, res) {
     try {
       await enviarCorreo({
         to: correo,
-        subject: 'Recuperación de contraseña - Acueducto Campoamor',
+        subject: 'Recuperación de contraseña - Acueducto Campo Amor',
         html: `<p>Tu código de recuperación es:</p>
                <h2>${codigoRecuperacion}</h2>
                <p>Este código expira en 15 minutos. Si no solicitaste esto, ignora este correo.</p>`,
@@ -367,7 +367,7 @@ async function resetearPassword(req, res) {
     try {
       await enviarCorreo({
         to: correo,
-        subject: 'Tu contraseña fue actualizada - Acueducto Campoamor',
+        subject: 'Tu contraseña fue actualizada - Acueducto Campo Amor',
         html: `<p>Tu contraseña se actualizó correctamente.</p>
                <p>Si no realizaste este cambio, contacta de inmediato al administrador del acueducto.</p>`,
       });

@@ -20,11 +20,13 @@ class AveriaCard extends StatelessWidget {
     required this.averia,
     this.onCambiarEstado,
     this.actualizando = false,
+    this.bloqueadaPorOtra = false,
   });
 
   final Averia averia;
   final void Function(String nuevoEstado)? onCambiarEstado;
   final bool actualizando;
+  final bool bloqueadaPorOtra;
 
   ({String texto, Color color}) _estado(AppColors colores) {
     switch (averia.estado) {
@@ -71,15 +73,28 @@ class AveriaCard extends StatelessWidget {
             ),
             if (onCambiarEstado != null) ...[
               const SizedBox(height: 12),
-              _DatoAveria(icono: Icons.person_outline, texto: averia.reportanteNombre ?? 'Reportante no disponible'),
+              _DatoAveria(
+                icono: Icons.person_outline,
+                texto: averia.reportanteNombre ?? 'Reportante no disponible',
+              ),
               if (averia.reportanteTelefono?.isNotEmpty == true)
-                _DatoAveria(icono: Icons.phone_outlined, texto: averia.reportanteTelefono!),
+                _DatoAveria(
+                  icono: Icons.phone_outlined,
+                  texto: averia.reportanteTelefono!,
+                ),
               if (averia.reportanteCorreo?.isNotEmpty == true)
-                _DatoAveria(icono: Icons.email_outlined, texto: averia.reportanteCorreo!),
-              if (averia.direccion?.isNotEmpty == true || averia.zona?.isNotEmpty == true)
+                _DatoAveria(
+                  icono: Icons.email_outlined,
+                  texto: averia.reportanteCorreo!,
+                ),
+              if (averia.direccion?.isNotEmpty == true ||
+                  averia.zona?.isNotEmpty == true)
                 _DatoAveria(
                   icono: Icons.location_on_outlined,
-                  texto: [averia.direccion, averia.zona].where((parte) => parte?.isNotEmpty == true).join(' · '),
+                  texto: [
+                    averia.direccion,
+                    averia.zona,
+                  ].where((parte) => parte?.isNotEmpty == true).join(' · '),
                 ),
             ],
             if (averia.notaFontanero != null) ...[
@@ -115,8 +130,11 @@ class AveriaCard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.check_circle_outline,
-                      size: 15, color: colores.secondaryText),
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 15,
+                    color: colores.secondaryText,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Resuelta: ${Formato.fecha(averia.fechaResolucion)}',
@@ -133,13 +151,38 @@ class AveriaCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: actualizando
+                  onPressed:
+                      actualizando ||
+                          (bloqueadaPorOtra && averia.estado != 'en_proceso')
                       ? null
-                      : () => onCambiarEstado!(averia.estado == 'en_proceso' ? 'resuelta' : 'en_proceso'),
+                      : () => onCambiarEstado!(
+                          averia.estado == 'en_proceso'
+                              ? 'resuelta'
+                              : 'en_proceso',
+                        ),
                   icon: actualizando
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Icon(averia.estado == 'en_proceso' ? Icons.check_circle_outline : Icons.play_arrow_rounded),
-                  label: Text(averia.estado == 'en_proceso' ? 'Marcar como solucionada' : 'Aceptar y comenzar'),
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(
+                          averia.estado == 'en_proceso'
+                              ? Icons.check_circle_outline
+                              : bloqueadaPorOtra
+                              ? Icons.lock_outline
+                              : Icons.play_arrow_rounded,
+                        ),
+                  label: Text(
+                    averia.estado == 'en_proceso'
+                        ? 'Marcar como solucionada'
+                        : bloqueadaPorOtra
+                        ? 'Termina la avería en curso para empezar otra'
+                        : 'Empezar',
+                  ),
                 ),
               ),
             ],
@@ -160,11 +203,16 @@ class _DatoAveria extends StatelessWidget {
     final color = AppColors.of(context).secondaryText;
     return Padding(
       padding: const EdgeInsets.only(top: 5),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icono, size: 16, color: color),
-        const SizedBox(width: 7),
-        Expanded(child: Text(texto, style: TextStyle(fontSize: 13, color: color))),
-      ]),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icono, size: 16, color: color),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(texto, style: TextStyle(fontSize: 13, color: color)),
+          ),
+        ],
+      ),
     );
   }
 }
