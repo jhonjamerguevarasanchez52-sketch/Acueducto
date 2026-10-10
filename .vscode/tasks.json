@@ -33,7 +33,7 @@
       "options": {
         "cwd": "${workspaceFolder}/frontend/hidroapp"
       },
-      "dependsOn": ["Iniciar Emulador Pixel 10a"],
+      "dependsOn": ["Iniciar Emulador Pixel 8 "],
       "dependsOrder": "sequence",
       "runOptions": {
         "runOn": "folderOpen"
