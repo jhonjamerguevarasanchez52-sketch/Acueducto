@@ -4,6 +4,7 @@ const profileModel = require('../models/profileModel');
 const { notificar } = require('../utils/notificar');
 const { enviarCorreo } = require('../config/mailer');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+const { escaparHtml } = require('../utils/html');
 
 function formatearMoneda(valor) {
   return Number(valor).toLocaleString('es-CO');
@@ -15,8 +16,8 @@ async function enviarCorreoFactura({ correo, nombre, periodo, valorTotal, fechaV
     await enviarCorreo({
       to: correo,
       subject: `Nueva factura - periodo ${periodo} - Acueducto Campo Amor`,
-      html: `<p>Hola ${nombre || ''},</p>
-             <p>Se generó tu factura del periodo <strong>${periodo}</strong> por un valor de
+      html: `<p>Hola ${escaparHtml(nombre)},</p>
+             <p>Se generó tu factura del periodo <strong>${escaparHtml(periodo)}</strong> por un valor de
              <strong>$${formatearMoneda(valorTotal)}</strong>.</p>
              ${fechaVencimiento ? `<p>Fecha límite de pago: ${new Date(fechaVencimiento).toLocaleDateString('es-CO')}.</p>` : ''}
              <p>Puedes consultar el detalle desde la aplicación de Acueducto Campo Amor.</p>`,

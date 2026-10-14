@@ -5,6 +5,7 @@ const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
 const { enviarCorreo } = require('../config/mailer');
 const { notificar } = require('../utils/notificar');
+const { escaparHtml } = require('../utils/html');
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
@@ -75,16 +76,10 @@ async function crearUsuario(req, res) {
       await enviarCorreo({
         to: correo,
         subject: 'Tu cuenta en Acueducto Campo Amor',
-        html: `<p>Hola ${nombre},</p>
-<<<<<<< HEAD
-              <p>Un administrador creó tu cuenta en Acueducto Campoamor. Esta es tu contraseña temporal:</p>
-              <h2>${passwordTemporal}</h2>
-              <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
-=======
-               <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
-               <h2>${passwordTemporal}</h2>
-               <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
->>>>>>> 694d2a344582dca7d217da8ff741c5d1db3ed9eb
+        html: `<p>Hola ${escaparHtml(nombre)},</p>
+          <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
+          <h2>${escaparHtml(passwordTemporal)}</h2>
+          <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
       });
     } catch (mailErr) {
       console.error('Error enviando correo de cuenta creada:', mailErr.message);
