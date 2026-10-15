@@ -25,3 +25,19 @@ frontend/devtools_options.yaml
 Thumbs.db
 
 *.apk
+
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+hidro-admin/.env
+hidro-admin/.env.*
+
+# Dependencias y compilaciones del panel web
+hidro-admin/node_modules/
+hidro-admin/dist/
+
+# Cachés
+.dart_tool/
+build/
