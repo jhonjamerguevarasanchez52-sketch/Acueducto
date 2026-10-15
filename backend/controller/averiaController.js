@@ -193,16 +193,25 @@ async function actualizarAveria(req, res) {
     const resumenAveria = (data.descripcion || '').trim();
     const notaFontanero = (data.nota_fontanero || '').trim();
     const mensajes = {
-      en_proceso: 'El fontanero aceptó atender tu avería. Está en proceso de solución.',
-      // Incluimos el reporte original y la nota para que el usuario reciba el
-      // contexto de qué se solucionó, incluso desde la vista de notificaciones.
+      en_proceso: [
+        'El fontanero tomó tu avería y la atenderá para resolverla en las próximas horas.',
+        notaFontanero ? `Mensaje del fontanero: ${notaFontanero}` : null,
+      ].filter(Boolean).join(' '),
+      // La notificación conserva el contexto del reporte y la respuesta escrita
+      // por el fontanero, para que el usuario la pueda leer desde la app.
       resuelta: [
         'Tu avería fue solucionada con éxito.',
         resumenAveria ? `Avería reportada: ${resumenAveria}` : null,
-        notaFontanero ? `Solución: ${notaFontanero}` : null,
+        notaFontanero ? `Mensaje del fontanero: ${notaFontanero}` : null,
       ].filter(Boolean).join(' '),
-      reportada: 'El estado de tu avería cambió a reportada.',
-      cancelada: 'Tu avería fue cancelada.',
+      reportada: [
+        'El estado de tu avería cambió a reportada.',
+        notaFontanero ? `Mensaje del fontanero: ${notaFontanero}` : null,
+      ].filter(Boolean).join(' '),
+      cancelada: [
+        'Tu avería fue cancelada.',
+        notaFontanero ? `Mensaje del fontanero: ${notaFontanero}` : null,
+      ].filter(Boolean).join(' '),
     };
     const notificacionEnviada = await notificar(data.perfil_id, mensajes[estado], 'averia');
 

@@ -160,6 +160,11 @@ async function cambiarRol(req, res) {
 
     const { data, error } = await profileModel.update(userId, { rol });
 
+    if (error?.code === '23505') {
+      return res.status(409).json({
+        error: 'Ya existe un fontanero asignado. Actualiza la lista de usuarios e inténtalo de nuevo.',
+      });
+    }
     if (error || !data) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }

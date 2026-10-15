@@ -17,11 +17,13 @@ function nuevaFila({ perfil_id, mensaje, tipo }) {
   };
 }
 
-function listByProfile(profileId, db = supabaseAdmin) {
+// Las operaciones de lectura/escritura propia requieren el cliente ligado al
+// JWT del usuario. Así una llamada sin `db` no usa por accidente service-role.
+function listByProfile(profileId, db) {
   return db.from(TABLE).select('*').eq('perfil_id', profileId).order('fecha', { ascending: false });
 }
 
-function countUnread(profileId, db = supabaseAdmin) {
+function countUnread(profileId, db) {
   return db
     .from(TABLE)
     .select('*', { count: 'exact', head: true })
@@ -30,16 +32,16 @@ function countUnread(profileId, db = supabaseAdmin) {
 }
 
 // Marca una notificación como leída, solo si es del perfil indicado.
-function markRead(id, profileId, db = supabaseAdmin) {
+function markRead(id, profileId, db) {
   return db.from(TABLE).update({ estado: 'leido' }).eq('id', id).eq('perfil_id', profileId).select().single();
 }
 
-function markAllRead(profileId, db = supabaseAdmin) {
+function markAllRead(profileId, db) {
   return db.from(TABLE).update({ estado: 'leido' }).eq('perfil_id', profileId).eq('estado', 'no_leido');
 }
 
 // Elimina una notificación, solo si es del perfil indicado.
-function removeOwn(id, profileId, db = supabaseAdmin) {
+function removeOwn(id, profileId, db) {
   return db.from(TABLE).delete().eq('id', id).eq('perfil_id', profileId).select().single();
 }
 

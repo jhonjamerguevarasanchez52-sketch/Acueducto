@@ -44,6 +44,11 @@ create table if not exists public.profiles (
   updated_at                     timestamptz
 );
 
+-- Solo puede existir una cuenta con acceso global a las averías.
+create unique index if not exists idx_profiles_un_solo_fontanero
+  on public.profiles (rol)
+  where rol = 'fontanero';
+
 -- ----------------------------------------------------------------------------
 --  rates: tarifas del servicio. La "vigente" es la más reciente cuyo rango
 --  de fechas contiene la fecha de hoy.

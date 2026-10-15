@@ -23,7 +23,9 @@ function create({ perfil_id, descripcion, zona, direccion }, db = supabaseAdmin)
     .single();
 }
 
-function listByProfile(profileId, db = supabaseAdmin) {
+// Lecturas del usuario: exige explícitamente el cliente ligado al JWT para
+// no caer por omisión en el cliente service-role que ignora RLS.
+function listByProfile(profileId, db) {
   return db.from(TABLE).select('*').eq('perfil_id', profileId).order('fecha_reporte', { ascending: false });
 }
 
