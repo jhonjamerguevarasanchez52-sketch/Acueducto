@@ -27,7 +27,8 @@ function list({ estado, perfil_id, limit, offset } = {}) {
 }
 
 // Todo corte nuevo nace "activo" con la fecha actual.
-function create({ perfil_id, motivo, factura_id }) {
+// cortado_por: id del administrador que lo registra. origen: 'manual' por defecto.
+function create({ perfil_id, motivo, factura_id, cortado_por, origen = 'manual' }) {
   return supabaseAdmin
     .from(TABLE)
     .insert({
@@ -36,19 +37,28 @@ function create({ perfil_id, motivo, factura_id }) {
       factura_id: factura_id || null,
       estado: 'activo',
       fecha_corte: new Date().toISOString(),
+      cortado_por: cortado_por || null,
+      origen,
     })
     .select()
     .single();
 }
 
 // Marca el corte como reconectado con la fecha actual.
-function reconnect(id) {
+// Solo afecta cortes que sigan activos: si ya estaba reconectado (o no existe)
+// devuelve data = null sin error, y el controlador responde 404.
+function reconnect(id, reconectado_por) {
   return supabaseAdmin
     .from(TABLE)
-    .update({ estado: 'reconectado', fecha_reconexion: new Date().toISOString() })
+    .update({
+      estado: 'reconectado',
+      fecha_reconexion: new Date().toISOString(),
+      reconectado_por: reconectado_por || null,
+    })
     .eq('id', id)
+    .eq('estado', 'activo')
     .select()
-    .single();
+    .maybeSingle();
 }
 
 module.exports = { listByProfile, findActiveByProfile, list, create, reconnect, ...crudBase(TABLE) };

@@ -2,6 +2,7 @@
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../screens/olvide_password_screen.dart';
 import '../../screens/verificar_cuenta_screen.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
@@ -66,9 +67,14 @@ class _LoginFormState extends State<LoginForm> {
   }
 
   void _recuperarPassword() {
-    AppSnackbar.info(
-      context,
-      'Para restablecer tu contraseña, contacta al administrador del acueducto.',
+    final correo = _correoCtrl.text.trim();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OlvidePasswordScreen(
+          // Solo se prellena si lo que escribieron parece un correo.
+          correoInicial: _correoValido.hasMatch(correo) ? correo : '',
+        ),
+      ),
     );
   }
 

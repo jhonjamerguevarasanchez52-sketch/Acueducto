@@ -76,22 +76,12 @@ class _AveriasScreenState extends State<AveriasScreen> {
         context: context,
         builder: (_) => const _ConfirmarSolucionDialog(),
       );
- 
-      controlador.dispose();
+      // null = el fontanero canceló el diálogo
       if (!mounted || nota == null) return;
-
-      if (nota == null) return;
-
     }
     if (!mounted) return;
     setState(() => _actualizandoIds.add(averia.id));
     try {
-
-      final respuesta = await context.read<AuthProvider>().api.put(
-        '/averias/${averia.id}',
-        body: {'estado': nuevoEstado, 'nota': ?nota},
-      );
-      
       final body = <String, dynamic>{'estado': nuevoEstado};
       if (nota != null) body['nota'] = nota;
       final respuesta = await api.put('/averias/${averia.id}', body: body);
