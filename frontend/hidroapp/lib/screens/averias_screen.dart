@@ -76,12 +76,7 @@ class _AveriasScreenState extends State<AveriasScreen> {
         context: context,
         builder: (_) => const _ConfirmarSolucionDialog(),
       );
- 
-      controlador.dispose();
       if (!mounted || nota == null) return;
-
-      if (nota == null) return;
-
     }
     if (!mounted) return;
     setState(() => _actualizandoIds.add(averia.id));
