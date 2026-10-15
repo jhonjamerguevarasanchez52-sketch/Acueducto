@@ -20,6 +20,8 @@ class AveriasScreen extends StatefulWidget {
 class _AveriasScreenState extends State<AveriasScreen> {
   late Future<List<Averia>> _futuro;
   late bool _esFontanero;
+  late bool _esAdministrador;
+  late bool _puedeVerTodasLasAverias;
   String _filtroEstado = 'todas';
 
   static const _filtrosEstado = <(String, String)>[
@@ -41,7 +43,9 @@ class _AveriasScreenState extends State<AveriasScreen> {
   void initState() {
     super.initState();
     final rol = context.read<AuthProvider>().profile?.rol;
-    _esFontanero = rol == 'fontanero' || rol == 'administrador';
+    _esFontanero = rol == 'fontanero';
+    _esAdministrador = rol == 'administrador';
+    _puedeVerTodasLasAverias = _esFontanero || rol == 'administrador';
     _futuro = _cargar();
   }
 
@@ -49,15 +53,24 @@ class _AveriasScreenState extends State<AveriasScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final rol = Provider.of<AuthProvider>(context).profile?.rol;
-    final esFontanero = rol == 'fontanero' || rol == 'administrador';
-    if (esFontanero != _esFontanero) {
+    final esFontanero = rol == 'fontanero';
+    final esAdministrador = rol == 'administrador';
+    final puedeVerTodasLasAverias = esFontanero || rol == 'administrador';
+    if (esFontanero != _esFontanero ||
+        esAdministrador != _esAdministrador ||
+        puedeVerTodasLasAverias != _puedeVerTodasLasAverias) {
+      final cambioAlcance = puedeVerTodasLasAverias != _puedeVerTodasLasAverias;
       _esFontanero = esFontanero;
-      _futuro = _cargar();
+      _esAdministrador = esAdministrador;
+      _puedeVerTodasLasAverias = puedeVerTodasLasAverias;
+      if (cambioAlcance) {
+        _futuro = _cargar();
+      }
     }
   }
 
   Future<List<Averia>> _cargar() async {
-    final ruta = _esFontanero ? '/averias' : '/averias/mis-averias';
+    final ruta = _puedeVerTodasLasAverias ? '/averias' : '/averias/mis-averias';
     final data = await context.read<AuthProvider>().api.get(ruta);
     return Averia.listaDesde(data);
   }
@@ -81,12 +94,6 @@ class _AveriasScreenState extends State<AveriasScreen> {
     if (!mounted) return;
     setState(() => _actualizandoIds.add(averia.id));
     try {
-
-      final respuesta = await context.read<AuthProvider>().api.put(
-        '/averias/${averia.id}',
-        body: {'estado': nuevoEstado, 'nota': ?nota},
-      );
-      
       final body = <String, dynamic>{'estado': nuevoEstado};
       if (nota != null) body['nota'] = nota;
       final respuesta = await api.put('/averias/${averia.id}', body: body);
@@ -129,6 +136,7 @@ class _AveriasScreenState extends State<AveriasScreen> {
       isDismissible: false,
       enableDrag: false,
       builder: (_) => FormularioReporteAveria(
+        esAdministrador: _esAdministrador,
         onCerrar: () => Navigator.of(context).pop(false),
       ),
     );
@@ -171,7 +179,7 @@ class _AveriasScreenState extends State<AveriasScreen> {
   Widget build(BuildContext context) {
     return GotaScaffold(
       appBar: HidroAppBar(
-        title: _esFontanero ? 'Averías reportadas' : 'Averías',
+        title: _puedeVerTodasLasAverias ? 'Averías reportadas' : 'Averías',
         actions: [
           IconButton(
             tooltip: 'Actualizar averías',

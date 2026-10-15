@@ -14,9 +14,9 @@ const { verificarRol } = require('../middleware/roleMiddleware');
 router.post('/', verificarToken, reportarAveria);
 router.get('/mis-averias', verificarToken, misAverias);
 
-// El fontanero (único) ve todas las averías y actualiza su estado
+// Fontanero y administrador ven todas las averías; solo el fontanero cambia estados.
 router.get('/', verificarToken, verificarRol('fontanero', 'administrador'), listarAverias);
-router.put('/:id', verificarToken, verificarRol('fontanero', 'administrador'), actualizarAveria);
+router.put('/:id', verificarToken, verificarRol('fontanero'), actualizarAveria);
 router.delete('/:id', verificarToken, verificarRol('fontanero', 'administrador'), eliminarAveria);
 
 module.exports = router;

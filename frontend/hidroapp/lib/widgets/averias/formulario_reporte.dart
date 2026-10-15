@@ -9,8 +9,13 @@ import '../core/app_snackbar.dart';
 /// Hoja inferior con el formulario para reportar una nueva avería. Devuelve
 /// `true` por `Navigator.pop` cuando el reporte se crea con éxito.
 class FormularioReporteAveria extends StatefulWidget {
-  const FormularioReporteAveria({super.key, required this.onCerrar});
+  const FormularioReporteAveria({
+    super.key,
+    required this.esAdministrador,
+    required this.onCerrar,
+  });
 
+  final bool esAdministrador;
   final VoidCallback onCerrar;
 
   @override
@@ -21,12 +26,14 @@ class FormularioReporteAveria extends StatefulWidget {
 class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
   final _formKey = GlobalKey<FormState>();
   final _descripcionCtrl = TextEditingController();
+  final _ubicacionCtrl = TextEditingController();
   bool _enviando = false;
   bool _ubicacionConfirmada = false;
 
   @override
   void dispose() {
     _descripcionCtrl.dispose();
+    _ubicacionCtrl.dispose();
     super.dispose();
   }
 
@@ -48,6 +55,7 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
         body: {
           'descripcion': _descripcionCtrl.text.trim(),
           'ubicacionConfirmada': true,
+          if (widget.esAdministrador) 'ubicacion': _ubicacionCtrl.text.trim(),
         },
       );
       if (mounted) Navigator.of(context).pop(true);
@@ -72,6 +80,7 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
     final fondo = MediaQuery.of(context).viewInsets.bottom;
     final perfil = context.watch<AuthProvider>().profile;
     final ubicacion = perfil?.ubicacionCuenta;
+    final puedeReportar = widget.esAdministrador || ubicacion != null;
     final colores = AppColors.of(context);
     return PopScope(
       canPop: !_enviando,
@@ -130,7 +139,37 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  if (ubicacion != null) ...[
+                  if (widget.esAdministrador) ...[
+                    TextFormField(
+                      controller: _ubicacionCtrl,
+                      maxLength: 200,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        labelText: 'Ubicación de la avería',
+                        hintText: 'Dirección, zona o número de lote',
+                        prefixIcon: Icon(Icons.location_on_outlined),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Indica dónde está la avería';
+                        }
+                        return null;
+                      },
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    CheckboxListTile(
+                      value: _ubicacionConfirmada,
+                      onChanged: (v) =>
+                          setState(() => _ubicacionConfirmada = v ?? false),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text(
+                        '¿Confirmas que esta es la ubicación de la avería?',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ] else if (ubicacion != null) ...[
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -210,9 +249,7 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                   ),
                   const SizedBox(height: 8),
                   FilledButton(
-                    onPressed: (_enviando || ubicacion == null)
-                        ? null
-                        : _enviar,
+                    onPressed: (_enviando || !puedeReportar) ? null : _enviar,
                     child: _enviando
                         ? const SizedBox(
                             height: 22,
