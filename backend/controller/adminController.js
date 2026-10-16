@@ -76,10 +76,17 @@ async function crearUsuario(req, res) {
       await enviarCorreo({
         to: correo,
         subject: 'Tu cuenta en Acueducto Campo Amor',
+<<<<<<< HEAD
         html: `<p>Hola ${escaparHtml(nombre)},</p>
           <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
           <h2>${escaparHtml(passwordTemporal)}</h2>
           <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
+=======
+        html: `<p>Hola ${nombre},</p>
+               <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
+               <h2>${passwordTemporal}</h2>
+               <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
+>>>>>>> 318467a21773f1e7432eb8e34afaf8d85b351590
       });
     } catch (mailErr) {
       console.error('Error enviando correo de cuenta creada:', mailErr.message);
@@ -232,11 +239,11 @@ async function cambiarEstadoUsuario(req, res) {
 
 // Eliminar un usuario definitivamente.
 // Borra la cuenta de Supabase Auth; por la cascada definida en el esquema
-// (profiles -> auth.users, e invoices/payments/breakdowns/notifications/
-// service_outages -> profiles, todas "on delete cascade"), esto arrastra
-// también el perfil y TODO su historial (facturas, pagos, averías,
-// notificaciones y cortes). Es irreversible: para solo bloquear el acceso
-// sin perder el historial, usa cambiarEstadoUsuario (activo: false) en su lugar.
+// (profiles -> auth.users, y los datos del usuario como titular -> profiles),
+// esto también borra su perfil y su historial. Las averías asignadas a un
+// fontanero conservan su historial y quedan sin asignación. Es irreversible:
+// para solo bloquear el acceso sin perder el historial, usa
+// cambiarEstadoUsuario (activo: false) en su lugar.
 async function eliminarUsuario(req, res) {
   const { userId } = req.params;
 

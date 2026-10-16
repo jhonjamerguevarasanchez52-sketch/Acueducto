@@ -76,7 +76,9 @@ create table if not exists public.invoices (
                      check (estado in ('pendiente', 'pagada', 'anulada', 'vencida')),
   fecha_emision     timestamptz not null default now(),
   fecha_vencimiento date,
-  observacion       text
+  observacion       text,
+  generada_automaticamente boolean not null default false,
+  correo_factura_enviado_at timestamptz
 );
 create index if not exists idx_invoices_perfil on public.invoices (perfil_id);
 create index if not exists idx_invoices_estado on public.invoices (estado);
@@ -109,7 +111,7 @@ create index if not exists idx_payments_factura on public.payments (factura_id);
 create table if not exists public.breakdowns (
   id               uuid primary key default gen_random_uuid(),
   perfil_id        uuid not null references public.profiles (id) on delete cascade,
-  fontanero_id     uuid references public.profiles (id),
+  fontanero_id     uuid references public.profiles (id) on delete set null,
   descripcion      text not null,
   zona             text,
   direccion        text,
@@ -256,6 +258,8 @@ alter table public.invoices        add column if not exists periodo           te
 alter table public.invoices        add column if not exists tipo              text not null default 'servicio';
 alter table public.invoices        add column if not exists fecha_vencimiento date;
 alter table public.invoices        add column if not exists observacion       text;
+alter table public.invoices        add column if not exists generada_automaticamente boolean not null default false;
+alter table public.invoices        add column if not exists correo_factura_enviado_at timestamptz;
 
 alter table public.payments        add column if not exists fecha_pago          timestamptz default now();
 alter table public.payments        add column if not exists fecha_confirmacion  timestamptz;
@@ -264,7 +268,7 @@ alter table public.payments        add column if not exists estado_wompi        
 alter table public.payments        add column if not exists transaccion_id      text;
 
 alter table public.breakdowns      add column if not exists nota_fontanero    text;
-alter table public.breakdowns      add column if not exists fontanero_id      uuid references public.profiles (id);
+alter table public.breakdowns      add column if not exists fontanero_id      uuid references public.profiles (id) on delete set null;
 alter table public.breakdowns      add column if not exists direccion         text;
 alter table public.breakdowns      add column if not exists fecha_resolucion timestamptz;
 
@@ -290,3 +294,9 @@ where b.id = orden.id and orden.numero > 1;
 create unique index if not exists idx_breakdowns_un_solo_en_proceso
   on public.breakdowns (estado)
   where estado = 'en_proceso';
+
+-- Evita emitir dos facturas ordinarias del mismo periodo para un usuario.
+-- Las extraordinarias pueden compartir periodo con una factura de servicio.
+create unique index if not exists idx_invoices_servicio_perfil_periodo
+  on public.invoices (perfil_id, periodo)
+  where tipo = 'servicio';
