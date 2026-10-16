@@ -226,11 +226,11 @@ async function cambiarEstadoUsuario(req, res) {
 
 // Eliminar un usuario definitivamente.
 // Borra la cuenta de Supabase Auth; por la cascada definida en el esquema
-// (profiles -> auth.users, e invoices/payments/breakdowns/notifications/
-// service_outages -> profiles, todas "on delete cascade"), esto arrastra
-// también el perfil y TODO su historial (facturas, pagos, averías,
-// notificaciones y cortes). Es irreversible: para solo bloquear el acceso
-// sin perder el historial, usa cambiarEstadoUsuario (activo: false) en su lugar.
+// (profiles -> auth.users, y los datos del usuario como titular -> profiles),
+// esto también borra su perfil y su historial. Las averías asignadas a un
+// fontanero conservan su historial y quedan sin asignación. Es irreversible:
+// para solo bloquear el acceso sin perder el historial, usa
+// cambiarEstadoUsuario (activo: false) en su lugar.
 async function eliminarUsuario(req, res) {
   const { userId } = req.params;
 

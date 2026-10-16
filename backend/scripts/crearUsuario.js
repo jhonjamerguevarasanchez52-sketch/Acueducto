@@ -131,7 +131,6 @@ async function main() {
   console.log('Perfil listo en "profiles" (is_verified = true, activo = true).');
   console.log('---');
   console.log('Correo   :', correo);
-  console.log('Password :', password);
   console.log('Rol      :', rol);
   console.log('Ya puede iniciar sesión en la app.');
 }

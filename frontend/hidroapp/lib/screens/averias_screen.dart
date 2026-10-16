@@ -76,7 +76,7 @@ class _AveriasScreenState extends State<AveriasScreen> {
         context: context,
         builder: (_) => const _ConfirmarSolucionDialog(),
       );
-      // null = el fontanero canceló el diálogo
+
       if (!mounted || nota == null) return;
     }
     if (!mounted) return;

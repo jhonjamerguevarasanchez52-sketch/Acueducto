@@ -1,6 +1,6 @@
 ﻿-- Ensure the assignment column exists on older installations.
 alter table public.breakdowns
-  add column if not exists fontanero_id uuid references public.profiles (id);
+  add column if not exists fontanero_id uuid references public.profiles (id) on delete set null;
 
 -- Keep the oldest active report in progress; return extra active reports to waiting.
 with averias_en_orden as (
