@@ -5,6 +5,7 @@ const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
 const { enviarCorreo } = require('../config/mailer');
 const { notificar } = require('../utils/notificar');
+const { escaparHtml } = require('../utils/html');
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
@@ -75,10 +76,17 @@ async function crearUsuario(req, res) {
       await enviarCorreo({
         to: correo,
         subject: 'Tu cuenta en Acueducto Campo Amor',
+<<<<<<< HEAD
+        html: `<p>Hola ${escaparHtml(nombre)},</p>
+          <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
+          <h2>${escaparHtml(passwordTemporal)}</h2>
+          <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
+=======
         html: `<p>Hola ${nombre},</p>
                <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
                <h2>${passwordTemporal}</h2>
                <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
+>>>>>>> 318467a21773f1e7432eb8e34afaf8d85b351590
       });
     } catch (mailErr) {
       console.error('Error enviando correo de cuenta creada:', mailErr.message);
@@ -159,6 +167,11 @@ async function cambiarRol(req, res) {
 
     const { data, error } = await profileModel.update(userId, { rol });
 
+    if (error?.code === '23505') {
+      return res.status(409).json({
+        error: 'Ya existe un fontanero asignado. Actualiza la lista de usuarios e inténtalo de nuevo.',
+      });
+    }
     if (error || !data) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'averias_screen.dart';
 import 'facturas_screen.dart';
@@ -18,16 +20,20 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _indice = 0;
+  int _versionAverias = 0;
+  int _versionNotificaciones = 0;
 
-  static const _pantallas = <Widget>[
-    HomeScreen(),
-    FacturasScreen(),
-    AveriasScreen(),
-    NotificacionesScreen(),
-    PerfilScreen(),
-  ];
+  List<Widget> get _pantallas => [
+        const HomeScreen(),
+        const FacturasScreen(),
+        AveriasScreen(key: ValueKey('averias-$_versionAverias')),
+        NotificacionesScreen(
+          key: ValueKey('notificaciones-$_versionNotificaciones'),
+        ),
+        const PerfilScreen(),
+      ];
 
   static const _iconos = [
     (Icons.home_outlined, Icons.home, 'Inicio'),
@@ -36,6 +42,56 @@ class _MainShellState extends State<MainShell> {
     (Icons.notifications_outlined, Icons.notifications, 'Avisos'),
     (Icons.person_outline, Icons.person, 'Perfil'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    _refrescarAccesoYDatos();
+  }
+
+  Future<void> _refrescarAccesoYDatos() async {
+    try {
+      await context.read<AuthProvider>().refreshProfile();
+    } catch (_) {
+      // La pantalla conserva sus datos si el perfil no se pudo refrescar;
+      // el siguiente acceso volverá a intentarlo.
+    }
+    if (!mounted) return;
+    setState(() {
+      _versionAverias++;
+      _versionNotificaciones++;
+    });
+  }
+
+  Future<void> _seleccionarPestana(int indice) async {
+    if (indice == 2) {
+      try {
+        // El rol define si se consulta la lista propia o la global y si se
+        // muestra Reportar. Lo refrescamos antes de crear la pantalla.
+        await context.read<AuthProvider>().refreshProfile();
+      } catch (_) {
+        // Si falla la red, mantenemos el rol que ya estaba cargado.
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      if (indice == 2) _versionAverias++;
+      if (indice == 3) _versionNotificaciones++;
+      _indice = indice;
+    });
+  }
 
   // Construidos en cada build (en vez de una lista const) para poder darle a
   // cada ícono un pequeño rebote cuando su pestaña queda seleccionada.
@@ -58,7 +114,7 @@ class _MainShellState extends State<MainShell> {
         ),
         child: NavigationBar(
           selectedIndex: _indice,
-          onDestinationSelected: (i) => setState(() => _indice = i),
+          onDestinationSelected: _seleccionarPestana,
           destinations: _destinos,
         ),
       ),
