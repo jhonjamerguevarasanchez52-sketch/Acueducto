@@ -59,6 +59,7 @@ export const endpoints = {
   adminUsers: '/admin/usuarios',
   facturas: '/facturas',
   facturasTodas: '/facturas/todas',
+  generarFacturasMensuales: '/facturas/generar-mensuales',
   facturaExtraordinaria: '/facturas/factura-extraordinaria',
   pagos: '/pagos/todos',
   cortes: '/cortes',

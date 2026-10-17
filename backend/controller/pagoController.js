@@ -5,6 +5,7 @@ const { calcularFirmaIntegridad } = require('../utils/wompiFirma');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 const WOMPI_CURRENCY = process.env.WOMPI_CURRENCY || 'COP';
+const ESTADOS_WOMPI_REINTENTABLES = new Set(['DECLINED', 'VOIDED', 'ERROR']);
 
 // ---------- USUARIO FINAL ----------
 
@@ -34,6 +35,10 @@ async function registrarPago(req, res) {
     return res.status(400).json({ error: 'Faltan campos obligatorios: factura_id, metodo' });
   }
 
+  if (metodo === 'wompi' && !process.env.WOMPI_INTEGRITY_KEY) {
+    return res.status(503).json({ error: 'El pago en línea no está configurado.' });
+  }
+
   try {
     // Verifica que la factura le pertenezca al usuario antes de aceptar el pago
     const { data: factura, error: errorFactura } = await invoiceModel.getOwn(factura_id, userId, {
@@ -53,6 +58,8 @@ async function registrarPago(req, res) {
       return res.status(400).json({ error: 'Esta factura está anulada' });
     }
 
+    const monto = factura.valor_total;
+
     // Evita ensuciar el panel de pagos pendientes con duplicados por doble
     // clic o reintentos del frontend: solo un pago sin confirmar a la vez
     // por factura.
@@ -65,47 +72,62 @@ async function registrarPago(req, res) {
       return errorConsulta(res, errorPendiente);
     }
 
+    let pago = null;
     if (pagoPendiente) {
-      return res.status(409).json({
-        error: 'Ya existe un pago pendiente de confirmación para esta factura',
-      });
+      const puedeReanudarCheckout = metodo === 'wompi' &&
+        pagoPendiente.metodo === 'wompi' && !pagoPendiente.estado_wompi;
+      const wompiRechazado = pagoPendiente.metodo === 'wompi' &&
+        ESTADOS_WOMPI_REINTENTABLES.has(pagoPendiente.estado_wompi);
+
+      if (puedeReanudarCheckout) {
+        if (Number(pagoPendiente.monto) !== Number(monto)) {
+          return res.status(409).json({
+            error: 'El valor de la factura cambió. Actualiza la factura antes de iniciar otro pago.',
+          });
+        }
+        pago = pagoPendiente;
+      } else if (!wompiRechazado) {
+        return res.status(409).json({
+          error: 'Ya existe un pago pendiente de confirmación para esta factura',
+        });
+      }
     }
 
-    // El monto NUNCA se toma del cliente: siempre es el valor real de la
-    // factura, para que nadie pueda registrar un pago por menos de lo debido.
-    const monto = factura.valor_total;
+    if (!pago) {
+      const { data, error } = await paymentModel.create(
+        { factura_id, perfil_id: userId, monto, metodo, referencia },
+        req.db
+      );
 
-    const { data, error } = await paymentModel.create(
-      { factura_id, perfil_id: userId, monto, metodo, referencia },
-      req.db
-    );
+      if (error) {
+        return errorConsulta(res, error);
+      }
 
-    if (error) {
-      return errorConsulta(res, error);
+      pago = data;
     }
 
     const respuesta = {
       message: 'Pago registrado, pendiente de confirmación',
-      pago: data,
+      pago,
     };
 
-    // Si el pago es por Wompi, el frontend necesita la firma de integridad
-    // para abrir el checkout con el monto exacto de la factura.
+    // Wompi signs the persisted payment ID and invoice amount server-side.
     if (metodo === 'wompi') {
       try {
         const amountInCents = Math.round(Number(monto) * 100);
         respuesta.wompi = {
-          reference: data.id,
+          reference: pago.id,
           amountInCents,
           currency: WOMPI_CURRENCY,
           signature: calcularFirmaIntegridad({
-            reference: data.id,
+            reference: pago.id,
             amountInCents,
             currency: WOMPI_CURRENCY,
           }),
         };
       } catch (firmaErr) {
         console.error('[pagos] no se pudo calcular la firma de integridad de Wompi:', firmaErr.message);
+        return res.status(503).json({ error: 'No se pudo preparar el pago con Wompi.' });
       }
     }
 

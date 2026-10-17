@@ -42,6 +42,7 @@ import Sidebar from './components/Sidebar.jsx'
 import StatCard from './components/StatCard.jsx'
 import { apiRequest, clearToken, endpoints, getToken, login } from './services/api.js'
 import { parseUsersCsv, parseUsersExcel } from './utils/usersCsv.js'
+import hidroAppLogo from './assets/hidroapp-logo.png'
 
 const quickActions = [
   { label: 'Usuarios', section: 'usuarios', icon: UserRoundPlus },
@@ -80,6 +81,12 @@ const operationDefinitions = {
       { name: 'valor_total', label: 'Valor total', type: 'number', required: true },
       { name: 'concepto', label: 'Concepto', required: true },
       { name: 'fecha_vencimiento', label: 'Fecha de vencimiento', type: 'date' },
+    ],
+  },
+  facturacionMensual: {
+    title: 'Generar facturas mensuales', section: 'facturas', endpoint: endpoints.generarFacturasMensuales, method: 'POST',
+    fields: [
+      { name: 'periodo', label: 'Periodo · usuarios activos · $12.000 por factura', type: 'month', required: true },
     ],
   },
   editarFactura: {
@@ -446,6 +453,12 @@ function App() {
   const handleOperationSubmit = async (event) => {
     event.preventDefault()
     const definition = operationDefinitions[operationType]
+    if (operationType === 'facturacionMensual') {
+      const confirmar = window.confirm(
+        `Se generarán facturas de servicio por $12.000 para los usuarios activos sin factura del periodo ${operationForm.periodo}. ¿Continuar?`,
+      )
+      if (!confirmar) return
+    }
     const body = Object.fromEntries(definition.fields
       .filter((field) => operationForm[field.name] !== '')
       .map((field) => [
@@ -512,22 +525,35 @@ function App() {
             @page { size: A4; margin: 18mm; }
             * { box-sizing: border-box; }
             body { margin: 0; color: #172d35; font: 14px Arial, sans-serif; }
-            .invoice-sheet { padding: 12px; }
-            .invoice-heading { display: flex; justify-content: space-between; gap: 24px; padding-bottom: 24px; border-bottom: 2px solid #177e78; }
-            .invoice-brand { color: #177e78; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-            .invoice-heading h2 { margin: 8px 0 0; color: #172d35; font-size: 27px; }
-            .invoice-number { text-align: right; }
+            .invoice-sheet { position: relative; overflow: hidden; padding: 0; border: 1px solid #d5e5ec; background: #fff; color: #173448; }
+            .invoice-watermark { position: absolute; z-index: 0; top: 32%; right: 7%; width: 320px; max-width: 52%; opacity: .04; pointer-events: none; }
+            .invoice-watermark img { display: block; width: 100%; height: auto; }
+            .invoice-sheet > :not(.invoice-watermark) { position: relative; z-index: 1; }
+            .invoice-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 24px; background: linear-gradient(120deg, #1e5fa0, #0a3665); color: #fff; }
+            .invoice-heading-brand { display: flex; align-items: center; gap: 14px; }
+            .invoice-logo-frame { display: grid; flex: none; place-items: center; width: 54px; height: 54px; overflow: hidden; border-radius: 12px; background: #fff; }
+            .invoice-logo { display: block; width: 100%; height: 100%; object-fit: cover; }
+            .invoice-brand { color: #dceff5; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+            .invoice-heading h2 { margin: 7px 0 0; color: #fff; font-size: 24px; }
+            .invoice-number { flex: none; text-align: right; }
+            .invoice-number span { color: #dceff5; font-size: 11px; text-transform: uppercase; }
             .invoice-number strong { display: block; margin-top: 6px; font-size: 16px; }
-            .invoice-meta, .invoice-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 24px 0; }
-            .invoice-meta div, .invoice-party { padding: 14px; background: #f2f7f6; }
-            .invoice-meta span, .invoice-party span { display: block; margin-bottom: 6px; color: #60757b; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-            .invoice-party p { margin: 4px 0; }
-            .invoice-lines { width: 100%; border-collapse: collapse; }
-            .invoice-lines th, .invoice-lines td { padding: 12px 10px; border-bottom: 1px solid #dce6e4; text-align: left; }
+            .invoice-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 22px 24px; }
+            .invoice-meta div { padding: 12px; border: 1px solid #e1edf2; background: #f3f8fa; }
+            .invoice-meta div:nth-child(1) { border-top: 3px solid #35a7d8; }
+            .invoice-meta div:nth-child(2) { border-top: 3px solid #dca934; }
+            .invoice-meta div:nth-child(3) { border-top: 3px solid #34a879; }
+            .invoice-meta div:nth-child(4) { border-top: 3px solid #e77757; }
+            .invoice-meta span, .invoice-party > span { display: block; margin-bottom: 6px; color: #607987; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+            .invoice-party { margin: 0 24px 22px; padding: 15px; border-left: 3px solid #4fc3f7; background: #f7fafc; }
+            .invoice-party p { margin: 4px 0 0; color: #607987; }
+            .invoice-lines { width: calc(100% - 48px); margin: 22px 24px 0; border-collapse: collapse; }
+            .invoice-lines th, .invoice-lines td { padding: 12px 10px; border-bottom: 1px solid #dce6ec; text-align: left; }
             .invoice-lines th:last-child, .invoice-lines td:last-child { text-align: right; }
-            .invoice-lines th { color: #60757b; font-size: 11px; text-transform: uppercase; }
-            .invoice-total { display: flex; justify-content: flex-end; gap: 28px; padding: 18px 10px; font-size: 18px; font-weight: 700; }
-            .invoice-note { margin-top: 28px; padding-top: 14px; border-top: 1px solid #dce6e4; color: #60757b; }
+            .invoice-lines th { color: #607987; font-size: 10px; text-transform: uppercase; }
+            .invoice-total { display: flex; justify-content: flex-end; gap: 28px; margin: 4px 24px 0; padding: 16px; border-left: 4px solid #00a878; background: linear-gradient(120deg, #eaf5fb, #e7f8ef); color: #173448; font-size: 17px; font-weight: 700; }
+            .invoice-note { margin: 20px 24px 0; padding: 14px 0 20px; border-top: 1px solid #dce6ec; color: #607987; }
+            @media (max-width: 600px) { .invoice-heading { gap: 12px; padding: 16px; } .invoice-heading h2 { font-size: 18px; } .invoice-logo-frame { width: 44px; height: 44px; } .invoice-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 16px; } .invoice-party { margin: 0 16px 18px; } .invoice-lines { width: calc(100% - 32px); margin: 18px 16px 0; } .invoice-total { margin: 4px 16px 0; } .invoice-note { margin: 18px 16px 0; } }
             @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
           </style>
         </head>
@@ -1081,6 +1107,7 @@ function App() {
           <h3>Facturas y vencimientos</h3>
         </div>
         <div className="hero-actions">
+          <button type="button" className="secondary-button" onClick={() => openOperation('facturacionMensual')}>Generar para todos</button>
           <button type="button" className="secondary-button" onClick={() => openOperation('facturaExtraordinaria')}>Factura extraordinaria</button>
           <button type="button" className="primary-button" onClick={() => openOperation('factura')}><Plus size={16} />Nueva factura</button>
         </div>
@@ -1659,7 +1686,9 @@ function App() {
               ))}
               {operationError && <p className="auth-error form-wide" role="alert">{operationError}</p>}
               <button type="submit" className="primary-button form-wide" disabled={operationPending}>
-                {operationPending ? 'Guardando...' : 'Guardar'}
+                {operationPending
+                  ? operationType === 'facturacionMensual' ? 'Generando...' : 'Guardando...'
+                  : operationType === 'facturacionMensual' ? 'Generar facturas' : 'Guardar'}
               </button>
             </form>
           </section>
@@ -1677,15 +1706,21 @@ function App() {
                   <h2 id="invoice-preview-title">Vista previa de factura</h2>
                 </div>
                 <div className="hero-actions">
-                  <button type="button" className="secondary-button" onClick={handleDownloadInvoice}><Printer size={16} />Descargar PDF</button>
-                  <button type="button" className="soft-button" onClick={() => setInvoicePreview(null)}>Cerrar</button>
+                  <button type="button" className="primary-button invoice-download-button" onClick={handleDownloadInvoice}><Printer size={16} />Descargar PDF</button>
+                  <button type="button" className="soft-button invoice-close-button" onClick={() => setInvoicePreview(null)}>Cerrar</button>
                 </div>
               </div>
               <article className="invoice-sheet" id="invoice-document">
+                <div className="invoice-watermark" aria-hidden="true">
+                  <img src={hidroAppLogo} alt="" />
+                </div>
                 <header className="invoice-heading">
-                  <div>
-                    <span className="invoice-brand">Acueducto Campoamor</span>
-                    <h2>{invoicePreview.tipo === 'extraordinaria' ? 'Factura extraordinaria' : 'Factura de servicio'}</h2>
+                  <div className="invoice-heading-brand">
+                    <span className="invoice-logo-frame"><img className="invoice-logo" src={hidroAppLogo} alt="" /></span>
+                    <div>
+                      <span className="invoice-brand">HidroApp · Acueducto Campo Amor</span>
+                      <h2>{invoicePreview.tipo === 'extraordinaria' ? 'Factura extraordinaria' : 'Factura de servicio'}</h2>
+                    </div>
                   </div>
                   <div className="invoice-number">
                     <span>Factura</span>

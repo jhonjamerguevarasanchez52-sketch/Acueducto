@@ -4,6 +4,7 @@ const profileModel = require('../models/profileModel');
 const { notificar } = require('../utils/notificar');
 const { enviarCorreo } = require('../config/mailer');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+const { generarFacturasMensuales: ejecutarFacturacionMensual } = require('../services/facturacionMensual');
 
 function formatearMoneda(valor) {
   return Number(valor).toLocaleString('es-CO');
@@ -75,6 +76,21 @@ async function listarFacturas(req, res) {
     if (error) return errorConsulta(res, error);
 
     return res.status(200).json(data);
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+async function generarFacturasMensuales(req, res) {
+  const { periodo } = req.body || {};
+  if (periodo !== undefined && !/^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) {
+    return res.status(400).json({ error: 'El periodo debe tener el formato AAAA-MM.' });
+  }
+
+  try {
+    const resumen = await ejecutarFacturacionMensual(periodo ? { periodo } : {});
+    const message = `Facturación ${resumen.periodo} finalizada: ${resumen.facturasCreadas} nuevas, ${resumen.facturasExistentes} existentes, ${resumen.correosEnviados} correos enviados y ${resumen.correosFallidos} fallidos.`;
+    return res.status(200).json({ message, ...resumen });
   } catch (err) {
     return errorInesperado(res, err);
   }
@@ -201,6 +217,7 @@ module.exports = {
   misFacturas,
   verFactura,
   listarFacturas,
+  generarFacturasMensuales,
   crearFactura,
   actualizarFactura,
   eliminarFactura,

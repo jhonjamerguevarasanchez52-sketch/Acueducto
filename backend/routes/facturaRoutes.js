@@ -4,6 +4,7 @@ const {
   misFacturas,
   verFactura,
   listarFacturas,
+  generarFacturasMensuales,
   crearFactura,
   actualizarFactura,
   eliminarFactura,
@@ -14,6 +15,7 @@ const { crearFacturaExtraordinaria } = require('../controller/facturaextraordina
 
 // --- Administrador ---
 router.get('/todas', verificarToken, verificarRol('administrador'), listarFacturas);
+router.post('/generar-mensuales', verificarToken, verificarRol('administrador'), generarFacturasMensuales);
 router.post('/factura-extraordinaria', verificarToken, verificarRol('administrador'), crearFacturaExtraordinaria);
 router.post('/', verificarToken, verificarRol('administrador'), crearFactura);
 router.put('/:id', verificarToken, verificarRol('administrador'), actualizarFactura);
