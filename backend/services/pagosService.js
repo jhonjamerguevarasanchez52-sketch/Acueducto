@@ -1,11 +1,17 @@
 const paymentModel = require('../models/paymentModel');
-const invoiceModel = require('../models/invoiceModel');
-const { notificar } = require('../utils/notificar');
 
 /**
- * Marca un pago como confirmado y su factura asociada como pagada.
+ * Marca un pago como confirmado.
  * Lo usan tanto la confirmación manual del administrador como el webhook
  * de Wompi, para que la lógica de "aplicar un pago" viva en un solo sitio.
+ *
+ * Al pasar `confirmado` a true, el trigger procesar_pago_confirmado de la
+ * base de datos se encarga de lo demás, todo en una sola transacción:
+ * valida la factura (monto, dueño, que no esté pagada o anulada), la marca
+ * como pagada, notifica al usuario, reconecta el servicio si estaba cortado
+ * y rechaza los otros pagos pendientes de la misma factura. Si alguna
+ * validación falla, el trigger lanza una excepción y el pago NO queda
+ * confirmado.
  *
  * @param {string} pagoId      id del registro en payments
  * @param {object} [extra]     campos adicionales a guardar en el pago
@@ -30,33 +36,9 @@ async function confirmarPago(pagoId, extra = {}) {
   });
 
   if (updateError) {
+    // Incluye los rechazos del trigger (factura ya pagada, monto distinto, etc.)
     return { ok: false, error: updateError.message };
   }
-
-  if (pago.factura_id) {
-    const { error: facturaError } = await invoiceModel.update(pago.factura_id, { estado: 'pagada' });
-
-    if (facturaError) {
-      // El pago ya quedó marcado como confirmado (el dinero sí se recibió),
-      // pero la factura no se pudo actualizar: no lo ocultamos como éxito,
-      // para que quede visibles en logs y alguien lo corrija a mano.
-      console.error(
-        `[pagos] el pago ${pagoId} se confirmó pero la factura ${pago.factura_id} no se pudo marcar como pagada:`,
-        facturaError.message
-      );
-      return {
-        ok: false,
-        error: 'El pago se confirmó, pero no se pudo actualizar la factura. Contacta al administrador.',
-        pago: pagoActualizado,
-      };
-    }
-  }
-
-  await notificar(
-    pago.perfil_id,
-    `Tu pago por $${pago.monto} fue confirmado. ¡Gracias!`,
-    'pago'
-  );
 
   return { ok: true, pago: pagoActualizado };
 }

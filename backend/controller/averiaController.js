@@ -62,15 +62,23 @@ async function reportarAveria(req, res) {
     const perfilId = req.usuario.id;
     const zonaUsuario = req.usuario.zona;
     const direccionUsuario = req.usuario.direccion;
-    const { descripcion, ubicacionConfirmada } = req.body;
+    const { descripcion, ubicacionConfirmada, ubicacion } = req.body;
 
     if (typeof descripcion !== 'string' || descripcion.trim().length < 20) {
       return res.status(400).json({ error: 'Describe el problema con más detalle (mínimo 20 caracteres).' });
     }
 
-    // La ubicación siempre se toma de los datos de la cuenta (no la escribe
-    // el usuario), pero debe confirmarla explícitamente antes de reportar.
-    if (!zonaUsuario && !direccionUsuario) {
+    let zonaReporte = zonaUsuario;
+    let direccionReporte = direccionUsuario;
+    if (req.usuario.rol === 'administrador') {
+      if (typeof ubicacion !== 'string' || !ubicacion.trim() || ubicacion.trim().length > 200) {
+        return res.status(400).json({
+          error: 'Indica la ubicación de la avería (máximo 200 caracteres).',
+        });
+      }
+      zonaReporte = null;
+      direccionReporte = ubicacion.trim();
+    } else if (!zonaUsuario && !direccionUsuario) {
       return res.status(400).json({
         error: 'Tu cuenta no tiene una dirección registrada. Contacta al administrador del acueducto para registrarla antes de reportar.',
       });
@@ -80,7 +88,7 @@ async function reportarAveria(req, res) {
     }
 
     const { data, error } = await breakdownModel.create(
-      { perfil_id: perfilId, descripcion: descripcion.trim(), zona: zonaUsuario, direccion: direccionUsuario },
+      { perfil_id: perfilId, descripcion: descripcion.trim(), zona: zonaReporte, direccion: direccionReporte },
       req.db
     );
 

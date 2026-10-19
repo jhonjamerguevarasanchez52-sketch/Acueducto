@@ -5,10 +5,9 @@ const supabaseAdmin = require('../config/supabaseAdminClient');
 const { confirmarPago } = require('./pagosService');
 
 /**
- * Cliente de Supabase simulado, suficiente para las cadenas que usan
- * confirmarPago() y notificar(): from().select().eq().single(),
- * from().update().eq().select().single() y from().update().eq() (sin
- * select, se resuelve directamente al hacer await).
+ * Cliente de Supabase simulado, suficiente para las cadenas que usa
+ * confirmarPago(): from().select().eq().single() y
+ * from().update().eq().select().single().
  */
 function crearFalsoSupabase(config) {
   return {
@@ -69,32 +68,30 @@ test('confirmarPago', async (t) => {
     assert.deepEqual(resultado.pago, pagoConfirmado);
   });
 
-  await t.test('confirma el pago y marca la factura como pagada', async () => {
+  await t.test('confirma el pago, guarda la fecha y los campos extra', async () => {
     const pagoPendiente = { id: 'p2', confirmado: false, factura_id: 'f2', monto: 30000, perfil_id: 'u2' };
     supabaseAdmin.from = crearFalsoSupabase({
       payments: { row: pagoPendiente },
-      invoices: { row: { id: 'f2', estado: 'pendiente' } },
-      notifications: {},
     }).from;
 
-    const resultado = await confirmarPago('p2', { metodo_confirmacion: 'manual' });
+    const resultado = await confirmarPago('p2', { estado_wompi: 'APPROVED', transaccion_id: 'tx-123' });
     assert.equal(resultado.ok, true);
     assert.equal(resultado.pago.confirmado, true);
-    assert.equal(resultado.pago.metodo_confirmacion, 'manual');
+    assert.ok(resultado.pago.fecha_confirmacion);
+    assert.equal(resultado.pago.estado_wompi, 'APPROVED');
+    assert.equal(resultado.pago.transaccion_id, 'tx-123');
   });
 
-  await t.test('si falla marcar la factura como pagada, no lo reporta como éxito', async () => {
+  await t.test('si el trigger rechaza el pago, devuelve el error y no lo reporta como éxito', async () => {
     const pagoPendiente = { id: 'p3', confirmado: false, factura_id: 'f3', monto: 10000, perfil_id: 'u3' };
+    const mensajeTrigger = 'El monto (10000) no coincide con el valor de la factura (13300)';
     supabaseAdmin.from = crearFalsoSupabase({
-      payments: { row: pagoPendiente },
-      invoices: { updateError: { message: 'timeout' } },
+      payments: { row: pagoPendiente, updateError: { message: mensajeTrigger } },
     }).from;
 
     const resultado = await confirmarPago('p3');
     assert.equal(resultado.ok, false);
-    assert.match(resultado.error, /no se pudo actualizar la factura/);
-    // El pago sí quedó confirmado: el dinero se recibió, aunque haya que
-    // corregir la factura a mano.
-    assert.equal(resultado.pago.confirmado, true);
+    assert.equal(resultado.error, mensajeTrigger);
+    assert.equal(resultado.pago, undefined);
   });
 });
