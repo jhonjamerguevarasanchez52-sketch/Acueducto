@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/factura.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/pago_checkout_service.dart';
 import '../utils/formato.dart';
 import '../widgets/core/core.dart';
 import '../widgets/home/home.dart';
@@ -20,13 +21,25 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late Future<List<Factura>> _facturas;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _facturas = _cargarFacturas();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refrescar();
   }
 
   Future<List<Factura>> _cargarFacturas() async {
@@ -43,19 +56,26 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _pagar(Factura factura) async {
     final eleccion = await mostrarPagarSheet(
       context,
-      subtitulo: '${Formato.periodo(factura.periodo)} · '
+      subtitulo:
+          '${Formato.periodo(factura.periodo)} · '
           '${Formato.pesos(factura.valorTotal)}',
     );
     if (eleccion == null || !mounted) return;
 
     try {
-      await context.read<AuthProvider>().api.post('/pagos', body: {
-        'factura_id': factura.id,
-        'metodo': eleccion.metodo,
-        if (eleccion.referencia != null) 'referencia': eleccion.referencia,
-      });
+      await PagoCheckoutService.procesar(
+        api: context.read<AuthProvider>().api,
+        facturaId: factura.id,
+        metodo: eleccion.metodo,
+        referencia: eleccion.referencia,
+      );
       if (!mounted) return;
-      AppSnackbar.success(context, 'Pago registrado. Queda pendiente de confirmación.');
+      AppSnackbar.success(
+        context,
+        eleccion.metodo == 'wompi'
+            ? 'Continúa el pago en Wompi. La factura se actualizará al confirmarse.'
+            : 'Pago registrado. Queda pendiente de confirmación.',
+      );
       _refrescar();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -97,8 +117,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 24),
                   Text(
                     'Más opciones',
-                    style: textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   HomeModuloTile(

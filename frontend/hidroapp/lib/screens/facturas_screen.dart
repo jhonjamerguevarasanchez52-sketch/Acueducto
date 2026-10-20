@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/factura.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/pago_checkout_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formato.dart';
 import '../widgets/core/core.dart';
@@ -21,13 +22,26 @@ class FacturasScreen extends StatefulWidget {
   State<FacturasScreen> createState() => _FacturasScreenState();
 }
 
-class _FacturasScreenState extends State<FacturasScreen> {
+class _FacturasScreenState extends State<FacturasScreen>
+    with WidgetsBindingObserver {
   late Future<List<Factura>> _futuro;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _futuro = _cargar();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refrescar();
   }
 
   Future<List<Factura>> _cargar() async {
@@ -44,19 +58,26 @@ class _FacturasScreenState extends State<FacturasScreen> {
   Future<void> _pagar(Factura factura) async {
     final eleccion = await mostrarPagarSheet(
       context,
-      subtitulo: '${Formato.periodo(factura.periodo)} · '
+      subtitulo:
+          '${Formato.periodo(factura.periodo)} · '
           '${Formato.pesos(factura.valorTotal)}',
     );
     if (eleccion == null || !mounted) return;
 
     try {
-      await context.read<AuthProvider>().api.post('/pagos', body: {
-        'factura_id': factura.id,
-        'metodo': eleccion.metodo,
-        if (eleccion.referencia != null) 'referencia': eleccion.referencia,
-      });
+      await PagoCheckoutService.procesar(
+        api: context.read<AuthProvider>().api,
+        facturaId: factura.id,
+        metodo: eleccion.metodo,
+        referencia: eleccion.referencia,
+      );
       if (!mounted) return;
-      AppSnackbar.success(context, 'Pago registrado. Queda pendiente de confirmación.');
+      AppSnackbar.success(
+        context,
+        eleccion.metodo == 'wompi'
+            ? 'Continúa el pago en Wompi. La factura se actualizará al confirmarse.'
+            : 'Pago registrado. Queda pendiente de confirmación.',
+      );
       _refrescar();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -65,9 +86,9 @@ class _FacturasScreenState extends State<FacturasScreen> {
   }
 
   void _verPagos() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const PagosScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const PagosScreen()));
   }
 
   @override
@@ -110,8 +131,10 @@ class _FacturasScreenState extends State<FacturasScreen> {
             }
 
             final pendientes = facturas.where((f) => f.estaPendiente).toList();
-            final totalPendiente =
-                pendientes.fold<double>(0, (s, f) => s + f.valorTotal);
+            final totalPendiente = pendientes.fold<double>(
+              0,
+              (s, f) => s + f.valorTotal,
+            );
 
             return ListView.builder(
               padding: const EdgeInsets.all(16),

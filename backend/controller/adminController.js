@@ -259,6 +259,13 @@ async function eliminarUsuario(req, res) {
       if (noExiste) {
         return res.status(404).json({ error: 'Usuario no encontrado' });
       }
+      const bloqueoPorRelacion = error.code === '23503'
+        || /foreign key|violates.*constraint|database error deleting user/i.test(error.message || '');
+      if (bloqueoPorRelacion) {
+        return res.status(409).json({
+          error: 'La base de datos aún tiene una relación que bloquea el borrado. Aplica la migración 20261014_breakdown_assignee_delete.sql en Supabase y vuelve a intentarlo.',
+        });
+      }
       return errorConsulta(res, error);
     }
 
