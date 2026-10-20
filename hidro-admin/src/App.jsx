@@ -164,6 +164,8 @@ function App() {
   const [sessionStatus, setSessionStatus] = useState(getToken() ? 'checking' : 'signed-out')
   const [profile, setProfile] = useState(null)
   const [email, setEmail] = useState('')
+  const [emailIsAdmin, setEmailIsAdmin] = useState(null)
+  const [checkingAdminEmail, setCheckingAdminEmail] = useState(false)
   const [password, setPassword] = useState('')
   const [recoveryCode, setRecoveryCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -574,6 +576,8 @@ function App() {
     setAuthNotice('')
 
     try {
+      const adminCheck = await apiRequest(endpoints.verifyAdminEmail, { method: 'POST', body: { correo: email } })
+      if (!adminCheck.esAdministrador) throw new Error('Este correo no está registrado en la base de datos.')
       await login(email, password)
       const currentProfile = await apiRequest(endpoints.profile)
       if (currentProfile.rol !== 'administrador') {
@@ -587,6 +591,28 @@ function App() {
       setAuthError(error.message || 'No fue posible iniciar sesión')
     } finally {
       setIsLoggingIn(false)
+    }
+  }
+
+  const checkAdminEmail = async () => {
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail) {
+      setEmailIsAdmin(false)
+      setAuthError('Ingresa el correo de un administrador.')
+      return false
+    }
+    setCheckingAdminEmail(true)
+    try {
+      await apiRequest(endpoints.verifyAdminEmail, { method: 'POST', body: { correo: normalizedEmail } })
+      setEmailIsAdmin(true)
+      setAuthError('')
+      return true
+    } catch (error) {
+      setEmailIsAdmin(false)
+      setAuthError(error.message || 'Este correo no está registrado en la base de datos.')
+      return false
+    } finally {
+      setCheckingAdminEmail(false)
     }
   }
 
@@ -666,6 +692,16 @@ function App() {
     event.preventDefault()
     setAuthError('')
     setAuthNotice('')
+
+    try {
+      const adminCheck = await apiRequest(endpoints.verifyAdminEmail, { method: 'POST', body: { correo: email } })
+      if (!adminCheck.esAdministrador) throw new Error('Este correo no está registrado en la base de datos.')
+      setEmailIsAdmin(true)
+    } catch (error) {
+      setEmailIsAdmin(false)
+      setAuthError(error.message || 'Este correo no está registrado en la base de datos.')
+      return
+    }
 
     if (authMode === 'reset' && newPassword !== confirmNewPassword) {
       setAuthError('Las contraseñas no coinciden.')
@@ -803,6 +839,17 @@ function App() {
     { label: 'Pagos por confirmar', value: metricValue('pagos', payments.filter((payment) => !payment.confirmado).length) },
     { label: 'Cortes activos', value: metricValue('cortes', activeCuts.length) },
   ]
+  const sectionTitles = {
+    dashboard: 'HIDRO-APP',
+    usuarios: 'Usuarios',
+    facturas: 'Facturación',
+    pagos: 'Pagos',
+    cortes: 'Cortes y reconexiones',
+    notificaciones: 'Notificaciones',
+    tarifas: 'Tarifas',
+    reportes: 'Reportes',
+  }
+  const currentSectionTitle = sectionTitles[activeSection] || 'HIDRO-APP'
 
   if (sessionStatus === 'checking') {
     return <main className="auth-shell"><p className="auth-loading">Verificando sesión...</p></main>
@@ -811,10 +858,27 @@ function App() {
   if (sessionStatus !== 'authenticated') {
     return (
       <main className="auth-shell">
+        <section className="auth-showcase" aria-label="Acueducto Campoamor">
+          <div className="auth-showcase-top">
+            <img src={hidroAppLogo} alt="" className="auth-brand-logo" />
+            <span>ACUEDUCTO CAMPOAMOR</span>
+          </div>
+          <div className="auth-showcase-copy">
+            <span className="auth-kicker"><span /> SERVICIO Y COMUNIDAD</span>
+            <h2>El agua de nuestra comunidad, bajo control.</h2>
+            <p>Gestiona usuarios, facturación y novedades del servicio desde un solo lugar.</p>
+          </div>
+          <div className="auth-showcase-footer">
+            <div className="auth-watermark"><Waves size={118} strokeWidth={1} /></div>
+            <span>PLATAFORMA DE ADMINISTRACIÓN</span>
+            <span className="auth-status"><i /> Sistema de gestión</span>
+          </div>
+        </section>
         <form className="auth-panel" onSubmit={authMode === 'login' ? handleLogin : handleRecoverySubmit}>
-          <div className="auth-mark"><Waves size={25} /></div>
-          <p className="eyebrow">Acueducto Campoamor</p>
-          <h1>{authMode === 'login' ? 'Panel administrativo' : authMode === 'request-reset' ? 'Recuperar contraseña' : 'Crear contraseña nueva'}</h1>
+          <div className="auth-form-heading">
+            <div className="auth-mark"><Waves size={22} /></div>
+            <p className="eyebrow">BIENVENIDO</p>
+            <h1>{authMode === 'login' ? 'Inicia sesión' : authMode === 'request-reset' ? 'Recupera tu acceso' : 'Crea una contraseña'}</h1>
           <p className="auth-description">
             {authMode === 'login'
               ? 'Ingresa con tu cuenta de administrador.'
@@ -822,13 +886,15 @@ function App() {
                 ? 'Te enviaremos un código al correo de tu cuenta.'
                 : 'Ingresa el código recibido y define una contraseña de al menos 8 caracteres.'}
           </p>
+          </div>
           <label htmlFor="admin-email">Correo electrónico</label>
           <input
             id="admin-email"
             type="email"
             autoComplete="username"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => { setEmail(event.target.value); setEmailIsAdmin(null); setAuthError('') }}
+            onBlur={checkAdminEmail}
             required
           />
           {authMode === 'login' && (
@@ -885,7 +951,10 @@ function App() {
               : authMode === 'login' ? 'Iniciar sesión' : authMode === 'request-reset' ? 'Enviar código' : 'Actualizar contraseña'}
           </button>
           {authMode === 'login' ? (
-            <button type="button" className="link-button auth-link" onClick={() => { setAuthMode('request-reset'); setAuthError(''); setAuthNotice('') }}>
+            <button type="button" className="link-button auth-link" disabled={checkingAdminEmail || emailIsAdmin === false} onClick={async () => {
+              if (emailIsAdmin !== true && !(await checkAdminEmail())) return
+              setAuthMode('request-reset'); setAuthError(''); setAuthNotice('')
+            }}>
               Olvidé mi contraseña
             </button>
           ) : (
@@ -893,6 +962,7 @@ function App() {
               Volver a iniciar sesión
             </button>
           )}
+          <p className="auth-security"><ShieldCheck size={15} /> Acceso seguro para administradores</p>
         </form>
       </main>
     )
@@ -1433,8 +1503,8 @@ function App() {
               <Menu size={18} />
             </button>
             <div>
-              <p className="eyebrow">Panel administrativo</p>
-              <h1>HIDRO-APP</h1>
+              <p className="eyebrow">Panel administrativo · Acueducto Campoamor</p>
+              <h1>{currentSectionTitle}</h1>
             </div>
           </div>
 
@@ -1463,8 +1533,8 @@ function App() {
         <main className="content" aria-live="polite">
           <section className="hero-panel">
             <div>
-              <p className="eyebrow">Resumen operativo</p>
-              <h2>Control central del acueducto</h2>
+              <p className="eyebrow">{activeSection === 'dashboard' ? 'Resumen operativo' : `Gestión de ${currentSectionTitle.toLocaleLowerCase('es')}`}</p>
+              <h2>{activeSection === 'dashboard' ? 'Control central del acueducto' : currentSectionTitle}</h2>
             </div>
             <div className="hero-actions">
               {quickActions.map(({ label, section, icon: Icon }) => (
