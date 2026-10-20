@@ -60,7 +60,7 @@ async function webhook(req, res) {
     const estadoWompi = trx.status; // APPROVED | DECLINED | VOIDED | ERROR
     const montoRecibidoCentavos = trx.amount_in_cents;
 
-    const { data: pago, error: pagoError } = await paymentModel.findById(referencia, 'id, confirmado, monto');
+    const { data: pago, error: pagoError } = await paymentModel.getById(referencia, 'id, confirmado, monto');
 
     // Ya respondimos 200 a Wompi, así que no reintentará: si esto fue un
     // error transitorio de la consulta (no "no encontrado"), lo dejamos bien
@@ -74,6 +74,10 @@ async function webhook(req, res) {
       console.warn('[wompi] pago no encontrado para referencia', referencia);
       return;
     }
+
+    // Un pago ya confirmado no se toca: Wompi puede reenviar el evento o
+    // mandar uno tardío (por ejemplo DECLINED de un intento anterior).
+    if (pago.confirmado) return;
 
     if (estadoWompi === 'APPROVED') {
       // El monto ya viene atado a la referencia por la firma de integridad
@@ -92,11 +96,16 @@ async function webhook(req, res) {
       const resultado = await confirmarPago(pago.id, {
         estado_wompi: estadoWompi,
         transaccion_id: trx.id,
-        metodo_confirmacion: 'wompi',
       });
 
       if (!resultado.ok) {
+        // Wompi cobró pero el trigger rechazó el pago (por ejemplo, la factura
+        // ya estaba pagada). Se deja marcado para localizarlo y devolver el dinero.
         console.error('[wompi] confirmarPago no tuvo éxito para', pago.id, ':', resultado.error);
+        await paymentModel.update(pago.id, {
+          estado_wompi: 'APPROVED_NO_APLICADO',
+          transaccion_id: trx.id,
+        });
       }
     } else {
       await paymentModel.update(pago.id, { estado_wompi: estadoWompi, transaccion_id: trx.id });

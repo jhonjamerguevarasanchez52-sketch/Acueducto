@@ -75,6 +75,18 @@ class _AveriasScreenState extends State<AveriasScreen> {
     return Averia.listaDesde(data);
   }
 
+  /// Una petición puede perder la respuesta después de que el backend ya
+  /// guardó el cambio. En ese caso consultamos el estado persistido antes de
+  /// decirle al fontanero que la operación falló.
+  Future<bool> _estadoYaGuardado(String averiaId, String estado) async {
+    try {
+      final averias = await _cargar();
+      return averias.any((a) => a.id == averiaId && a.estado == estado);
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _refrescar() async {
     final futuro = _cargar();
     setState(() => _futuro = futuro);
@@ -84,11 +96,12 @@ class _AveriasScreenState extends State<AveriasScreen> {
   Future<void> _cambiarEstado(Averia averia, String nuevoEstado) async {
     final api = context.read<AuthProvider>().api;
     String? nota;
-    if (nuevoEstado == 'resuelta') {
+    if (nuevoEstado == 'resuelta' || nuevoEstado == 'en_proceso') {
       nota = await showDialog<String>(
         context: context,
-        builder: (_) => const _ConfirmarSolucionDialog(),
+        builder: (_) => _MensajeFontaneroDialog(estado: nuevoEstado),
       );
+
       if (!mounted || nota == null) return;
     }
     if (!mounted) return;
@@ -110,14 +123,40 @@ class _AveriasScreenState extends State<AveriasScreen> {
         } else {
           AppSnackbar.info(
             context,
-            '$accion, pero no se pudo enviar la notificación al usuario.',
+            '$accion y quedó guardada. No se pudo confirmar el aviso al usuario.',
           );
         }
       }
     } on ApiException catch (e) {
-      if (mounted) AppSnackbar.error(context, e.message);
+      final guardada = await _estadoYaGuardado(averia.id, nuevoEstado);
+      if (!mounted) return;
+      if (guardada) {
+        await _refrescar();
+        if (mounted) {
+          AppSnackbar.info(
+            context,
+            nuevoEstado == 'resuelta'
+                ? 'La avería quedó solucionada y guardada. No se pudo confirmar el aviso al usuario.'
+                : 'El cambio quedó guardado. No se pudo confirmar el aviso al usuario.',
+          );
+        }
+      } else {
+        AppSnackbar.error(context, e.message);
+      }
     } catch (_) {
-      if (mounted) {
+      final guardada = await _estadoYaGuardado(averia.id, nuevoEstado);
+      if (!mounted) return;
+      if (guardada) {
+        await _refrescar();
+        if (mounted) {
+          AppSnackbar.info(
+            context,
+            nuevoEstado == 'resuelta'
+                ? 'La avería quedó solucionada y guardada. No se pudo confirmar el aviso al usuario.'
+                : 'El cambio quedó guardado. No se pudo confirmar el aviso al usuario.',
+          );
+        }
+      } else {
         AppSnackbar.error(
           context,
           'No se pudo actualizar la avería. Intenta de nuevo.',
@@ -288,15 +327,17 @@ class _AveriasScreenState extends State<AveriasScreen> {
 
 /// El diálogo conserva su controlador durante la animación de cierre y lo
 /// libera cuando la ruta ya desmontó el campo de texto.
-class _ConfirmarSolucionDialog extends StatefulWidget {
-  const _ConfirmarSolucionDialog();
+class _MensajeFontaneroDialog extends StatefulWidget {
+  const _MensajeFontaneroDialog({required this.estado});
+
+  final String estado;
 
   @override
-  State<_ConfirmarSolucionDialog> createState() =>
-      _ConfirmarSolucionDialogState();
+  State<_MensajeFontaneroDialog> createState() =>
+      _MensajeFontaneroDialogState();
 }
 
-class _ConfirmarSolucionDialogState extends State<_ConfirmarSolucionDialog> {
+class _MensajeFontaneroDialogState extends State<_MensajeFontaneroDialog> {
   final _controlador = TextEditingController();
 
   @override
@@ -307,15 +348,18 @@ class _ConfirmarSolucionDialogState extends State<_ConfirmarSolucionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final resuelta = widget.estado == 'resuelta';
     return AlertDialog(
-      title: const Text('Confirmar solución'),
+      title: Text(resuelta ? 'Confirmar solución' : 'Aceptar avería'),
       content: TextField(
         controller: _controlador,
         maxLength: 1000,
         maxLines: 3,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Mensaje para el usuario (opcional)',
-          hintText: 'Explica brevemente qué se solucionó',
+          hintText: resuelta
+              ? 'Explica brevemente qué se solucionó'
+              : 'Escribe una actualización para el usuario',
         ),
       ),
       actions: [
@@ -325,7 +369,7 @@ class _ConfirmarSolucionDialogState extends State<_ConfirmarSolucionDialog> {
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, _controlador.text.trim()),
-          child: const Text('Marcar solucionada'),
+          child: Text(resuelta ? 'Marcar solucionada' : 'Aceptar avería'),
         ),
       ],
     );
