@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/pago.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/pago_checkout_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formato.dart';
 import '../widgets/core/core.dart';
@@ -18,13 +19,25 @@ class PagosScreen extends StatefulWidget {
   State<PagosScreen> createState() => _PagosScreenState();
 }
 
-class _PagosScreenState extends State<PagosScreen> {
+class _PagosScreenState extends State<PagosScreen> with WidgetsBindingObserver {
   late Future<List<Pago>> _futuro;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _futuro = _cargar();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refrescar();
   }
 
   Future<List<Pago>> _cargar() async {
@@ -48,13 +61,19 @@ class _PagosScreenState extends State<PagosScreen> {
     if (eleccion == null || !mounted) return;
 
     try {
-      await context.read<AuthProvider>().api.post('/pagos', body: {
-        'factura_id': pago.facturaId,
-        'metodo': eleccion.metodo,
-        if (eleccion.referencia != null) 'referencia': eleccion.referencia,
-      });
+      await PagoCheckoutService.procesar(
+        api: context.read<AuthProvider>().api,
+        facturaId: pago.facturaId,
+        metodo: eleccion.metodo,
+        referencia: eleccion.referencia,
+      );
       if (!mounted) return;
-      AppSnackbar.success(context, 'Pago registrado. Queda pendiente de confirmación.');
+      AppSnackbar.success(
+        context,
+        eleccion.metodo == 'wompi'
+            ? 'Continúa el pago en Wompi. El estado se actualizará al confirmarse.'
+            : 'Pago registrado. Queda pendiente de confirmación.',
+      );
       _refrescar();
     } on ApiException catch (e) {
       if (!mounted) return;

@@ -22,12 +22,15 @@ import {
   Clock3,
   CreditCard,
   Download,
+  Eye,
   FileText,
   Gauge,
   Menu,
   Plus,
+  Printer,
   Search,
   ShieldCheck,
+  Trash2,
   TrendingUp,
   Upload,
   UserRound,
@@ -39,6 +42,7 @@ import Sidebar from './components/Sidebar.jsx'
 import StatCard from './components/StatCard.jsx'
 import { apiRequest, clearToken, endpoints, getToken, login } from './services/api.js'
 import { parseUsersCsv, parseUsersExcel } from './utils/usersCsv.js'
+import hidroAppLogo from './assets/hidroapp-logo.png'
 
 const quickActions = [
   { label: 'Usuarios', section: 'usuarios', icon: UserRoundPlus },
@@ -48,7 +52,7 @@ const quickActions = [
 
 const resourceEndpointBySection = {
   usuarios: 'adminUsers',
-  facturas: 'facturas',
+  facturas: 'facturasTodas',
   pagos: 'pagos',
   cortes: 'cortes',
   notificaciones: 'notificaciones',
@@ -77,6 +81,12 @@ const operationDefinitions = {
       { name: 'valor_total', label: 'Valor total', type: 'number', required: true },
       { name: 'concepto', label: 'Concepto', required: true },
       { name: 'fecha_vencimiento', label: 'Fecha de vencimiento', type: 'date' },
+    ],
+  },
+  facturacionMensual: {
+    title: 'Generar facturas mensuales', section: 'facturas', endpoint: endpoints.generarFacturasMensuales, method: 'POST',
+    fields: [
+      { name: 'periodo', label: 'Periodo · usuarios activos · $12.000 por factura', type: 'month', required: true },
     ],
   },
   editarFactura: {
@@ -143,6 +153,9 @@ const formatMoney = (value) => Number(value || 0).toLocaleString('es-CO', {
 })
 
 const formatDate = (value) => value ? new Date(value).toLocaleDateString('es-CO') : '—'
+const formatInvoiceNumber = (invoice) => invoice.numero_factura
+  ? `FAC-${String(invoice.numero_factura).padStart(6, '0')}`
+  : `FAC-${String(invoice.id || '').slice(0, 8).toUpperCase()}`
 
 function App() {
   const [activeSection, setActiveSection] = useState('dashboard')
@@ -190,6 +203,7 @@ function App() {
   const [operationForm, setOperationForm] = useState({})
   const [operationError, setOperationError] = useState('')
   const [operationPending, setOperationPending] = useState(false)
+  const [invoicePreview, setInvoicePreview] = useState(null)
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
 
@@ -272,6 +286,7 @@ function App() {
     setActiveSection(section)
     setSearchQuery('')
     loadSection(section)
+    if (section === 'facturas' || section === 'pagos') void ensureUsersLoaded()
   }
 
   const handleCreateUser = async (event) => {
@@ -438,6 +453,12 @@ function App() {
   const handleOperationSubmit = async (event) => {
     event.preventDefault()
     const definition = operationDefinitions[operationType]
+    if (operationType === 'facturacionMensual') {
+      const confirmar = window.confirm(
+        `Se generarán facturas de servicio por $12.000 para los usuarios activos sin factura del periodo ${operationForm.periodo}. ¿Continuar?`,
+      )
+      if (!confirmar) return
+    }
     const body = Object.fromEntries(definition.fields
       .filter((field) => operationForm[field.name] !== '')
       .map((field) => [
@@ -478,6 +499,72 @@ function App() {
     } catch (error) {
       setActionError(error.message || 'No fue posible completar la operación.')
     }
+  }
+
+  const openInvoicePreview = async (invoice) => {
+    await ensureUsersLoaded()
+    setInvoicePreview(invoice)
+  }
+
+  const handleDownloadInvoice = () => {
+    const printWindow = window.open('', '_blank')
+    const invoiceDocument = document.getElementById('invoice-document')
+    if (!printWindow || !invoiceDocument) {
+      setActionError('Permite las ventanas emergentes para descargar la factura.')
+      return
+    }
+
+    printWindow.addEventListener('afterprint', () => printWindow.close(), { once: true })
+    printWindow.document.write(`<!doctype html>
+      <html lang="es">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>${formatInvoiceNumber(invoicePreview)}</title>
+          <style>
+            @page { size: A4; margin: 18mm; }
+            * { box-sizing: border-box; }
+            body { margin: 0; color: #172d35; font: 14px Arial, sans-serif; }
+            .invoice-sheet { position: relative; overflow: hidden; padding: 0; border: 1px solid #d5e5ec; background: #fff; color: #173448; }
+            .invoice-watermark { position: absolute; z-index: 0; top: 32%; right: 7%; width: 320px; max-width: 52%; opacity: .04; pointer-events: none; }
+            .invoice-watermark img { display: block; width: 100%; height: auto; }
+            .invoice-sheet > :not(.invoice-watermark) { position: relative; z-index: 1; }
+            .invoice-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 24px; background: linear-gradient(120deg, #1e5fa0, #0a3665); color: #fff; }
+            .invoice-heading-brand { display: flex; align-items: center; gap: 14px; }
+            .invoice-logo-frame { display: grid; flex: none; place-items: center; width: 54px; height: 54px; overflow: hidden; border-radius: 12px; background: #fff; }
+            .invoice-logo { display: block; width: 100%; height: 100%; object-fit: cover; }
+            .invoice-brand { color: #dceff5; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+            .invoice-heading h2 { margin: 7px 0 0; color: #fff; font-size: 24px; }
+            .invoice-number { flex: none; text-align: right; }
+            .invoice-number span { color: #dceff5; font-size: 11px; text-transform: uppercase; }
+            .invoice-number strong { display: block; margin-top: 6px; font-size: 16px; }
+            .invoice-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 22px 24px; }
+            .invoice-meta div { padding: 12px; border: 1px solid #e1edf2; background: #f3f8fa; }
+            .invoice-meta div:nth-child(1) { border-top: 3px solid #35a7d8; }
+            .invoice-meta div:nth-child(2) { border-top: 3px solid #dca934; }
+            .invoice-meta div:nth-child(3) { border-top: 3px solid #34a879; }
+            .invoice-meta div:nth-child(4) { border-top: 3px solid #e77757; }
+            .invoice-meta span, .invoice-party > span { display: block; margin-bottom: 6px; color: #607987; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+            .invoice-party { margin: 0 24px 22px; padding: 15px; border-left: 3px solid #4fc3f7; background: #f7fafc; }
+            .invoice-party p { margin: 4px 0 0; color: #607987; }
+            .invoice-lines { width: calc(100% - 48px); margin: 22px 24px 0; border-collapse: collapse; }
+            .invoice-lines th, .invoice-lines td { padding: 12px 10px; border-bottom: 1px solid #dce6ec; text-align: left; }
+            .invoice-lines th:last-child, .invoice-lines td:last-child { text-align: right; }
+            .invoice-lines th { color: #607987; font-size: 10px; text-transform: uppercase; }
+            .invoice-total { display: flex; justify-content: flex-end; gap: 28px; margin: 4px 24px 0; padding: 16px; border-left: 4px solid #00a878; background: linear-gradient(120deg, #eaf5fb, #e7f8ef); color: #173448; font-size: 17px; font-weight: 700; }
+            .invoice-note { margin: 20px 24px 0; padding: 14px 0 20px; border-top: 1px solid #dce6ec; color: #607987; }
+            @media (max-width: 600px) { .invoice-heading { gap: 12px; padding: 16px; } .invoice-heading h2 { font-size: 18px; } .invoice-logo-frame { width: 44px; height: 44px; } .invoice-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 16px; } .invoice-party { margin: 0 16px 18px; } .invoice-lines { width: calc(100% - 32px); margin: 18px 16px 0; } .invoice-total { margin: 4px 16px 0; } .invoice-note { margin: 18px 16px 0; } }
+            @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>${invoiceDocument.innerHTML}</body>
+      </html>`)
+    printWindow.document.close()
+    printWindow.setTimeout(() => {
+      printWindow.focus()
+      printWindow.print()
+    }, 250)
+    setActionError('')
   }
 
   const handleLogin = async (event) => {
@@ -1001,7 +1088,7 @@ function App() {
                       <option value="fontanero">Fontanero</option>
                       <option value="administrador">Administrador</option>
                     </select>
-                    <button type="button" className="link-button danger-link" onClick={() => performAction('usuarios', `${endpoints.adminUsers}/${user.id}`, 'DELETE', undefined, 'Eliminar esta cuenta también borrará sus facturas, pagos y cortes. ¿Continuar?')}>Eliminar</button>
+                    <button type="button" className="link-button danger-link" onClick={() => performAction('usuarios', `${endpoints.adminUsers}/${user.id}`, 'DELETE', undefined, 'La eliminación es permanente y borra el historial asociado a esta cuenta. No se puede deshacer. ¿Continuar?')}><Trash2 size={14} />Eliminar</button>
                   </>}
                 </td>
               </tr>
@@ -1020,6 +1107,7 @@ function App() {
           <h3>Facturas y vencimientos</h3>
         </div>
         <div className="hero-actions">
+          <button type="button" className="secondary-button" onClick={() => openOperation('facturacionMensual')}>Generar para todos</button>
           <button type="button" className="secondary-button" onClick={() => openOperation('facturaExtraordinaria')}>Factura extraordinaria</button>
           <button type="button" className="primary-button" onClick={() => openOperation('factura')}><Plus size={16} />Nueva factura</button>
         </div>
@@ -1029,8 +1117,8 @@ function App() {
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Perfil</th>
+              <th>Factura</th>
+              <th>Suscriptor</th>
               <th>Periodo</th>
               <th>Valor</th>
               <th>Vencimiento</th>
@@ -1044,13 +1132,26 @@ function App() {
                   : filterRows(sectionData.facturas || []).length === 0 ? <tr><td colSpan="7" className="table-message">No hay resultados.</td></tr>
                     : filterRows(sectionData.facturas).map((invoice) => (
                     <tr key={invoice.id}>
-                      <td>{invoice.id}</td>
-                      <td>{invoice.perfil_id}</td>
+                      <td>{formatInvoiceNumber(invoice)}</td>
+                      <td>
+                        {(() => {
+                          const user = users.find((profileItem) => profileItem.id === invoice.perfil_id)
+                          const name = [user?.nombre, user?.apellido].filter(Boolean).join(' ')
+                          return (
+                            <div className="identity-cell">
+                              <strong>{name || 'Perfil sin nombre'}</strong>
+                              <span>{user?.correo || 'Correo no disponible'}</span>
+                              <small>{user?.direccion || user?.zona || 'Ubicación no registrada'}</small>
+                            </div>
+                          )
+                        })()}
+                      </td>
                       <td>{invoice.periodo}</td>
                       <td>{formatMoney(invoice.valor_total)}</td>
                       <td>{formatDate(invoice.fecha_vencimiento)}</td>
                       <td><span className={`status-badge ${invoice.estado}`}>{invoice.estado}</span></td>
                       <td className="row-actions">
+                        <button type="button" className="link-button" onClick={() => openInvoicePreview(invoice)}><Eye size={14} />Ver</button>
                         <button type="button" className="link-button" onClick={() => openOperation('editarFactura', invoice)}>Editar</button>
                         <button type="button" className="link-button danger-link" onClick={() => performAction('facturas', `${endpoints.facturas}/${invoice.id}`, 'DELETE', undefined, '¿Eliminar esta factura? Si ya tiene pagos, el backend rechazará la operación; anúlala en ese caso.')}>Eliminar</button>
                       </td>
@@ -1092,8 +1193,20 @@ function App() {
                     : filterRows(sectionData.pagos).map((payment) => (
                     <tr key={payment.id}>
                       <td>{payment.id}</td>
-                      <td>{payment.perfil_id}</td>
-                      <td>{payment.factura_id}</td>
+                      <td>
+                        {(() => {
+                          const user = users.find((profileItem) => profileItem.id === payment.perfil_id)
+                          const name = [user?.nombre, user?.apellido].filter(Boolean).join(' ')
+                          return (
+                            <div className="identity-cell">
+                              <strong>{name || 'Perfil sin nombre'}</strong>
+                              <span>{user?.correo || 'Correo no disponible'}</span>
+                              <small>{user?.direccion || user?.zona || 'Ubicación no registrada'}</small>
+                            </div>
+                          )
+                        })()}
+                      </td>
+                      <td>{formatInvoiceNumber(invoices.find((invoice) => invoice.id === payment.factura_id) || { id: payment.factura_id })}</td>
                       <td>{formatMoney(payment.monto)}</td>
                       <td>{payment.metodo || '—'}</td>
                       <td>{formatDate(payment.fecha_pago)}</td>
@@ -1573,12 +1686,76 @@ function App() {
               ))}
               {operationError && <p className="auth-error form-wide" role="alert">{operationError}</p>}
               <button type="submit" className="primary-button form-wide" disabled={operationPending}>
-                {operationPending ? 'Guardando...' : 'Guardar'}
+                {operationPending
+                  ? operationType === 'facturacionMensual' ? 'Generando...' : 'Guardando...'
+                  : operationType === 'facturacionMensual' ? 'Generar facturas' : 'Guardar'}
               </button>
             </form>
           </section>
         </div>
       )}
+      {invoicePreview && (() => {
+        const invoiceUser = users.find((user) => user.id === invoicePreview.perfil_id)
+        const invoiceUserName = [invoiceUser?.nombre, invoiceUser?.apellido].filter(Boolean).join(' ') || 'Suscriptor'
+        return (
+          <div className="modal-backdrop">
+            <section className="modal-panel invoice-modal-panel" role="dialog" aria-modal="true" aria-labelledby="invoice-preview-title">
+              <div className="panel-header invoice-preview-actions">
+                <div>
+                  <p className="eyebrow">Documento de cobro</p>
+                  <h2 id="invoice-preview-title">Vista previa de factura</h2>
+                </div>
+                <div className="hero-actions">
+                  <button type="button" className="primary-button invoice-download-button" onClick={handleDownloadInvoice}><Printer size={16} />Descargar PDF</button>
+                  <button type="button" className="soft-button invoice-close-button" onClick={() => setInvoicePreview(null)}>Cerrar</button>
+                </div>
+              </div>
+              <article className="invoice-sheet" id="invoice-document">
+                <div className="invoice-watermark" aria-hidden="true">
+                  <img src={hidroAppLogo} alt="" />
+                </div>
+                <header className="invoice-heading">
+                  <div className="invoice-heading-brand">
+                    <span className="invoice-logo-frame"><img className="invoice-logo" src={hidroAppLogo} alt="" /></span>
+                    <div>
+                      <span className="invoice-brand">HidroApp · Acueducto Campo Amor</span>
+                      <h2>{invoicePreview.tipo === 'extraordinaria' ? 'Factura extraordinaria' : 'Factura de servicio'}</h2>
+                    </div>
+                  </div>
+                  <div className="invoice-number">
+                    <span>Factura</span>
+                    <strong>{formatInvoiceNumber(invoicePreview)}</strong>
+                  </div>
+                </header>
+                <div className="invoice-meta">
+                  <div><span>Periodo facturado</span><strong>{invoicePreview.periodo || '—'}</strong></div>
+                  <div><span>Estado</span><strong>{invoicePreview.estado || '—'}</strong></div>
+                  <div><span>Fecha de emisión</span><strong>{formatDate(invoicePreview.fecha_emision)}</strong></div>
+                  <div><span>Fecha límite de pago</span><strong>{formatDate(invoicePreview.fecha_vencimiento)}</strong></div>
+                </div>
+                <div className="invoice-party">
+                  <span>Suscriptor</span>
+                  <strong>{invoiceUserName}</strong>
+                  <p>{invoiceUser?.correo || 'Correo no registrado'}</p>
+                  {invoiceUser?.direccion && <p>{invoiceUser.direccion}</p>}
+                  {invoiceUser?.zona && <p>Zona {invoiceUser.zona}</p>}
+                  {invoiceUser?.numero_lote && <p>Lote {invoiceUser.numero_lote}</p>}
+                </div>
+                <table className="invoice-lines">
+                  <thead><tr><th>Concepto</th><th>Periodo</th><th>Valor</th></tr></thead>
+                  <tbody><tr>
+                    <td>{invoicePreview.observacion || (invoicePreview.tipo === 'extraordinaria' ? 'Cuota extraordinaria' : 'Servicio de acueducto')}</td>
+                    <td>{invoicePreview.periodo || '—'}</td>
+                    <td>{formatMoney(invoicePreview.valor_total)}</td>
+                  </tr></tbody>
+                </table>
+                <div className="invoice-total"><span>Total a pagar</span><strong>{formatMoney(invoicePreview.valor_total)}</strong></div>
+                <p className="invoice-note">Conserve este documento como soporte de su facturación.</p>
+              </article>
+            </section>
+          </div>
+        )
+      })()}
     </div>
   )
 }

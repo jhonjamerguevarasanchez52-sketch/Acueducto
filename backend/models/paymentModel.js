@@ -34,7 +34,14 @@ function findById(id, columns = '*') {
 
 // Pago aún sin confirmar de una factura (si lo hay): evita duplicados por doble clic.
 function findPendingByInvoice(invoiceId, db = supabaseAdmin) {
-  return db.from(TABLE).select('id').eq('factura_id', invoiceId).eq('confirmado', false).maybeSingle();
+  return db
+    .from(TABLE)
+    .select('*')
+    .eq('factura_id', invoiceId)
+    .eq('confirmado', false)
+    .order('fecha_pago', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 }
 
 // Cuántos pagos tiene una factura.
