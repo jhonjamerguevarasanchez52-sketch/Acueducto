@@ -1,5 +1,6 @@
 const authModel = require('../models/authModel');
 const profileModel = require('../models/profileModel');
+const breakdownModel = require('../models/breakdownModel');
 const { CAMPOS_EDITABLES_PERFIL } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
@@ -76,17 +77,10 @@ async function crearUsuario(req, res) {
       await enviarCorreo({
         to: correo,
         subject: 'Tu cuenta en Acueducto Campo Amor',
-<<<<<<< HEAD
         html: `<p>Hola ${escaparHtml(nombre)},</p>
           <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
           <h2>${escaparHtml(passwordTemporal)}</h2>
           <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
-=======
-        html: `<p>Hola ${nombre},</p>
-               <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
-               <h2>${passwordTemporal}</h2>
-               <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
->>>>>>> 318467a21773f1e7432eb8e34afaf8d85b351590
       });
     } catch (mailErr) {
       console.error('Error enviando correo de cuenta creada:', mailErr.message);
@@ -252,6 +246,11 @@ async function eliminarUsuario(req, res) {
   }
 
   try {
+    // Quita primero la asignación activa para que la eliminación también
+    // funcione en bases antiguas cuya FK aún no tiene ON DELETE SET NULL.
+    const { error: errorAverias } = await breakdownModel.unassignFromPlumber(userId);
+    if (errorAverias) return errorConsulta(res, errorAverias);
+
     const { error } = await authModel.deleteUser(userId);
 
     if (error) {

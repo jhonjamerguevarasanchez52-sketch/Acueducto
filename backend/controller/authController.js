@@ -18,6 +18,19 @@ function normalizarCorreo(correo) {
   return String(correo || '').toLowerCase().trim();
 }
 
+async function verificarCorreoAdministrador(req, res) {
+  const correo = normalizarCorreo(req.body.correo);
+  if (!correo) return res.status(400).json({ error: 'El correo es obligatorio' });
+  try {
+    const { data: perfil, error } = await profileModel.findByEmail(correo, 'id, rol');
+    if (error && error.code !== 'PGRST116') return errorConsulta(res, error);
+    if (!perfil || perfil.rol !== 'administrador') {
+      return res.status(403).json({ esAdministrador: false, error: 'Este correo no está registrado en la base de datos.' });
+    }
+    return res.status(200).json({ esAdministrador: true });
+  } catch (err) { return errorInesperado(res, err); }
+}
+
 // No hay endpoint de auto-registro: las cuentas las crea el administrador con
 // `scripts/crearUsuario.js` (Auth + fila en `profiles` con is_verified = true).
 // El flujo de verificación por código de abajo sigue disponible por si una
@@ -39,6 +52,11 @@ async function iniciarSesion(req, res) {
   }
 
   try {
+    const { data: adminPerfil, error: adminError } = await profileModel.findByEmail(correo, 'id, rol');
+    if (adminError && adminError.code !== 'PGRST116') return errorConsulta(res, adminError);
+    if (!adminPerfil || adminPerfil.rol !== 'administrador') {
+      return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
+    }
     const { data, error } = await authModel.signIn(correo, password);
 
     if (error) {
@@ -101,8 +119,10 @@ async function verificarCuenta(req, res) {
   try {
     const { data: perfil, error: buscarError } = await profileModel.findByEmail(
       correo,
-      'id, is_verified, codigo_verificacion, codigo_verificacion_expiracion'
+      'id, rol, is_verified, codigo_verificacion, codigo_verificacion_expiracion'
     );
+
+    if (perfil?.rol !== 'administrador') return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
 
     // No revelamos si el correo existe: mismo mensaje que un código incorrecto.
     if (buscarError || !perfil) {
@@ -161,8 +181,10 @@ async function reenviarCodigoVerificacion(req, res) {
   try {
     const { data: perfil, error: buscarError } = await profileModel.findByEmail(
       correo,
-      'id, is_verified, nombre'
+      'id, rol, is_verified, nombre'
     );
+
+    if (perfil?.rol !== 'administrador') return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
 
     // No revelamos si el correo existe o ya está verificado: mismo mensaje siempre.
     const mensajeGenerico = { message: 'Si el correo existe y no ha sido verificado, se enviará un nuevo código' };
@@ -271,9 +293,9 @@ async function solicitarRecuperacion(req, res) {
   registrarFallo('recuperar', correo);
 
   try {
-    const { data: perfil, error: buscarError } = await profileModel.findByEmail(correo, 'id');
+    const { data: perfil, error: buscarError } = await profileModel.findByEmail(correo, 'id, rol');
 
-    if (buscarError || !perfil) {
+    if (buscarError || !perfil || perfil.rol !== 'administrador') {
       // No revelamos si el correo existe o no, por seguridad
       return res.status(200).json({ message: 'Si el correo existe, se enviará un código de recuperación' });
     }
@@ -330,8 +352,10 @@ async function resetearPassword(req, res) {
   try {
     const { data: perfil, error: buscarError } = await profileModel.findByEmail(
       correo,
-      'id, codigo_recuperacion, codigo_expiracion'
+      'id, rol, codigo_recuperacion, codigo_expiracion'
     );
+
+    if (perfil?.rol !== 'administrador') return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
 
     if (buscarError || !perfil) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -382,6 +406,7 @@ async function resetearPassword(req, res) {
 }
 
 module.exports = {
+  verificarCorreoAdministrador,
   iniciarSesion,
   verificarCuenta,
   reenviarCodigoVerificacion,
