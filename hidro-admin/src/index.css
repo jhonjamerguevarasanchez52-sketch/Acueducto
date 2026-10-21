@@ -1692,6 +1692,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .modal-panel { border: 1px solid #e5edf3; border-radius: 22px; box-shadow: 0 30px 90px rgba(10,35,56,.25); }
 .action-feedback, .auth-notice { border-radius: 12px; }
 
+
 .treasury-report-panel { display: grid; gap: 22px; }
 .treasury-report-panel .panel-header { align-items: flex-start; margin-bottom: 0; }
 .report-caption { color: var(--muted); margin: 7px 0 0; font-size: .88rem; }
@@ -1707,6 +1708,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .report-downloads .secondary-button { display: inline-flex; align-items: center; gap: 8px; }
 @media (max-width: 900px) { .treasury-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .treasury-report-panel .panel-header { flex-direction: column; } .report-filters { align-items: stretch; flex-direction: column; } .report-filters input { width: 100%; box-sizing: border-box; } .treasury-kpis { grid-template-columns: 1fr; } }
+
 
 @media (max-width: 980px) {
   .sidebar { border-radius: 0 22px 22px 0; }
