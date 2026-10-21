@@ -10,3 +10,5 @@ alter table public.invoices
 create unique index if not exists idx_invoices_servicio_perfil_periodo
   on public.invoices (perfil_id, periodo)
   where tipo = 'servicio';
+
+notify pgrst, 'reload schema';
