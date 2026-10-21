@@ -27,14 +27,18 @@ test('registrarPago con Wompi', async (t) => {
     findPendingByInvoice: paymentModel.findPendingByInvoice,
     create: paymentModel.create,
   };
-  const integrityKeyOriginal = process.env.WOMPI_INTEGRITY_KEY;
+  const variablesOriginales = Object.fromEntries(
+    ['WOMPI_PUBLIC_KEY', 'WOMPI_INTEGRITY_KEY', 'WOMPI_EVENTS_SECRET'].map((key) => [key, process.env[key]])
+  );
 
   t.after(() => {
     invoiceModel.getOwn = funcionesOriginales.getOwn;
     paymentModel.findPendingByInvoice = funcionesOriginales.findPendingByInvoice;
     paymentModel.create = funcionesOriginales.create;
-    if (integrityKeyOriginal === undefined) delete process.env.WOMPI_INTEGRITY_KEY;
-    else process.env.WOMPI_INTEGRITY_KEY = integrityKeyOriginal;
+    for (const [key, value] of Object.entries(variablesOriginales)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   const factura = {
@@ -53,7 +57,9 @@ test('registrarPago con Wompi', async (t) => {
     cantidadCreaciones += 1;
     return { data: pagoNuevo, error: null };
   };
-  process.env.WOMPI_INTEGRITY_KEY = 'integrity-test-secret';
+  process.env.WOMPI_PUBLIC_KEY = 'pub_test_demo';
+  process.env.WOMPI_INTEGRITY_KEY = 'test_integrity_demo';
+  process.env.WOMPI_EVENTS_SECRET = 'test_events_demo';
 
   async function solicitarPago(metodo = 'wompi') {
     const res = crearRespuesta();
@@ -71,7 +77,7 @@ test('registrarPago con Wompi', async (t) => {
     const res = await solicitarPago();
     const firmaEsperada = crypto
       .createHash('sha256')
-      .update('pago-nuevo1250000COPintegrity-test-secret')
+      .update('pago-nuevo1250000COPtest_integrity_demo')
       .digest('hex');
 
     assert.equal(res.codigo, 201);
