@@ -4,6 +4,8 @@ const supabaseAdmin = require('../config/supabaseAdminClient');
 const { confirmarPago } = require('../services/pagosService');
 const { calcularFirmaIntegridad } = require('../utils/wompiFirma');
 const { registrarAuditoria } = require('../utils/auditoria');
+const { obtenerProblemaConfiguracion } = require('../utils/wompiConfig');
+const recibosPagoService = require('../services/recibosPagoService');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 const WOMPI_CURRENCY = process.env.WOMPI_CURRENCY || 'COP';
@@ -15,6 +17,18 @@ const METODOS_ADMIN = ['efectivo', 'transferencia', 'otro'];
 // Mensajes con los que el trigger procesar_pago_confirmado rechaza un pago.
 // Son errores esperados del negocio (no fallos del servidor).
 const RECHAZO_TRIGGER = /ya fue pagada|anulada|no coincide|no corresponde|no existe/i;
+
+async function agregarUrlsRecibos(pagos = []) {
+  return Promise.all(pagos.map(async (pago) => {
+    if (pago.metodo !== 'fisico' || !pago.referencia) return pago;
+    try {
+      return { ...pago, recibo_url: await recibosPagoService.crearUrlRecibo(pago.referencia) };
+    } catch (err) {
+      console.error('[pagos] no se pudo generar enlace temporal del recibo:', err.message);
+      return { ...pago, recibo_url: null };
+    }
+  }));
+}
 
 // ---------- USUARIO FINAL ----------
 
@@ -29,7 +43,7 @@ async function misPagos(req, res) {
       return errorConsulta(res, error);
     }
 
-    return res.status(200).json(data);
+    return res.status(200).json(await agregarUrlsRecibos(data || []));
   } catch (err) {
     return errorInesperado(res, err);
   }
@@ -44,8 +58,15 @@ async function registrarPago(req, res) {
     return res.status(400).json({ error: 'Faltan campos obligatorios: factura_id, metodo' });
   }
 
-  if (metodo === 'wompi' && !process.env.WOMPI_INTEGRITY_KEY) {
-    return res.status(503).json({ error: 'El pago en línea no está configurado.' });
+  if (metodo !== 'wompi') {
+    return res.status(400).json({ error: 'Para pagar físicamente debes adjuntar el recibo.' });
+  }
+
+  if (metodo === 'wompi') {
+    const problemaConfiguracion = obtenerProblemaConfiguracion();
+    if (problemaConfiguracion) {
+      return res.status(503).json({ error: problemaConfiguracion });
+    }
   }
 
   try {
@@ -84,7 +105,8 @@ async function registrarPago(req, res) {
     let pago = null;
     if (pagoPendiente) {
       const puedeReanudarCheckout = metodo === 'wompi' &&
-        pagoPendiente.metodo === 'wompi' && !pagoPendiente.estado_wompi;
+        pagoPendiente.metodo === 'wompi' &&
+        [null, undefined, 'PENDING'].includes(pagoPendiente.estado_wompi);
       const wompiRechazado = pagoPendiente.metodo === 'wompi' &&
         ESTADOS_WOMPI_REINTENTABLES.has(pagoPendiente.estado_wompi);
 
@@ -104,7 +126,14 @@ async function registrarPago(req, res) {
 
     if (!pago) {
       const { data, error } = await paymentModel.create(
-        { factura_id, perfil_id: userId, monto, metodo, referencia },
+        {
+          factura_id,
+          perfil_id: userId,
+          monto,
+          metodo,
+          referencia,
+          estado_wompi: 'PENDING',
+        },
         req.db
       );
 
@@ -125,6 +154,7 @@ async function registrarPago(req, res) {
       try {
         const amountInCents = Math.round(Number(monto) * 100);
         respuesta.wompi = {
+          publicKey: process.env.WOMPI_PUBLIC_KEY,
           reference: pago.id,
           amountInCents,
           currency: WOMPI_CURRENCY,
@@ -146,6 +176,83 @@ async function registrarPago(req, res) {
   }
 }
 
+// Registra el pago físico únicamente cuando se recibe un comprobante de imagen.
+async function registrarPagoFisicoConRecibo(req, res) {
+  const userId = req.usuario.id;
+  const facturaId = req.params.facturaId;
+  const bytes = req.body;
+  const contentType = String(req.headers['content-type'] || '').split(';')[0].toLowerCase();
+
+  if (!Buffer.isBuffer(bytes) || bytes.length === 0) {
+    return res.status(400).json({ error: 'Selecciona una imagen del recibo para continuar.' });
+  }
+  if (bytes.length > recibosPagoService.MAX_BYTES) {
+    return res.status(413).json({ error: 'El recibo debe pesar máximo 5 MB.' });
+  }
+  if (!recibosPagoService.MIME_TYPES.includes(contentType)) {
+    return res.status(415).json({ error: 'El recibo debe ser una imagen JPG, PNG o WEBP.' });
+  }
+
+  const esJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const esPng = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const esWebp = bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+  const tipoValido = (contentType === 'image/jpeg' && esJpeg) ||
+    (contentType === 'image/png' && esPng) ||
+    (contentType === 'image/webp' && esWebp);
+  if (!tipoValido) {
+    return res.status(400).json({ error: 'El archivo no coincide con el formato de imagen indicado.' });
+  }
+
+  try {
+    const { data: factura, error: errorFactura } = await invoiceModel.getOwn(facturaId, userId, {
+      columns: 'id, perfil_id, valor_total, estado',
+      db: req.db,
+    });
+    if (errorFactura || !factura) {
+      return res.status(404).json({ error: 'Factura no encontrada o no te pertenece.' });
+    }
+    if (factura.estado === 'pagada') return res.status(400).json({ error: 'Esta factura ya fue pagada.' });
+    if (factura.estado === 'anulada') return res.status(400).json({ error: 'Esta factura está anulada.' });
+
+    const { data: pendiente, error: errorPendiente } = await paymentModel.findPendingByInvoice(facturaId, req.db);
+    if (errorPendiente) return errorConsulta(res, errorPendiente);
+    if (pendiente) {
+      return res.status(409).json({ error: 'Ya existe un pago pendiente de revisión para esta factura.' });
+    }
+
+    const { path, error: errorSubida } = await recibosPagoService.subirRecibo({
+      perfilId: userId,
+      facturaId,
+      bytes,
+      contentType,
+    });
+    if (errorSubida) {
+      console.error('[pagos] error guardando recibo:', errorSubida.message);
+      return res.status(502).json({ error: 'No se pudo guardar el recibo. Intenta de nuevo.' });
+    }
+
+    const { data: pago, error: errorPago } = await paymentModel.create({
+      factura_id: facturaId,
+      perfil_id: userId,
+      monto: factura.valor_total,
+      metodo: 'fisico',
+      referencia: path,
+    }, req.db);
+
+    if (errorPago) {
+      await recibosPagoService.eliminarRecibo(path);
+      return errorConsulta(res, errorPago);
+    }
+
+    return res.status(201).json({
+      message: 'Recibo enviado. El pago queda pendiente de revisión.',
+      pago,
+    });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
 // ---------- ADMINISTRADOR ----------
 
 // Listar pagos, con filtro opcional ?confirmado=true|false y ?perfil_id=
@@ -156,7 +263,7 @@ async function listarPagos(req, res) {
     const { data, error } = await paymentModel.list({ confirmado, perfil_id, limit, offset });
     if (error) return errorConsulta(res, error);
 
-    return res.status(200).json(data);
+    return res.status(200).json(await agregarUrlsRecibos(data || []));
   } catch (err) {
     return errorInesperado(res, err);
   }
@@ -312,7 +419,7 @@ async function eliminarPago(req, res) {
   try {
     const { data: pago, error: errorBusqueda } = await paymentModel.getById(
       id,
-      'id, confirmado, perfil_id, factura_id, monto, metodo'
+      'id, confirmado, perfil_id, factura_id, monto, metodo, referencia'
     );
 
     if (errorBusqueda || !pago) {
@@ -343,6 +450,7 @@ async function eliminarPago(req, res) {
         metodo: pago.metodo,
       },
     });
+    if (pago.metodo === 'fisico') await recibosPagoService.eliminarRecibo(pago.referencia);
 
     return res.status(200).json({ message: 'Pago eliminado', pago: data });
   } catch (err) {
@@ -353,6 +461,7 @@ async function eliminarPago(req, res) {
 module.exports = {
   misPagos,
   registrarPago,
+  registrarPagoFisicoConRecibo,
   listarPagos,
   listarPagosWompi,
   confirmarPagoManual,

@@ -12,6 +12,7 @@ class Pago {
     this.fechaPago,
     this.fechaConfirmacion,
     this.estadoWompi,
+    this.reciboUrl,
   });
 
   final String id;
@@ -23,10 +24,17 @@ class Pago {
   final DateTime? fechaPago;
   final DateTime? fechaConfirmacion;
   final String? estadoWompi; // APPROVED | DECLINED | VOIDED | ERROR
+  final String? reciboUrl;
 
   /// `true` si el pago llegó por Wompi y fue rechazado/anulado.
   bool get rechazado =>
-      estadoWompi != null && estadoWompi != 'APPROVED' && !confirmado;
+      const {
+        'DECLINED',
+        'VOIDED',
+        'ERROR',
+        'MONTO_INVALIDO',
+      }.contains(estadoWompi) &&
+      !confirmado;
 
   factory Pago.fromJson(Map<String, dynamic> json) {
     return Pago(
@@ -43,6 +51,9 @@ class Pago {
       estadoWompi: (json['estado_wompi']?.toString().trim().isEmpty ?? true)
           ? null
           : json['estado_wompi'].toString(),
+      reciboUrl: (json['recibo_url']?.toString().trim().isEmpty ?? true)
+          ? null
+          : json['recibo_url'].toString(),
     );
   }
 

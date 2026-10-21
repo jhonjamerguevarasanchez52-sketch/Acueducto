@@ -76,17 +76,10 @@ async function crearUsuario(req, res) {
       await enviarCorreo({
         to: correo,
         subject: 'Tu cuenta en Acueducto Campo Amor',
-<<<<<<< HEAD
         html: `<p>Hola ${escaparHtml(nombre)},</p>
           <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
           <h2>${escaparHtml(passwordTemporal)}</h2>
           <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
-=======
-        html: `<p>Hola ${nombre},</p>
-               <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
-               <h2>${passwordTemporal}</h2>
-               <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
->>>>>>> 318467a21773f1e7432eb8e34afaf8d85b351590
       });
     } catch (mailErr) {
       console.error('Error enviando correo de cuenta creada:', mailErr.message);

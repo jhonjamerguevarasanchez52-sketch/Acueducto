@@ -59,6 +59,24 @@ class ApiService {
       .post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
       .timeout(_timeout));
 
+  Future<dynamic> postBytes(
+    String path, {
+    required List<int> bytes,
+    required String contentType,
+  }) =>
+      _send(
+        () => _client
+            .post(
+              _uri(path),
+              headers: {
+                'Content-Type': contentType,
+                if (authToken != null) 'Authorization': 'Bearer $authToken',
+              },
+              body: bytes,
+            )
+            .timeout(_timeout),
+      );
+
   Future<dynamic> put(String path, {Object? body}) => _send(() => _client
       .put(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
       .timeout(_timeout));

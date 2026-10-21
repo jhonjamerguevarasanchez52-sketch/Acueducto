@@ -1208,10 +1208,11 @@ function App() {
                       </td>
                       <td>{formatInvoiceNumber(invoices.find((invoice) => invoice.id === payment.factura_id) || { id: payment.factura_id })}</td>
                       <td>{formatMoney(payment.monto)}</td>
-                      <td>{payment.metodo || '—'}</td>
+                      <td>{payment.metodo === 'fisico' ? 'Pago físico' : payment.metodo === 'wompi' ? 'Wompi' : payment.metodo || '—'}</td>
                       <td>{formatDate(payment.fecha_pago)}</td>
                       <td>{payment.confirmado ? 'Confirmado' : 'Pendiente'}</td>
                       <td className="row-actions">
+                        {payment.recibo_url && <a className="link-button" href={payment.recibo_url} target="_blank" rel="noreferrer">Ver recibo</a>}
                         {!payment.confirmado && <>
                           <button type="button" className="link-button" onClick={() => performAction('pagos', `${endpoints.pagos}/${payment.id}/confirmar`, 'PUT')}>Confirmar</button>
                           <button type="button" className="link-button danger-link" onClick={() => performAction('pagos', `${endpoints.pagos}/${payment.id}`, 'DELETE', undefined, '¿Eliminar este pago pendiente?')}>Eliminar</button>

@@ -4,7 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/factura.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import '../services/pago_checkout_service.dart';
+import '../services/recibo_pago_service.dart';
+import '../services/wompi_checkout_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formato.dart';
 import '../widgets/core/core.dart';
@@ -34,14 +35,14 @@ class _FacturasScreenState extends State<FacturasScreen>
   }
 
   @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) _refrescar();
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refrescar();
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<List<Factura>> _cargar() async {
@@ -65,18 +66,43 @@ class _FacturasScreenState extends State<FacturasScreen>
     if (eleccion == null || !mounted) return;
 
     try {
-      await PagoCheckoutService.procesar(
-        api: context.read<AuthProvider>().api,
-        facturaId: factura.id,
-        metodo: eleccion.metodo,
-        referencia: eleccion.referencia,
+      if (eleccion.metodo == 'wompi') {
+        await WompiCheckoutService.pagar(
+          context.read<AuthProvider>().api,
+          factura.id,
+        );
+        if (!mounted) return;
+        AppSnackbar.success(
+          context,
+          'Checkout abierto. El estado se actualizará al volver.',
+        );
+        _refrescar();
+        return;
+      }
+      if (eleccion.metodo == 'fisico') {
+        final subido = await ReciboPagoService.subir(
+          context.read<AuthProvider>().api,
+          factura.id,
+        );
+        if (!mounted) return;
+        if (subido) {
+          AppSnackbar.success(context, 'Recibo enviado. Pago pendiente de revisión.');
+          _refrescar();
+        }
+        return;
+      }
+      await context.read<AuthProvider>().api.post(
+        '/pagos',
+        body: {
+          'factura_id': factura.id,
+          'metodo': eleccion.metodo,
+          if (eleccion.referencia != null) 'referencia': eleccion.referencia,
+        },
       );
       if (!mounted) return;
       AppSnackbar.success(
         context,
-        eleccion.metodo == 'wompi'
-            ? 'Continúa el pago en Wompi. La factura se actualizará al confirmarse.'
-            : 'Pago registrado. Queda pendiente de confirmación.',
+        'Pago registrado. Queda pendiente de confirmación.',
       );
       _refrescar();
     } on ApiException catch (e) {

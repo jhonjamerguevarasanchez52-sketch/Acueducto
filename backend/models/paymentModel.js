@@ -39,6 +39,7 @@ function findPendingByInvoice(invoiceId, db = supabaseAdmin) {
     .select('*')
     .eq('factura_id', invoiceId)
     .eq('confirmado', false)
+    .or('estado_wompi.is.null,estado_wompi.in.(PENDING,APPROVED_NO_APLICADO,MONTO_INVALIDO)')
     .order('fecha_pago', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -50,7 +51,7 @@ function countByInvoice(invoiceId) {
 }
 
 // Todo pago nuevo nace sin confirmar y con la fecha actual.
-function create({ factura_id, perfil_id, monto, metodo, referencia }, db = supabaseAdmin) {
+function create({ factura_id, perfil_id, monto, metodo, referencia, estado_wompi }, db = supabaseAdmin) {
   return db
     .from(TABLE)
     .insert({
@@ -61,6 +62,7 @@ function create({ factura_id, perfil_id, monto, metodo, referencia }, db = supab
       referencia: referencia || null,
       confirmado: false,
       fecha_pago: new Date().toISOString(),
+      estado_wompi: estado_wompi || null,
     })
     .select()
     .single();

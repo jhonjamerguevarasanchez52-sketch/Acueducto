@@ -33,7 +33,7 @@ function listByProfile(profileId, db) {
 function latestByProfile(profileId, limit = 3) {
   return supabaseAdmin
     .from(TABLE)
-    .select('descripcion, estado, fecha_reporte')
+    .select('descripcion, estado, fecha_reporte, zona, direccion, nota_fontanero, fecha_resolucion')
     .eq('perfil_id', profileId)
     .order('fecha_reporte', { ascending: false })
     .limit(limit);
