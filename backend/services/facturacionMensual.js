@@ -49,6 +49,11 @@ function esDuplicado(error) {
   return error && error.code === '23505';
 }
 
+function columnaOpcionalNoDisponible(error, columna) {
+  return error && ['42703', 'PGRST204'].includes(error.code)
+    && String(error.message || '').includes(columna);
+}
+
 async function generarFacturasMensuales({
   periodo = periodoAnterior(),
   fechaEmision = new Date(),
@@ -65,7 +70,7 @@ async function generarFacturasMensuales({
 
   const { data: existentes, error: errorExistentes } = await db
     .from('invoices')
-    .select('id, perfil_id, generada_automaticamente, correo_factura_enviado_at')
+    .select('*')
     .eq('periodo', periodo)
     .eq('tipo', 'servicio');
   if (errorExistentes) {
@@ -91,7 +96,7 @@ async function generarFacturasMensuales({
       resumen.facturasExistentes += 1;
       if (!factura.generada_automaticamente || factura.correo_factura_enviado_at) continue;
     } else {
-      const { data, error: errorFactura } = await db
+      let resultadoFactura = await db
         .from('invoices')
         .insert({
           perfil_id: perfil.id,
@@ -105,6 +110,24 @@ async function generarFacturasMensuales({
         })
         .select()
         .single();
+
+      if (columnaOpcionalNoDisponible(resultadoFactura.error, 'generada_automaticamente')) {
+        resultadoFactura = await db
+          .from('invoices')
+          .insert({
+            perfil_id: perfil.id,
+            periodo,
+            tipo: 'servicio',
+            valor_total: VALOR_MENSUAL,
+            estado: 'pendiente',
+            fecha_emision: fechaEmision.toISOString(),
+            fecha_vencimiento: vencimiento,
+          })
+          .select()
+          .single();
+      }
+
+      const { data, error: errorFactura } = resultadoFactura;
 
       if (errorFactura) {
         if (esDuplicado(errorFactura)) {
@@ -136,12 +159,14 @@ async function generarFacturasMensuales({
                <p>Puedes consultar el detalle desde la aplicación de Acueducto Campoamor.</p>`,
       });
       if (!respuesta) throw new Error('El servicio de correo no confirmó el envío.');
-      const { error: errorActualizacion } = await db
-        .from('invoices')
-        .update({ correo_factura_enviado_at: new Date().toISOString() })
-        .eq('id', factura.id);
-      if (errorActualizacion) {
-        throw new Error(`Correo enviado, pero no se pudo guardar su estado: ${errorActualizacion.message}`);
+      if (factura && factura.generada_automaticamente) {
+        const { error: errorActualizacion } = await db
+          .from('invoices')
+          .update({ correo_factura_enviado_at: new Date().toISOString() })
+          .eq('id', factura.id);
+        if (errorActualizacion && !columnaOpcionalNoDisponible(errorActualizacion, 'correo_factura_enviado_at')) {
+          throw new Error(`Correo enviado, pero no se pudo guardar su estado: ${errorActualizacion.message}`);
+        }
       }
       resumen.correosEnviados += 1;
     } catch (errorCorreo) {

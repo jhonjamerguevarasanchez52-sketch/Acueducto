@@ -1306,6 +1306,20 @@ th {
   font: inherit;
 }
 
+.create-user-form .checkbox-field,
+.create-user-form label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.create-user-form input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #087f82;
+}
+
 .form-wide {
   grid-column: 1 / -1;
 }

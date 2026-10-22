@@ -131,6 +131,7 @@ const operationDefinitions = {
       { name: 'perfil_id', label: 'Destinatario', type: 'recipient', defaultValue: 'todos' },
       { name: 'tipo', label: 'Tipo', type: 'select', options: ['general', 'servicio', 'factura', 'corte'], defaultValue: 'general' },
       { name: 'mensaje', label: 'Mensaje', type: 'textarea', required: true },
+      { name: 'enviar_correo', label: 'Enviar también al correo', type: 'checkbox', defaultValue: true },
     ],
   },
   editarUsuario: {
@@ -498,7 +499,10 @@ function App() {
         method: definition.method,
         body,
       })
-      setActionMessage(result.message || 'Cambios guardados.')
+      const resumenCorreo = result.correos_enviados === undefined
+        ? ''
+        : ` Correos enviados: ${result.correos_enviados}; fallidos: ${result.correos_fallidos}.`
+      setActionMessage(`${result.message || 'Cambios guardados.'}${resumenCorreo}`)
       setOperationType('')
       await loadSection(definition.section)
     } catch (error) {
@@ -1972,15 +1976,17 @@ function App() {
             </div>
             <form className="create-user-form" onSubmit={handleOperationSubmit}>
               {operationDefinitions[operationType].fields.map((field) => (
-                <label key={field.name} className={field.type === 'textarea' ? 'form-wide' : ''}>
+                <label key={field.name} className={field.type === 'textarea' || field.type === 'checkbox' ? 'form-wide' : ''}>
                   {field.label}
-                  {field.type === 'textarea' ? (
+                  {field.type === 'checkbox' ? (
+                    <input type="checkbox" checked={Boolean(operationForm[field.name])} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.checked })} />
+                  ) : field.type === 'textarea' ? (
                     <textarea value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })} required={field.required} rows={4} />
                   ) : field.type === 'user' || field.type === 'recipient' ? (
                     <select value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })} required={field.required}>
-                      {field.type === 'recipient' && <option value="todos">Todos los usuarios activos</option>}
+                      {field.type === 'recipient' && <option value="todos">{operationType === 'notificacion' ? 'Todos los usuarios registrados' : 'Todos los usuarios activos'}</option>}
                       {field.type === 'user' && <option value="">Selecciona un usuario</option>}
-                      {users.filter((user) => field.type !== 'recipient' || (user.activo && user.rol === 'usuario')).map((user) => <option key={user.id} value={user.id}>{[user.nombre, user.apellido].filter(Boolean).join(' ')} - {user.correo}</option>)}
+                      {users.filter((user) => field.type !== 'recipient' || operationType !== 'facturaExtraordinaria' || (user.rol === 'usuario' && user.activo)).map((user) => <option key={user.id} value={user.id}>{[user.nombre, user.apellido].filter(Boolean).join(' ')} - {user.correo} ({user.rol})</option>)}
                     </select>
                   ) : field.type === 'select' ? (
                     <select value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })} required={field.required}>
