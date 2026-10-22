@@ -61,6 +61,7 @@ function responderAuthNoDisponible(res, error) {
   return res.status(503).json({
     error: 'No pudimos conectar con el servicio de acceso. Revisa tu conexión e inténtalo de nuevo.',
   });
+}
 
 async function verificarCorreoAdministrador(req, res) {
   const correo = normalizarCorreo(req.body.correo);
@@ -103,9 +104,6 @@ async function iniciarSesion(req, res) {
     if (!adminPerfil || adminPerfil.rol !== 'administrador') {
       return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
     }
-    const { data, error } = await authModel.signIn(correo, password);
-
-
     if (error) {
       // No contar fallos de red como intentos de contraseña.
       if (esErrorTransitorioAuth(error)) return responderAuthNoDisponible(res, error);
