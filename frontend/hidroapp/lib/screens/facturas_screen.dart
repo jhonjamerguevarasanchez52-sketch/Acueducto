@@ -67,10 +67,12 @@ class _FacturasScreenState extends State<FacturasScreen>
 
     try {
       if (eleccion.metodo == 'wompi') {
-        await WompiCheckoutService.pagar(
+        final abierto = await WompiCheckoutService.pagar(
+          context,
           context.read<AuthProvider>().api,
           factura.id,
         );
+        if (!abierto) return;
         if (!mounted) return;
         AppSnackbar.success(
           context,

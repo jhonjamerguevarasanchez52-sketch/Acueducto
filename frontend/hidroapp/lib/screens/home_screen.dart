@@ -65,10 +65,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     try {
       if (eleccion.metodo == 'wompi') {
-        await WompiCheckoutService.pagar(
+        final abierto = await WompiCheckoutService.pagar(
+          context,
           context.read<AuthProvider>().api,
           factura.id,
         );
+        if (!abierto) return;
         if (!mounted) return;
         AppSnackbar.success(
           context,

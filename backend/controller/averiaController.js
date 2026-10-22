@@ -88,8 +88,7 @@ async function reportarAveria(req, res) {
     }
 
     const { data, error } = await breakdownModel.create(
-      { perfil_id: perfilId, descripcion: descripcion.trim(), zona: zonaReporte, direccion: direccionReporte },
-      req.db
+      { perfil_id: perfilId, descripcion: descripcion.trim(), zona: zonaReporte, direccion: direccionReporte }
     );
 
     if (error) return errorConsulta(res, error);
