@@ -35,7 +35,13 @@ function listActiveIds() {
 }
 
 function listActiveForBilling() {
-  return supabaseAdmin.from(TABLE).select('id, nombre, correo').eq('activo', true).eq('rol', 'usuario');
+  // La facturación mensual y su correo incluyen a todos los perfiles activos,
+  // también administradores y fontaneros.
+  return supabaseAdmin.from(TABLE).select('id, nombre, correo').eq('activo', true);
+}
+
+function listRegisteredUsersForNotifications() {
+  return supabaseAdmin.from(TABLE).select('id, nombre, correo, rol');
 }
 
 function create(datos) {
@@ -68,6 +74,7 @@ module.exports = {
   list,
   listActiveIds,
   listActiveForBilling,
+  listRegisteredUsersForNotifications,
   create,
   update,
   saveFields,

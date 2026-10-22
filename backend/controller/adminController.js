@@ -1,5 +1,6 @@
 const authModel = require('../models/authModel');
 const profileModel = require('../models/profileModel');
+const breakdownModel = require('../models/breakdownModel');
 const { CAMPOS_EDITABLES_PERFIL } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
@@ -245,6 +246,11 @@ async function eliminarUsuario(req, res) {
   }
 
   try {
+    // Quita primero la asignación activa para que la eliminación también
+    // funcione en bases antiguas cuya FK aún no tiene ON DELETE SET NULL.
+    const { error: errorAverias } = await breakdownModel.unassignFromPlumber(userId);
+    if (errorAverias) return errorConsulta(res, errorAverias);
+
     const { error } = await authModel.deleteUser(userId);
 
     if (error) {

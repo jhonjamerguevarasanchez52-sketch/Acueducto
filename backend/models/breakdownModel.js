@@ -29,6 +29,11 @@ function listByProfile(profileId, db) {
   return db.from(TABLE).select('*').eq('perfil_id', profileId).order('fecha_reporte', { ascending: false });
 }
 
+// Conserva el historial de averías cuando se elimina la cuenta del fontanero.
+function unassignFromPlumber(profileId) {
+  return supabaseAdmin.from(TABLE).update({ fontanero_id: null }).eq('fontanero_id', profileId);
+}
+
 // Últimas averías de un perfil (contexto del chatbot).
 function latestByProfile(profileId, limit = 3) {
   return supabaseAdmin
@@ -46,4 +51,4 @@ function list({ estado, limit, offset } = {}) {
   return aplicarPaginacion(query, { limit, offset });
 }
 
-module.exports = { create, listByProfile, latestByProfile, list, ...crudBase(TABLE) };
+module.exports = { create, listByProfile, latestByProfile, list, unassignFromPlumber, ...crudBase(TABLE) };
