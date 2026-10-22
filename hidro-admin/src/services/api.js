@@ -52,6 +52,7 @@ export async function apiRequest(path, options = {}) {
 
 export const endpoints = {
   login: '/auth/login',
+  verifyAdminEmail: '/auth/verificar-administrador',
   changePassword: '/auth/cambiar-password',
   requestPasswordReset: '/auth/solicitar-recuperacion',
   resetPassword: '/auth/resetear-password',

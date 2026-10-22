@@ -77,6 +77,7 @@ const operationDefinitions = {
   facturaExtraordinaria: {
     title: 'Factura extraordinaria', section: 'facturas', endpoint: endpoints.facturaExtraordinaria, method: 'POST',
     fields: [
+      { name: 'perfil_ids', label: 'Destinatarios', type: 'recipient', required: true, defaultValue: 'todos' },
       { name: 'periodo', label: 'Periodo', required: true },
       { name: 'valor_total', label: 'Valor total', type: 'number', required: true },
       { name: 'concepto', label: 'Concepto', required: true },
@@ -130,6 +131,7 @@ const operationDefinitions = {
       { name: 'perfil_id', label: 'Destinatario', type: 'recipient', defaultValue: 'todos' },
       { name: 'tipo', label: 'Tipo', type: 'select', options: ['general', 'servicio', 'factura', 'corte'], defaultValue: 'general' },
       { name: 'mensaje', label: 'Mensaje', type: 'textarea', required: true },
+      { name: 'enviar_correo', label: 'Enviar también al correo', type: 'checkbox', defaultValue: true },
     ],
   },
   editarUsuario: {
@@ -164,6 +166,8 @@ function App() {
   const [sessionStatus, setSessionStatus] = useState(getToken() ? 'checking' : 'signed-out')
   const [profile, setProfile] = useState(null)
   const [email, setEmail] = useState('')
+  const [emailIsAdmin, setEmailIsAdmin] = useState(null)
+  const [checkingAdminEmail, setCheckingAdminEmail] = useState(false)
   const [password, setPassword] = useState('')
   const [recoveryCode, setRecoveryCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -206,6 +210,9 @@ function App() {
   const [invoicePreview, setInvoicePreview] = useState(null)
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
+  const now = new Date()
+  const [reportFrom, setReportFrom] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`)
+  const [reportTo, setReportTo] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`)
 
   const filterRows = (rows) => {
     const query = searchQuery.trim().toLocaleLowerCase('es')
@@ -287,6 +294,9 @@ function App() {
     setSearchQuery('')
     loadSection(section)
     if (section === 'facturas' || section === 'pagos') void ensureUsersLoaded()
+    if (section === 'reportes') {
+      void Promise.all(['usuarios', 'facturas', 'pagos'].map((name) => loadSection(name)))
+    }
   }
 
   const handleCreateUser = async (event) => {
@@ -459,12 +469,23 @@ function App() {
       )
       if (!confirmar) return
     }
+    if (operationType === 'facturaExtraordinaria' && operationForm.perfil_ids === 'todos') {
+      const cantidad = users.filter((user) => user.activo && user.rol === 'usuario').length
+      const total = cantidad * Number(operationForm.valor_total || 0)
+      const confirmar = window.confirm(
+        `Se generarÃ¡ una factura extraordinaria por ${formatMoney(operationForm.valor_total)} a cada uno de los ${cantidad} usuarios activos. Total: ${formatMoney(total)}. Concepto: ${operationForm.concepto}. Â¿Continuar?`,
+      )
+      if (!confirmar) return
+    }
     const body = Object.fromEntries(definition.fields
-      .filter((field) => operationForm[field.name] !== '')
+      .filter((field) => field.type !== 'recipient' && operationForm[field.name] !== '')
       .map((field) => [
         field.name,
         field.type === 'number' ? Number(operationForm[field.name]) : operationForm[field.name],
       ]))
+    if (operationType === 'facturaExtraordinaria' && operationForm.perfil_ids !== 'todos') {
+      body.perfil_ids = [operationForm.perfil_ids]
+    }
     const suffix = operationType === 'editarUsuario' || operationType === 'editarTarifa' || operationType === 'editarFactura'
       ? `/${operationItem.id}`
       : ''
@@ -478,7 +499,10 @@ function App() {
         method: definition.method,
         body,
       })
-      setActionMessage(result.message || 'Cambios guardados.')
+      const resumenCorreo = result.correos_enviados === undefined
+        ? ''
+        : ` Correos enviados: ${result.correos_enviados}; fallidos: ${result.correos_fallidos}.`
+      setActionMessage(`${result.message || 'Cambios guardados.'}${resumenCorreo}`)
       setOperationType('')
       await loadSection(definition.section)
     } catch (error) {
@@ -574,6 +598,8 @@ function App() {
     setAuthNotice('')
 
     try {
+      const adminCheck = await apiRequest(endpoints.verifyAdminEmail, { method: 'POST', body: { correo: email } })
+      if (!adminCheck.esAdministrador) throw new Error('Este correo no está registrado en la base de datos.')
       await login(email, password)
       const currentProfile = await apiRequest(endpoints.profile)
       if (currentProfile.rol !== 'administrador') {
@@ -587,6 +613,28 @@ function App() {
       setAuthError(error.message || 'No fue posible iniciar sesión')
     } finally {
       setIsLoggingIn(false)
+    }
+  }
+
+  const checkAdminEmail = async () => {
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail) {
+      setEmailIsAdmin(false)
+      setAuthError('Ingresa el correo de un administrador.')
+      return false
+    }
+    setCheckingAdminEmail(true)
+    try {
+      await apiRequest(endpoints.verifyAdminEmail, { method: 'POST', body: { correo: normalizedEmail } })
+      setEmailIsAdmin(true)
+      setAuthError('')
+      return true
+    } catch (error) {
+      setEmailIsAdmin(false)
+      setAuthError(error.message || 'Este correo no está registrado en la base de datos.')
+      return false
+    } finally {
+      setCheckingAdminEmail(false)
     }
   }
 
@@ -667,6 +715,16 @@ function App() {
     setAuthError('')
     setAuthNotice('')
 
+    try {
+      const adminCheck = await apiRequest(endpoints.verifyAdminEmail, { method: 'POST', body: { correo: email } })
+      if (!adminCheck.esAdministrador) throw new Error('Este correo no está registrado en la base de datos.')
+      setEmailIsAdmin(true)
+    } catch (error) {
+      setEmailIsAdmin(false)
+      setAuthError(error.message || 'Este correo no está registrado en la base de datos.')
+      return
+    }
+
     if (authMode === 'reset' && newPassword !== confirmNewPassword) {
       setAuthError('Las contraseñas no coinciden.')
       return
@@ -721,38 +779,22 @@ function App() {
     }
   }
 
-  const handleExportPayments = () => {
-    const rows = sectionData.pagos || []
-    if (rows.length === 0) {
-      setActionError('No hay pagos cargados para exportar.')
-      return
-    }
-
-    const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))]
-    const quote = (value) => {
-      const text = String(value ?? '')
-      const safeText = /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text
-      return `"${safeText.replaceAll('"', '""')}"`
-    }
-    const csv = [columns, ...rows.map((row) => columns.map((column) => row[column]))]
-      .map((line) => line.map(quote).join(','))
-      .join('\r\n')
-    const file = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(file)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `pagos-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-    setActionError('')
-    setActionMessage('Se exportó el listado de pagos.')
-  }
-
   const users = sectionData.usuarios || []
   const invoices = sectionData.facturas || []
   const payments = sectionData.pagos || []
   const cuts = sectionData.cortes || []
   const confirmedPayments = payments.filter((payment) => payment.confirmado)
+  const inReportRange = (value) => {
+    if (!value) return false
+    const day = String(value).slice(0, 10)
+    return (!reportFrom || day >= reportFrom) && (!reportTo || day <= reportTo)
+  }
+  const reportPayments = payments.filter((payment) => inReportRange(payment.fecha_pago))
+  const reportInvoices = invoices.filter((invoice) => inReportRange(invoice.fecha_emision))
+  const reportConfirmedPayments = reportPayments.filter((payment) => payment.confirmado)
+  const reportRevenue = reportConfirmedPayments.reduce((sum, payment) => sum + Number(payment.monto || 0), 0)
+  const reportPendingRevenue = reportPayments.filter((payment) => !payment.confirmado)
+    .reduce((sum, payment) => sum + Number(payment.monto || 0), 0)
   const activeUsers = users.filter((user) => user.activo)
   const pendingInvoices = invoices.filter((invoice) => invoice.estado === 'pendiente')
   const activeCuts = cuts.filter((cut) => cut.estado === 'activo')
@@ -803,6 +845,17 @@ function App() {
     { label: 'Pagos por confirmar', value: metricValue('pagos', payments.filter((payment) => !payment.confirmado).length) },
     { label: 'Cortes activos', value: metricValue('cortes', activeCuts.length) },
   ]
+  const sectionTitles = {
+    dashboard: 'HIDRO-APP',
+    usuarios: 'Usuarios',
+    facturas: 'Facturación',
+    pagos: 'Pagos',
+    cortes: 'Cortes y reconexiones',
+    notificaciones: 'Notificaciones',
+    tarifas: 'Tarifas',
+    reportes: 'Reportes',
+  }
+  const currentSectionTitle = sectionTitles[activeSection] || 'HIDRO-APP'
 
   if (sessionStatus === 'checking') {
     return <main className="auth-shell"><p className="auth-loading">Verificando sesión...</p></main>
@@ -811,10 +864,27 @@ function App() {
   if (sessionStatus !== 'authenticated') {
     return (
       <main className="auth-shell">
+        <section className="auth-showcase" aria-label="Acueducto Campoamor">
+          <div className="auth-showcase-top">
+            <img src={hidroAppLogo} alt="" className="auth-brand-logo" />
+            <span>ACUEDUCTO CAMPOAMOR</span>
+          </div>
+          <div className="auth-showcase-copy">
+            <span className="auth-kicker"><span /> SERVICIO Y COMUNIDAD</span>
+            <h2>El agua de nuestra comunidad, bajo control.</h2>
+            <p>Gestiona usuarios, facturación y novedades del servicio desde un solo lugar.</p>
+          </div>
+          <div className="auth-showcase-footer">
+            <div className="auth-watermark"><Waves size={118} strokeWidth={1} /></div>
+            <span>PLATAFORMA DE ADMINISTRACIÓN</span>
+            <span className="auth-status"><i /> Sistema de gestión</span>
+          </div>
+        </section>
         <form className="auth-panel" onSubmit={authMode === 'login' ? handleLogin : handleRecoverySubmit}>
-          <div className="auth-mark"><Waves size={25} /></div>
-          <p className="eyebrow">Acueducto Campoamor</p>
-          <h1>{authMode === 'login' ? 'Panel administrativo' : authMode === 'request-reset' ? 'Recuperar contraseña' : 'Crear contraseña nueva'}</h1>
+          <div className="auth-form-heading">
+            <div className="auth-mark"><Waves size={22} /></div>
+            <p className="eyebrow">BIENVENIDO</p>
+            <h1>{authMode === 'login' ? 'Inicia sesión' : authMode === 'request-reset' ? 'Recupera tu acceso' : 'Crea una contraseña'}</h1>
           <p className="auth-description">
             {authMode === 'login'
               ? 'Ingresa con tu cuenta de administrador.'
@@ -822,13 +892,15 @@ function App() {
                 ? 'Te enviaremos un código al correo de tu cuenta.'
                 : 'Ingresa el código recibido y define una contraseña de al menos 8 caracteres.'}
           </p>
+          </div>
           <label htmlFor="admin-email">Correo electrónico</label>
           <input
             id="admin-email"
             type="email"
             autoComplete="username"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => { setEmail(event.target.value); setEmailIsAdmin(null); setAuthError('') }}
+            onBlur={checkAdminEmail}
             required
           />
           {authMode === 'login' && (
@@ -885,7 +957,10 @@ function App() {
               : authMode === 'login' ? 'Iniciar sesión' : authMode === 'request-reset' ? 'Enviar código' : 'Actualizar contraseña'}
           </button>
           {authMode === 'login' ? (
-            <button type="button" className="link-button auth-link" onClick={() => { setAuthMode('request-reset'); setAuthError(''); setAuthNotice('') }}>
+            <button type="button" className="link-button auth-link" disabled={checkingAdminEmail || emailIsAdmin === false} onClick={async () => {
+              if (emailIsAdmin !== true && !(await checkAdminEmail())) return
+              setAuthMode('request-reset'); setAuthError(''); setAuthNotice('')
+            }}>
               Olvidé mi contraseña
             </button>
           ) : (
@@ -893,6 +968,7 @@ function App() {
               Volver a iniciar sesión
             </button>
           )}
+          <p className="auth-security"><ShieldCheck size={15} /> Acceso seguro para administradores</p>
         </form>
       </main>
     )
@@ -920,9 +996,9 @@ function App() {
               <p className="eyebrow">Estadísticas</p>
               <h3>Ingresos del servicio</h3>
             </div>
-            <button type="button" className="soft-button" onClick={handleExportPayments}>
+            <button type="button" className="soft-button" onClick={() => exportTreasuryWorkbook('pagos')}>
               <Download size={16} />
-              Exportar
+              Excel
             </button>
           </div>
 
@@ -1348,8 +1424,243 @@ function App() {
     </div>
   )
 
+  const exportTreasuryWorkbook = async (report = 'todos') => {
+    const required = report === 'balance' || report === 'pagos'
+      ? ['pagos', 'usuarios', 'facturas']
+      : report === 'facturas'
+        ? ['facturas', 'usuarios']
+        : ['usuarios', 'facturas', 'pagos']
+    const missing = required.find((section) => sectionData[section] === undefined)
+    if (missing) {
+      setActionError(`No fue posible preparar el informe: revisa la carga de ${missing}.`)
+      return
+    }
+    let ExcelJS
+    try {
+      ExcelJS = (await import('exceljs')).default
+    } catch (error) {
+      console.error('No fue posible cargar el generador Excel:', error)
+      setActionError('No se pudo cargar el generador Excel. Reinicia el servidor del panel e inténtalo de nuevo.')
+      return
+    }
+
+    const profileById = new Map(users.map((user) => [user.id, user]))
+    const invoiceById = new Map(invoices.map((invoice) => [invoice.id, invoice]))
+    const userName = (id) => {
+      const user = profileById.get(id)
+      return [user?.nombre, user?.apellido].filter(Boolean).join(' ') || 'Sin nombre'
+    }
+    const paymentRows = reportPayments.map((payment) => {
+      const user = profileById.get(payment.perfil_id)
+      const invoice = invoiceById.get(payment.factura_id)
+      return {
+        Fecha: formatDate(payment.fecha_pago),
+        Suscriptor: userName(payment.perfil_id),
+        Correo: user?.correo || '',
+        Dirección: user?.direccion || user?.zona || '',
+        Factura: formatInvoiceNumber(invoice || { id: payment.factura_id }),
+        Periodo: invoice?.periodo || '',
+        Monto: Number(payment.monto || 0),
+        Método: payment.metodo || '',
+        Estado: payment.confirmado ? 'Confirmado' : 'Pendiente por confirmar',
+        Referencia: payment.referencia || payment.transaccion_id || '',
+        'ID de pago': payment.id,
+      }
+    })
+    const invoiceRows = reportInvoices.map((invoice) => {
+      const user = profileById.get(invoice.perfil_id)
+      return {
+        'Fecha de emisión': formatDate(invoice.fecha_emision),
+        Factura: formatInvoiceNumber(invoice),
+        Periodo: invoice.periodo,
+        Suscriptor: userName(invoice.perfil_id),
+        Correo: user?.correo || '',
+        Dirección: user?.direccion || user?.zona || '',
+        Tipo: invoice.tipo || 'servicio',
+        Valor: Number(invoice.valor_total || 0),
+        Estado: invoice.estado,
+        Vencimiento: formatDate(invoice.fecha_vencimiento),
+        Observación: invoice.observacion || '',
+      }
+    })
+    const accountRows = users.filter((user) => user.rol === 'usuario').map((user) => {
+      const billed = reportInvoices.filter((invoice) => invoice.perfil_id === user.id)
+        .reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0)
+      const paid = reportConfirmedPayments.filter((payment) => payment.perfil_id === user.id)
+        .reduce((sum, payment) => sum + Number(payment.monto || 0), 0)
+      const dueInvoices = reportInvoices.filter((invoice) => invoice.perfil_id === user.id && ['pendiente', 'vencida'].includes(invoice.estado))
+      return {
+        Suscriptor: [user.nombre, user.apellido].filter(Boolean).join(' '),
+        Correo: user.correo || '',
+        Teléfono: user.telefono || '',
+        Dirección: user.direccion || user.zona || '',
+        Lote: user.numero_lote || '',
+        Estado: user.activo ? 'Activo' : 'Inactivo',
+        'Facturado en el periodo': billed,
+        'Pagado confirmado en el periodo': paid,
+        'Saldo de facturas pendientes': dueInvoices.reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0),
+        'Facturas pendientes': dueInvoices.length,
+      }
+    })
+    const monthlyTotals = new Map()
+    reportConfirmedPayments.forEach((payment) => {
+      const month = String(payment.fecha_pago || '').slice(0, 7) || 'Sin fecha'
+      monthlyTotals.set(month, (monthlyTotals.get(month) || 0) + Number(payment.monto || 0))
+    })
+    const balanceRows = [
+      { Concepto: 'Ingresos recibidos y confirmados', Cantidad: reportConfirmedPayments.length, Valor: reportRevenue },
+      { Concepto: 'Pagos pendientes de confirmar', Cantidad: reportPayments.filter((payment) => !payment.confirmado).length, Valor: reportPendingRevenue },
+      { Concepto: 'Facturas emitidas', Cantidad: reportInvoices.length, Valor: reportInvoices.reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0) },
+      { Concepto: 'Facturas pendientes o vencidas', Cantidad: reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).length, Valor: reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0) },
+      ...[...monthlyTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, value]) => ({ Concepto: `Recaudo confirmado · ${month}`, Cantidad: '', Valor: value })),
+    ]
+    const sheetRows = {
+      balance: { 'Balance de ingresos': balanceRows },
+      pagos: { 'Pagos de usuarios': paymentRows },
+      facturas: { 'Facturas emitidas': invoiceRows },
+      usuarios: { 'Estado por usuario': accountRows },
+      todos: {
+        'Balance de ingresos': balanceRows,
+        'Pagos de usuarios': paymentRows,
+        'Facturas emitidas': invoiceRows,
+        'Estado por usuario': accountRows,
+      },
+    }
+    const workbook = new ExcelJS.Workbook()
+    workbook.creator = 'HIDRO-APP · Acueducto Campoamor'
+    workbook.subject = 'Informes de tesorería'
+    workbook.title = `Informe ${report}`
+    workbook.created = new Date()
+    const logoResponse = await fetch(hidroAppLogo)
+    const logoBlob = await logoResponse.blob()
+    const logoBitmap = await createImageBitmap(logoBlob)
+    const watermarkCanvas = document.createElement('canvas')
+    watermarkCanvas.width = logoBitmap.width
+    watermarkCanvas.height = logoBitmap.height
+    const watermarkContext = watermarkCanvas.getContext('2d')
+    watermarkContext.globalAlpha = 0.075
+    watermarkContext.drawImage(logoBitmap, 0, 0)
+    const watermarkBase64 = watermarkCanvas.toDataURL('image/png').split(',')[1]
+    const logoBase64 = await logoBlob.arrayBuffer().then((buffer) => {
+      let binary = ''
+      new Uint8Array(buffer).forEach((byte) => { binary += String.fromCharCode(byte) })
+      return btoa(binary)
+    })
+    const brandImage = workbook.addImage({ base64: logoBase64, extension: 'png' })
+    const watermarkImage = workbook.addImage({ base64: watermarkBase64, extension: 'png' })
+    const reportTitles = {
+      balance: 'Balance de ingresos',
+      pagos: 'Pagos de usuarios',
+      facturas: 'Facturas emitidas',
+      usuarios: 'Estado de cuenta por usuario',
+      todos: 'Informe integral de tesorería',
+    }
+    Object.entries(sheetRows[report]).forEach(([name, rows]) => {
+      const safeRows = rows.length ? rows : [{ 'Sin registros en el periodo': 'No hay información para las fechas seleccionadas.' }]
+      const columns = Object.keys(safeRows[0])
+      const worksheet = workbook.addWorksheet(name, {
+        views: [{ state: 'frozen', ySplit: 4 }],
+        pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+      })
+      worksheet.columns = columns.map((key) => ({
+        key,
+        width: Math.min(34, Math.max(key.length + 3, ...safeRows.slice(0, 100).map((row) => String(row[key] ?? '').length + 2))),
+      }))
+      worksheet.mergeCells(1, 1, 1, columns.length)
+      worksheet.mergeCells(2, 1, 2, columns.length)
+      worksheet.getCell('A1').value = `${reportTitles[report]} · ${name}`
+      worksheet.getCell('A1').font = { name: 'Aptos Display', size: 18, bold: true, color: { argb: 'FFFFFFFF' } }
+      worksheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left', indent: 3 }
+      worksheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF123B5D' } }
+      worksheet.getCell('A2').value = `ACUEDUCTO CAMPOAMOR  |  Periodo: ${reportFrom || 'Sin límite'} al ${reportTo || 'Sin límite'}  |  Generado: ${new Date().toLocaleString('es-CO')}`
+      worksheet.getCell('A2').font = { name: 'Aptos', size: 10, color: { argb: 'FF426579' }, italic: true }
+      worksheet.getCell('A2').alignment = { vertical: 'middle', horizontal: 'left', indent: 3 }
+      worksheet.getRow(1).height = 43
+      worksheet.getRow(2).height = 25
+      worksheet.getRow(3).height = 9
+      worksheet.addImage(brandImage, { tl: { col: 0.18, row: 0.08 }, ext: { width: 38, height: 38 } })
+      worksheet.addImage(watermarkImage, { tl: { col: Math.max(1, columns.length - 4), row: 5 }, ext: { width: 190, height: 190 } })
+      const header = worksheet.getRow(4)
+      header.values = columns
+      header.height = 30
+      header.eachCell((cell) => {
+        cell.font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF087F82' } }
+        cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true }
+        cell.border = { bottom: { style: 'medium', color: { argb: 'FF65C9B5' } } }
+      })
+      safeRows.forEach((record, index) => {
+        const row = worksheet.addRow(columns.map((column) => record[column] ?? ''))
+        row.height = 23
+        row.eachCell((cell, columnNumber) => {
+          cell.font = { name: 'Aptos', size: 10, color: { argb: 'FF263B4D' } }
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: index % 2 === 0 ? 'FFF2F8FA' : 'FFFFFFFF' } }
+          cell.alignment = { vertical: 'middle', horizontal: typeof cell.value === 'number' ? 'right' : 'left' }
+          cell.border = { bottom: { style: 'hair', color: { argb: 'FFDCE8EC' } } }
+          const headerName = columns[columnNumber - 1]
+          if (/monto|valor|facturado|pagado|saldo/i.test(headerName) && typeof cell.value === 'number') {
+            cell.numFmt = '"$" #,##0;[Red]-"$" #,##0'
+            cell.font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FF145B4B' } }
+          }
+          if (headerName === 'Estado') {
+            const status = String(cell.value || '').toLowerCase()
+            const color = status.includes('confirmado') || status === 'pagada' || status === 'activo'
+              ? 'FFE1F4EB'
+              : status.includes('pendiente') || status === 'vencida'
+                ? 'FFFFF1D8'
+                : status === 'anulada' || status === 'inactivo' ? 'FFFCE6E6' : null
+            if (color) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } }
+          }
+        })
+      })
+      worksheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: Math.max(4, worksheet.rowCount), column: columns.length } }
+      worksheet.getColumn(1).alignment = { vertical: 'middle' }
+      worksheet.headerFooter.oddFooter = '&L&HAcueducto Campoamor&CInforme de tesorería&R&P de &N'
+    })
+    const suffix = `${reportFrom || 'inicio'}-${reportTo || 'hoy'}`
+    const buffer = await workbook.xlsx.writeBuffer()
+    const file = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(file)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `informe-${report}-${suffix}.xlsx`
+    link.click()
+    URL.revokeObjectURL(url)
+    setActionError('')
+    setActionMessage('Informe Excel descargado. Los ingresos incluyen solo pagos confirmados.')
+  }
+
   const renderReportes = () => (
     <>
+      <section className="panel treasury-report-panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Tesorería</p>
+            <h3>Informes financieros del acueducto</h3>
+            <p className="report-caption">Consulta recaudos confirmados, pagos pendientes y facturación por periodo.</p>
+          </div>
+          <button type="button" className="primary-button" onClick={() => exportTreasuryWorkbook('todos')}>
+            <Download size={16} /> Descargar informes Excel
+          </button>
+        </div>
+        <div className="report-filters">
+          <label>Desde<input type="date" value={reportFrom} max={reportTo || undefined} onChange={(event) => setReportFrom(event.target.value)} /></label>
+          <label>Hasta<input type="date" value={reportTo} min={reportFrom || undefined} onChange={(event) => setReportTo(event.target.value)} /></label>
+          <span>Periodo aplicado a pagos y facturas emitidas</span>
+        </div>
+        <div className="treasury-kpis">
+          <div><span>Ingresos recaudados</span><strong>{sectionErrors.pagos ? '—' : formatMoney(reportRevenue)}</strong><small>{reportConfirmedPayments.length} pagos confirmados</small></div>
+          <div><span>Pagos por confirmar</span><strong>{sectionErrors.pagos ? '—' : formatMoney(reportPendingRevenue)}</strong><small>{reportPayments.filter((payment) => !payment.confirmado).length} transacciones</small></div>
+          <div><span>Facturas emitidas</span><strong>{sectionErrors.facturas ? '—' : formatMoney(reportInvoices.reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0))}</strong><small>{reportInvoices.length} facturas del periodo</small></div>
+          <div><span>Facturas pendientes</span><strong>{sectionErrors.facturas ? '—' : reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).length}</strong><small>Incluye vencidas</small></div>
+        </div>
+        <div className="report-downloads">
+          <button type="button" className="secondary-button" onClick={() => exportTreasuryWorkbook('balance')}><Download size={15} /> Balance de ingresos</button>
+          <button type="button" className="secondary-button" onClick={() => exportTreasuryWorkbook('pagos')}><Download size={15} /> Pagos de usuarios</button>
+          <button type="button" className="secondary-button" onClick={() => exportTreasuryWorkbook('facturas')}><Download size={15} /> Facturas emitidas</button>
+          <button type="button" className="secondary-button" onClick={() => exportTreasuryWorkbook('usuarios')}><Download size={15} /> Estado por usuario</button>
+        </div>
+      </section>
       <section className="analytics-grid">
         <div className="panel chart-panel large-panel">
           <div className="panel-header">
@@ -1434,8 +1745,8 @@ function App() {
               <Menu size={18} />
             </button>
             <div>
-              <p className="eyebrow">Panel administrativo</p>
-              <h1>HIDRO-APP</h1>
+              <p className="eyebrow">Panel administrativo · Acueducto Campoamor</p>
+              <h1>{currentSectionTitle}</h1>
             </div>
           </div>
 
@@ -1464,8 +1775,8 @@ function App() {
         <main className="content" aria-live="polite">
           <section className="hero-panel">
             <div>
-              <p className="eyebrow">Resumen operativo</p>
-              <h2>Control central del acueducto</h2>
+              <p className="eyebrow">{activeSection === 'dashboard' ? 'Resumen operativo' : `Gestión de ${currentSectionTitle.toLocaleLowerCase('es')}`}</p>
+              <h2>{activeSection === 'dashboard' ? 'Control central del acueducto' : currentSectionTitle}</h2>
             </div>
             <div className="hero-actions">
               {quickActions.map(({ label, section, icon: Icon }) => (
@@ -1583,7 +1894,7 @@ function App() {
             </div>
             <p className="bulk-help">
               Sube un archivo CSV UTF-8 o Excel (.xlsx) con las columnas <strong>nombre, apellido, correo</strong> y, opcionalmente, <strong>rol</strong>.
-              Si omites el rol, se asignará “usuario”. Máximo {MAX_BULK_USERS} usuarios y 5 MB por archivo.
+              Si omites el rol, se asignará “usuario�?. Máximo {MAX_BULK_USERS} usuarios y 5 MB por archivo.
             </p>
             <button type="button" className="link-button bulk-template-button" onClick={handleDownloadUsersTemplate}>
               <Download size={16} />
@@ -1666,15 +1977,17 @@ function App() {
             </div>
             <form className="create-user-form" onSubmit={handleOperationSubmit}>
               {operationDefinitions[operationType].fields.map((field) => (
-                <label key={field.name} className={field.type === 'textarea' ? 'form-wide' : ''}>
+                <label key={field.name} className={field.type === 'textarea' || field.type === 'checkbox' ? 'form-wide' : ''}>
                   {field.label}
-                  {field.type === 'textarea' ? (
+                  {field.type === 'checkbox' ? (
+                    <input type="checkbox" checked={Boolean(operationForm[field.name])} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.checked })} />
+                  ) : field.type === 'textarea' ? (
                     <textarea value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })} required={field.required} rows={4} />
                   ) : field.type === 'user' || field.type === 'recipient' ? (
                     <select value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })} required={field.required}>
-                      {field.type === 'recipient' && <option value="todos">Todos los usuarios activos</option>}
+                      {field.type === 'recipient' && <option value="todos">{operationType === 'notificacion' ? 'Todos los usuarios registrados' : 'Todos los usuarios activos'}</option>}
                       {field.type === 'user' && <option value="">Selecciona un usuario</option>}
-                      {users.map((user) => <option key={user.id} value={user.id}>{[user.nombre, user.apellido].filter(Boolean).join(' ')} · {user.correo}</option>)}
+                      {users.filter((user) => field.type !== 'recipient' || operationType !== 'facturaExtraordinaria' || (user.rol === 'usuario' && user.activo)).map((user) => <option key={user.id} value={user.id}>{[user.nombre, user.apellido].filter(Boolean).join(' ')} - {user.correo} ({user.rol})</option>)}
                     </select>
                   ) : field.type === 'select' ? (
                     <select value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })} required={field.required}>

@@ -3,6 +3,7 @@ const router = express.Router();
 
 const {
   iniciarSesion,
+  verificarCorreoAdministrador,
   verificarCuenta,
   reenviarCodigoVerificacion,
   cambiarPasswordPropio,
@@ -18,6 +19,7 @@ router.use(limiteAuth);
 // No hay auto-registro: las cuentas las crea el administrador con
 // `scripts/crearUsuario.js`. Por eso no se expone ninguna ruta de registro.
 router.post('/login', iniciarSesion);
+router.post('/verificar-administrador', verificarCorreoAdministrador);
 
 // TODO: login con Google pendiente de reimplementar con Supabase
 // (signInWithIdToken). El controlador anterior (controller/google.js)
