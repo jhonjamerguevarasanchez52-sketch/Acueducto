@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const invoiceModel = require('../models/invoiceModel');
 const paymentModel = require('../models/paymentModel');
 const { registrarPago } = require('./pagoController');
+const { cotizarWompi } = require('../utils/wompiTarifa');
 
 function crearRespuesta() {
   return {
@@ -47,6 +48,7 @@ test('registrarPago con Wompi', async (t) => {
     valor_total: 12500,
     estado: 'pendiente',
   };
+  const cotizacion = cotizarWompi(factura.valor_total);
   const pagoNuevo = { id: 'pago-nuevo', monto: factura.valor_total, metodo: 'wompi' };
   let pagoPendiente = null;
   let cantidadCreaciones = 0;
@@ -75,15 +77,19 @@ test('registrarPago con Wompi', async (t) => {
     pagoPendiente = null;
     cantidadCreaciones = 0;
     const res = await solicitarPago();
+    const amountInCents = Math.round(cotizacion.totalCobrar * 100);
     const firmaEsperada = crypto
       .createHash('sha256')
-      .update('pago-nuevo1250000COPtest_integrity_demo')
+      .update(`pago-nuevo${amountInCents}COPtest_integrity_demo`)
       .digest('hex');
 
     assert.equal(res.codigo, 201);
     assert.equal(cantidadCreaciones, 1);
     assert.equal(res.cuerpo.wompi.reference, pagoNuevo.id);
-    assert.equal(res.cuerpo.wompi.amountInCents, 1250000);
+    assert.equal(res.cuerpo.wompi.amountInCents, amountInCents);
+    assert.equal(res.cuerpo.wompi.valorServicio, cotizacion.valorServicio);
+    assert.equal(res.cuerpo.wompi.cargoWompi, cotizacion.cargoWompi);
+    assert.equal(res.cuerpo.wompi.totalCobrar, cotizacion.totalCobrar);
     assert.equal(res.cuerpo.wompi.signature, firmaEsperada);
   });
 
@@ -91,6 +97,7 @@ test('registrarPago con Wompi', async (t) => {
     pagoPendiente = {
       id: 'pago-reanudable',
       monto: factura.valor_total,
+      cargo_wompi: cotizacion.cargoWompi,
       metodo: 'wompi',
       estado_wompi: null,
     };
@@ -144,7 +151,35 @@ test('registrarPago con Wompi', async (t) => {
     assert.equal(cantidadCreaciones, 0);
   });
 
+  await t.test('reutiliza el pago creado por una solicitud concurrente', async () => {
+    pagoPendiente = null;
+    cantidadCreaciones = 0;
+    const pagoConcurrente = {
+      id: 'pago-concurrente',
+      monto: factura.valor_total,
+      cargo_wompi: cotizacion.cargoWompi,
+      metodo: 'wompi',
+      estado_wompi: 'PENDING',
+    };
+    paymentModel.create = async () => {
+      cantidadCreaciones += 1;
+      pagoPendiente = pagoConcurrente;
+      return { data: null, error: { code: '23505', message: 'duplicate key' } };
+    };
+
+    const res = await solicitarPago();
+
+    assert.equal(res.codigo, 201);
+    assert.equal(cantidadCreaciones, 1);
+    assert.equal(res.cuerpo.wompi.reference, pagoConcurrente.id);
+  });
+
   await t.test('no crea un pago si falta la llave de integridad', async () => {
+    paymentModel.create = async () => {
+      cantidadCreaciones += 1;
+      return { data: pagoNuevo, error: null };
+    };
+    pagoPendiente = null;
     delete process.env.WOMPI_INTEGRITY_KEY;
     cantidadCreaciones = 0;
     const res = await solicitarPago();

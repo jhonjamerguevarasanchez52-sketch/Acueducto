@@ -95,6 +95,8 @@ create table if not exists public.payments (
   factura_id          uuid not null references public.invoices (id) on delete cascade,
   perfil_id           uuid not null references public.profiles (id) on delete cascade,
   monto               numeric(12,2) not null check (monto > 0),
+  cargo_wompi         numeric(12,2) not null default 0 check (cargo_wompi >= 0),
+  monto_total         numeric(12,2) not null,
   metodo              text not null,               -- 'efectivo' | 'nequi' | 'pse' | 'tarjeta' ...
   referencia          text,
   confirmado          boolean not null default false,
@@ -102,7 +104,10 @@ create table if not exists public.payments (
   fecha_confirmacion  timestamptz,
   metodo_confirmacion text,                        -- 'manual' | 'wompi'
   estado_wompi        text,                        -- APPROVED | DECLINED | VOIDED | ERROR
-  transaccion_id      text
+  transaccion_id      text,
+  medio_pago_wompi    text,
+  correo_comprobante_enviado_at timestamptz,
+  registrado_por      uuid references public.profiles (id) on delete set null
 );
 create index if not exists idx_payments_perfil on public.payments (perfil_id);
 create index if not exists idx_payments_factura on public.payments (factura_id);
@@ -140,6 +145,23 @@ create table if not exists public.notifications (
 );
 create index if not exists idx_notifications_perfil on public.notifications (perfil_id);
 
+-- Registro de acciones administrativas sensibles. Solo el backend service role
+-- puede insertar; el panel no consulta esta tabla directamente.
+create table if not exists public.admin_audit_log (
+  id          uuid primary key default gen_random_uuid(),
+  admin_id    uuid references public.profiles (id) on delete set null,
+  accion      text not null,
+  tabla       text not null,
+  registro_id uuid,
+  detalle     jsonb,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_admin_audit_log_created_at
+  on public.admin_audit_log (created_at desc);
+alter table public.admin_audit_log enable row level security;
+revoke all on table public.admin_audit_log from public, anon, authenticated;
+grant insert on table public.admin_audit_log to service_role;
+
 -- ----------------------------------------------------------------------------
 --  service_outages: cortes de servicio.
 -- ----------------------------------------------------------------------------
@@ -147,6 +169,9 @@ create table if not exists public.service_outages (
   id               uuid primary key default gen_random_uuid(),
   perfil_id        uuid not null references public.profiles (id) on delete cascade,
   factura_id       uuid references public.invoices (id) on delete set null,
+  cortado_por      uuid references public.profiles (id) on delete set null,
+  reconectado_por  uuid references public.profiles (id) on delete set null,
+  origen           text not null default 'manual',
   motivo           text not null,
   estado           text not null default 'activo' check (estado in ('activo', 'reconectado', 'resuelto')),
   fecha_corte      timestamptz not null default now(),
@@ -219,9 +244,6 @@ create policy "pagos: ver los propios"
   using (perfil_id = auth.uid());
 
 drop policy if exists "pagos: registrar los propios (sin confirmar)" on public.payments;
-create policy "pagos: registrar los propios (sin confirmar)"
-  on public.payments for insert
-  with check (perfil_id = auth.uid() and confirmado = false);
 
 -- breakdowns ----------------------------------------------------------
 drop policy if exists "averias: ver las propias" on public.breakdowns;
@@ -230,9 +252,6 @@ create policy "averias: ver las propias"
   using (perfil_id = auth.uid());
 
 drop policy if exists "averias: reportar las propias" on public.breakdowns;
-create policy "averias: reportar las propias"
-  on public.breakdowns for insert
-  with check (perfil_id = auth.uid());
 
 -- notifications -----------------------------------------------------
 drop policy if exists "notificaciones: ver las propias" on public.notifications;
@@ -266,10 +285,17 @@ alter table public.invoices        add column if not exists generada_automaticam
 alter table public.invoices        add column if not exists correo_factura_enviado_at timestamptz;
 
 alter table public.payments        add column if not exists fecha_pago          timestamptz default now();
+alter table public.payments        add column if not exists cargo_wompi        numeric(12,2) not null default 0 check (cargo_wompi >= 0);
+alter table public.payments        add column if not exists monto_total        numeric(12,2);
+update public.payments set monto_total = monto + cargo_wompi where monto_total is null;
+alter table public.payments        alter column monto_total set not null;
 alter table public.payments        add column if not exists fecha_confirmacion  timestamptz;
 alter table public.payments        add column if not exists metodo_confirmacion text;
 alter table public.payments        add column if not exists estado_wompi        text;
 alter table public.payments        add column if not exists transaccion_id      text;
+alter table public.payments        add column if not exists medio_pago_wompi   text;
+alter table public.payments        add column if not exists correo_comprobante_enviado_at timestamptz;
+alter table public.payments        add column if not exists registrado_por uuid references public.profiles (id) on delete set null;
 
 alter table public.breakdowns      add column if not exists nota_fontanero    text;
 alter table public.breakdowns      add column if not exists fontanero_id      uuid references public.profiles (id) on delete set null;
@@ -278,6 +304,9 @@ alter table public.breakdowns      add column if not exists fecha_resolucion tim
 
 alter table public.service_outages add column if not exists factura_id        uuid references public.invoices (id) on delete set null;
 alter table public.service_outages add column if not exists fecha_reconexion  timestamptz;
+alter table public.service_outages add column if not exists cortado_por uuid references public.profiles (id) on delete set null;
+alter table public.service_outages add column if not exists reconectado_por uuid references public.profiles (id) on delete set null;
+alter table public.service_outages add column if not exists origen text not null default 'manual';
 
 alter table public.profiles        add column if not exists activo            boolean not null default true;
 alter table public.profiles        add column if not exists debe_cambiar_password boolean not null default false;
@@ -332,3 +361,150 @@ create unique index if not exists idx_breakdowns_un_solo_en_proceso
 create unique index if not exists idx_invoices_servicio_perfil_periodo
   on public.invoices (perfil_id, periodo)
   where tipo = 'servicio';
+
+-- Los perfiles solo permiten que la app cambie campos de contacto propios.
+-- RLS limita las filas, pero se requieren privilegios de columna para proteger
+-- los códigos de recuperación y campos administrativos.
+revoke select on table public.profiles from public, anon, authenticated;
+grant select (
+  id, nombre, apellido, correo, rol, activo, is_verified,
+  debe_cambiar_password, telefono, numero_lote, direccion, ocupacion, zona,
+  created_at, updated_at
+) on table public.profiles to authenticated;
+
+revoke update on table public.profiles from public, anon, authenticated;
+grant update (
+  nombre,
+  apellido,
+  telefono,
+  numero_lote,
+  direccion,
+  ocupacion,
+  zona
+) on table public.profiles to authenticated;
+
+-- Las escrituras con validación de negocio pasan por el backend autenticado.
+revoke insert on table public.payments from public, anon, authenticated;
+revoke insert on table public.breakdowns from public, anon, authenticated;
+revoke update on table public.notifications from public, anon, authenticated;
+grant update (estado) on table public.notifications to authenticated;
+
+create or replace function public.sellar_edicion_perfil_propio()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.role() = 'authenticated' and (
+    new.nombre is distinct from old.nombre or
+    new.apellido is distinct from old.apellido or
+    new.telefono is distinct from old.telefono or
+    new.numero_lote is distinct from old.numero_lote or
+    new.direccion is distinct from old.direccion or
+    new.ocupacion is distinct from old.ocupacion or
+    new.zona is distinct from old.zona
+  ) then
+    if coalesce(trim(new.telefono), '') <> ''
+      and coalesce(trim(new.numero_lote), '') <> ''
+      and coalesce(trim(new.direccion), '') <> ''
+      and coalesce(trim(new.zona), '') <> '' then
+      new.updated_at := now();
+    else
+      new.updated_at := null;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_profiles_sellar_edicion_propia on public.profiles;
+create trigger trg_profiles_sellar_edicion_propia
+before update on public.profiles
+for each row execute function public.sellar_edicion_perfil_propio();
+
+create unique index if not exists idx_payments_un_pendiente_por_factura
+  on public.payments (factura_id)
+  where confirmado = false
+    and (estado_wompi is null or estado_wompi in (
+      'PENDING',
+      'APPROVED_NO_APLICADO',
+      'MONTO_INVALIDO'
+    ));
+
+create or replace function public.forzar_pago_no_confirmado_al_insertar()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  new.confirmado := false;
+  new.fecha_confirmacion := null;
+  new.metodo_confirmacion := null;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_forzar_pago_no_confirmado on public.payments;
+create trigger trg_forzar_pago_no_confirmado
+before insert on public.payments
+for each row execute function public.forzar_pago_no_confirmado_al_insertar();
+
+create or replace function public.procesar_pago_confirmado()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_factura public.invoices%rowtype;
+begin
+  if old.confirmado or not new.confirmado then
+    return new;
+  end if;
+
+  select * into v_factura
+  from public.invoices
+  where id = new.factura_id
+  for update;
+
+  if not found then
+    raise exception 'La factura no existe';
+  end if;
+  if v_factura.perfil_id <> new.perfil_id then
+    raise exception 'El pago no corresponde al titular de la factura';
+  end if;
+  if new.monto <> v_factura.valor_total then
+    raise exception 'El monto (%) no coincide con el valor de la factura (%)', new.monto, v_factura.valor_total;
+  end if;
+  if new.monto_total <> new.monto + coalesce(new.cargo_wompi, 0) then
+    raise exception 'El total cobrado no corresponde al monto y cargo registrados';
+  end if;
+  if v_factura.estado in ('pagada', 'anulada') then
+    raise exception 'La factura ya fue pagada o está anulada';
+  end if;
+
+  update public.invoices set estado = 'pagada' where id = new.factura_id;
+  update public.service_outages
+  set estado = 'reconectado', fecha_reconexion = now()
+  where perfil_id = new.perfil_id and estado = 'activo';
+  update public.payments
+  set estado_wompi = 'SUPERSEDED'
+  where factura_id = new.factura_id
+    and id <> new.id
+    and confirmado = false
+    and (estado_wompi is null or estado_wompi = 'PENDING');
+
+  insert into public.notifications (perfil_id, mensaje, tipo, estado)
+  values (
+    new.perfil_id,
+    format('El pago de la factura %s fue confirmado correctamente.', v_factura.numero_factura),
+    'pago',
+    'no_leido'
+  );
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_procesar_pago_confirmado on public.payments;
+create trigger trg_procesar_pago_confirmado
+after update of confirmado on public.payments
+for each row execute function public.procesar_pago_confirmado();

@@ -191,7 +191,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
   @override
   Widget build(BuildContext context) {
     final rol = context.watch<AuthProvider>().profile?.rol;
-    final puedePublicar = rol == 'fontanero' || rol == 'administrador';
+    final puedePublicar = rol == 'administrador';
     return GotaScaffold(
       appBar: HidroAppBar(
         title: 'Notificaciones',

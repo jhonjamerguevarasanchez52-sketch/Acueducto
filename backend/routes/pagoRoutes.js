@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   misPagos,
+  cotizacionWompi,
   registrarPago,
   registrarPagoFisicoConRecibo,
   listarPagos,
@@ -23,6 +24,7 @@ router.delete('/:id', verificarToken, verificarRol('administrador'), eliminarPag
 
 // --- Usuario final ---
 router.get('/', verificarToken, misPagos);
+router.get('/cotizacion-wompi/:facturaId', verificarToken, cotizacionWompi);
 router.post('/', verificarToken, registrarPago);
 router.post(
   '/:facturaId/recibo',

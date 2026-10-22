@@ -77,7 +77,7 @@ class Profile {
       correo: json['correo']?.toString() ?? '',
       nombre: json['nombre']?.toString() ?? '',
       apellido: json['apellido']?.toString() ?? '',
-      rol: json['rol']?.toString() ?? 'usuario',
+      rol: (json['rol']?.toString() ?? 'usuario').trim().toLowerCase(),
       telefono: json['telefono']?.toString(),
       numeroLote: json['numero_lote']?.toString(),
       direccion: json['direccion']?.toString(),

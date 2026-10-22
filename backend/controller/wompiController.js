@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const paymentModel = require('../models/paymentModel');
 const { confirmarPago } = require('../services/pagosService');
+const { enviarComprobantePagoWompi } = require('../services/comprobantePagoWompi');
 const { obtenerConfiguracionPublica } = require('../utils/wompiConfig');
 
 const EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET;
@@ -70,10 +71,19 @@ async function webhook(req, res) {
     const estadoWompi = trx.status; // APPROVED | DECLINED | VOIDED | ERROR
     const montoRecibidoCentavos = trx.amount_in_cents;
 
-    const { data: pago, error: pagoError } = await paymentModel.getById(referencia, 'id, confirmado, monto');
+    const { data: pago, error: pagoError } = await paymentModel.getById(
+      referencia,
+      'id, confirmado, monto, monto_total, estado_wompi, correo_comprobante_enviado_at'
+    );
 
     // Los errores operativos responden 500 para que Wompi vuelva a intentar.
     if (pagoError) {
+      // Wompi can deliver an old event after its payment record was removed.
+      // A missing reference is terminal; retrying it cannot make the row appear.
+      if (pagoError.code === 'PGRST116') {
+        console.warn('[wompi] pago no encontrado para referencia', referencia);
+        return res.status(200).json({ received: true, ignored: true });
+      }
       console.error('[wompi] error consultando pago para referencia', referencia, ':', pagoError.message);
       return res.status(500).json({ error: 'No se pudo consultar el pago' });
     }
@@ -85,29 +95,45 @@ async function webhook(req, res) {
 
     // Un pago ya confirmado no se toca: Wompi puede reenviar el evento o
     // mandar uno tardío (por ejemplo DECLINED de un intento anterior).
-    if (pago.confirmado) return;
+    // Wompi puede reenviar eventos. Responder también en este caso evita
+    // dejar la petición abierta y permite que el proveedor cierre el reintento.
+    if (pago.confirmado) {
+      if (pago.estado_wompi === 'APPROVED' && !pago.correo_comprobante_enviado_at) {
+        try {
+          await enviarComprobantePagoWompi(pago.id);
+        } catch (err) {
+          console.error('[wompi] no se pudo enviar el comprobante; se solicita reintento:', err.message);
+          return res.status(500).json({ error: 'No se pudo enviar el comprobante del pago' });
+        }
+      }
+      return res.status(200).json({ received: true, alreadyProcessed: true });
+    }
 
     if (estadoWompi === 'APPROVED') {
       // El monto ya viene atado a la referencia por la firma de integridad
       // (ver utils/wompiFirma.js), pero igual lo verificamos aquí: si no
       // coincide con lo que se guardó al registrar el pago, algo no cuadra
       // y no debe marcarse la factura como pagada.
-      const montoEsperadoCentavos = Math.round(Number(pago.monto) * 100);
-      if (montoRecibidoCentavos !== montoEsperadoCentavos) {
+      const montoEsperadoCentavos = Math.round(Number(pago.monto_total ?? pago.monto) * 100);
+      const monedaEsperada = (process.env.WOMPI_CURRENCY || 'COP').trim().toUpperCase();
+      if (montoRecibidoCentavos !== montoEsperadoCentavos || trx.currency !== monedaEsperada) {
         console.error(
-          `[wompi] monto recibido (${montoRecibidoCentavos}) no coincide con el esperado (${montoEsperadoCentavos}) para el pago ${pago.id}; no se confirma.`
+          `[wompi] monto o moneda recibidos (${montoRecibidoCentavos} ${trx.currency}) no coinciden con lo esperado (${montoEsperadoCentavos} ${monedaEsperada}) para el pago ${pago.id}; no se confirma.`
         );
         const { error: updateError } = await paymentModel.update(pago.id, {
           estado_wompi: 'MONTO_INVALIDO',
           transaccion_id: trx.id,
+          medio_pago_wompi: trx.payment_method_type || null,
         });
         if (updateError) throw updateError;
         return res.status(200).json({ received: true });
       }
 
       const resultado = await confirmarPago(pago.id, {
+        metodo_confirmacion: 'wompi',
         estado_wompi: estadoWompi,
         transaccion_id: trx.id,
+        medio_pago_wompi: trx.payment_method_type || null,
       });
 
       if (!resultado.ok) {
@@ -117,13 +143,22 @@ async function webhook(req, res) {
         const { error: updateError } = await paymentModel.update(pago.id, {
           estado_wompi: 'APPROVED_NO_APLICADO',
           transaccion_id: trx.id,
+          medio_pago_wompi: trx.payment_method_type || null,
         });
         if (updateError) throw updateError;
+      } else {
+        try {
+          await enviarComprobantePagoWompi(pago.id);
+        } catch (err) {
+          console.error('[wompi] no se pudo enviar el comprobante; se solicita reintento:', err.message);
+          return res.status(500).json({ error: 'No se pudo enviar el comprobante del pago' });
+        }
       }
     } else {
       const { error: updateError } = await paymentModel.update(pago.id, {
         estado_wompi: estadoWompi,
         transaccion_id: trx.id,
+        medio_pago_wompi: trx.payment_method_type || null,
       });
       if (updateError) throw updateError;
     }
