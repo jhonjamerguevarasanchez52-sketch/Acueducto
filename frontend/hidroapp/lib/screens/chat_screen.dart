@@ -10,9 +10,9 @@ import '../widgets/core/hidro_app_bar.dart';
 /// Pantalla del asistente virtual "GOTA". Conversación simple contra el
 /// endpoint `POST /api/chat`, que responde `{ "respuesta": "..." }`.
 ///
-/// El historial vive solo en memoria: al salir de la pantalla se pierde. El
-/// backend, por ahora, responde cada mensaje de forma independiente (no recibe
-/// los turnos anteriores).
+/// El historial vive solo en memoria: al salir de la pantalla se pierde. Se
+/// envían al backend los ocho turnos recientes para mantener el contexto sin
+/// inflar cada petición.
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -52,11 +52,24 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _bajarAlFinal();
 
+    final historial = _mensajes
+        .take(_mensajes.length - 1)
+        .where((m) => m.autor != ChatAutor.error)
+        .map((m) => <String, String>{
+              'role': m.autor == ChatAutor.usuario ? 'user' : 'assistant',
+              'content': m.texto,
+            })
+        .toList();
+    final inicioHistorial = historial.length > 8 ? historial.length - 8 : 0;
+
     try {
       final data = await context
           .read<AuthProvider>()
           .api
-          .post('/chat', body: {'mensaje': texto});
+          .post('/chat', body: {
+        'mensaje': texto,
+        'historial': historial.skip(inicioHistorial).toList(),
+      });
 
       final respuesta = data is Map && data['respuesta'] is String
           ? (data['respuesta'] as String).trim()
@@ -88,8 +101,13 @@ class _ChatScreenState extends State<ChatScreen> {
       orElse: () => ChatMensaje.usuario(''),
     );
     if (ultimoUsuario.texto.isEmpty) return;
-    setState(() => _mensajes.removeWhere((m) => m.autor == ChatAutor.error));
-    _entradaCtrl.text = ultimoUsuario.texto;
+    final texto = ultimoUsuario.texto;
+    setState(() {
+      _mensajes.removeWhere((m) => m.autor == ChatAutor.error);
+      final indice = _mensajes.lastIndexWhere((m) => m.autor == ChatAutor.usuario);
+      if (indice >= 0) _mensajes.removeAt(indice);
+      _entradaCtrl.text = texto;
+    });
     _enviar();
   }
 

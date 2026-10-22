@@ -25,9 +25,9 @@ async function confirmarPago(pagoId, extra = {}) {
     return { ok: false, error: 'Pago no encontrado' };
   }
 
-  if (pago.confirmado) {
-    return { ok: true, pago }; // idempotente: ya estaba confirmado
-  }
+  // Repetir una confirmación ya aplicada no debe cambiar la fecha ni volver
+  // a disparar el trigger que procesa la factura.
+  if (pago.confirmado) return { ok: true, pago };
 
   const { data: pagoActualizado, error: updateError } = await paymentModel.update(pagoId, {
     confirmado: true,

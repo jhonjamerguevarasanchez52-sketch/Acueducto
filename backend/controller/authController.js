@@ -18,6 +18,50 @@ function normalizarCorreo(correo) {
   return String(correo || '').toLowerCase().trim();
 }
 
+
+// Errores de transporte de Supabase Auth no significan que la contraseña sea
+// incorrecta. Reconocemos también errores de DNS/TLS/socket que varían según
+// la versión de Node, el sistema operativo y el proveedor de hosting.
+function esErrorTransitorioAuth(error) {
+  const texto = [error?.name, error?.message, error?.code,
+    error?.cause?.code, error?.cause?.name, error?.cause?.message]
+    .filter(Boolean).join(' ').toLowerCase();
+  const estado = Number(error?.status ?? error?.statusCode ?? error?.cause?.status);
+  return [500, 502, 503, 504].includes(estado)
+    || /authretryablefetcherror|fetch failed|network|econnreset|econnrefused|etimedout|eai_again|enotfound|und_err_connect_timeout|socket hang up|tls|service unavailable|bad gateway|gateway timeout/.test(texto);
+}
+
+async function reintentarServicioSupabase(operacion) {
+  // Reintentos breves para recuperarse de fallos puntuales de red o de
+  // disponibilidad tanto en Auth como en la consulta de perfil.
+  for (let intento = 0; ; intento++) {
+    try {
+      const resultado = await operacion();
+      if (!resultado.error || !esErrorTransitorioAuth(resultado.error) || intento >= 2) {
+        return resultado;
+      }
+    } catch (error) {
+      if (!esErrorTransitorioAuth(error) || intento >= 2) throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300 * (2 ** intento)));
+  }
+}
+
+async function iniciarSesionSupabase(correo, password) {
+  return reintentarServicioSupabase(() => authModel.signIn(correo, password));
+}
+
+function responderAuthNoDisponible(res, error) {
+  console.error('[login] Falló la conexión con Supabase Auth tras reintentos:', {
+    name: error?.name,
+    causeName: error?.cause?.name,
+    causeCode: error?.cause?.code,
+    causeMessage: error?.cause?.message,
+  });
+  return res.status(503).json({
+    error: 'No pudimos conectar con el servicio de acceso. Revisa tu conexión e inténtalo de nuevo.',
+  });
+
 async function verificarCorreoAdministrador(req, res) {
   const correo = normalizarCorreo(req.body.correo);
   if (!correo) return res.status(400).json({ error: 'El correo es obligatorio' });
@@ -29,6 +73,7 @@ async function verificarCorreoAdministrador(req, res) {
     }
     return res.status(200).json({ esAdministrador: true });
   } catch (err) { return errorInesperado(res, err); }
+
 }
 
 // No hay endpoint de auto-registro: las cuentas las crea el administrador con
@@ -52,6 +97,7 @@ async function iniciarSesion(req, res) {
   }
 
   try {
+    const { data, error } = await iniciarSesionSupabase(correo, password);
     const { data: adminPerfil, error: adminError } = await profileModel.findByEmail(correo, 'id, rol');
     if (adminError && adminError.code !== 'PGRST116') return errorConsulta(res, adminError);
     if (!adminPerfil || adminPerfil.rol !== 'administrador') {
@@ -59,17 +105,26 @@ async function iniciarSesion(req, res) {
     }
     const { data, error } = await authModel.signIn(correo, password);
 
+
     if (error) {
+      // No contar fallos de red como intentos de contraseña.
+      if (esErrorTransitorioAuth(error)) return responderAuthNoDisponible(res, error);
+
       registrarFallo('login', correo);
       return res.status(401).json({ error: error.message });
     }
 
     // Exigimos que la cuenta esté verificada por código antes de permitir el acceso.
-    const { data: perfil, error: perfilError } = await profileModel.getById(data.user.id, {
-      columns: 'is_verified, activo, debe_cambiar_password',
-    });
+    const { data: perfil, error: perfilError } = await reintentarServicioSupabase(
+      () => profileModel.getById(data.user.id, {
+        columns: 'is_verified, activo, debe_cambiar_password',
+      }),
+    );
 
     if (perfilError) {
+      if (esErrorTransitorioAuth(perfilError)) {
+        return responderAuthNoDisponible(res, perfilError);
+      }
       return errorConsulta(res, perfilError);
     }
 
@@ -94,6 +149,7 @@ async function iniciarSesion(req, res) {
       debeCambiarPassword: perfil.debe_cambiar_password === true,
     });
   } catch (err) {
+    if (esErrorTransitorioAuth(err)) return responderAuthNoDisponible(res, err);
     return errorInesperado(res, err);
   }
 }

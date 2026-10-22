@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   misPagos,
   registrarPago,
+  registrarPagoFisicoConRecibo,
   listarPagos,
   listarPagosWompi,
   confirmarPagoManual,
@@ -23,5 +24,11 @@ router.delete('/:id', verificarToken, verificarRol('administrador'), eliminarPag
 // --- Usuario final ---
 router.get('/', verificarToken, misPagos);
 router.post('/', verificarToken, registrarPago);
+router.post(
+  '/:facturaId/recibo',
+  verificarToken,
+  express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '5mb' }),
+  registrarPagoFisicoConRecibo
+);
 
 module.exports = router;

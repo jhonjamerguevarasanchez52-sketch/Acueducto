@@ -30,57 +30,15 @@ class _PagarSheet extends StatefulWidget {
 }
 
 class _PagarSheetState extends State<_PagarSheet> {
-  static const _metodos =
-      <({String id, String nombre, IconData icono, bool pideReferencia})>[
-        (
-          id: 'wompi',
-          nombre: 'Wompi · tarjeta, PSE y más',
-          icono: Icons.credit_card_outlined,
-          pideReferencia: false,
-        ),
-        (
-          id: 'efectivo',
-          nombre: 'Efectivo',
-          icono: Icons.payments_outlined,
-          pideReferencia: false,
-        ),
-        (
-          id: 'transferencia',
-          nombre: 'Transferencia bancaria',
-          icono: Icons.account_balance_outlined,
-          pideReferencia: true,
-        ),
-        (
-          id: 'nequi',
-          nombre: 'Nequi',
-          icono: Icons.smartphone_outlined,
-          pideReferencia: true,
-        ),
-        (
-          id: 'pse',
-          nombre: 'PSE',
-          icono: Icons.account_balance_wallet_outlined,
-          pideReferencia: true,
-        ),
-      ];
+  static const _metodos = <({String id, String nombre, IconData icono})>[
+    (id: 'wompi', nombre: 'Pagar en línea con Wompi', icono: Icons.lock_outline),
+    (id: 'fisico', nombre: 'Pago físico', icono: Icons.receipt_long_outlined),
+  ];
 
-  String _metodo = _metodos.first.id;
-  final _referenciaCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _referenciaCtrl.dispose();
-    super.dispose();
-  }
-
-  bool get _pideReferencia =>
-      _metodos.firstWhere((m) => m.id == _metodo).pideReferencia;
+  String _metodo = 'wompi';
 
   void _confirmar() {
-    final ref = _referenciaCtrl.text.trim();
-    Navigator.of(
-      context,
-    ).pop((metodo: _metodo, referencia: ref.isEmpty ? null : ref));
+    Navigator.of(context).pop((metodo: _metodo, referencia: null));
   }
 
   @override
@@ -98,43 +56,30 @@ class _PagarSheetState extends State<_PagarSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Elige cómo pagar',
+            'Pagar factura',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 2),
           Text(widget.subtitulo, style: TextStyle(color: secundario)),
           const SizedBox(height: 14),
-          for (final m in _metodos)
+          for (final metodo in _metodos)
             _MetodoTile(
-              nombre: m.nombre,
-              icono: m.icono,
-              seleccionado: m.id == _metodo,
-              onTap: () => setState(() => _metodo = m.id),
+              nombre: metodo.nombre,
+              icono: metodo.icono,
+              seleccionado: _metodo == metodo.id,
+              onTap: () => setState(() => _metodo = metodo.id),
             ),
-          if (_pideReferencia) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: _referenciaCtrl,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _confirmar(),
-              decoration: const InputDecoration(
-                labelText: 'Referencia o comprobante (opcional)',
-              ),
-            ),
-          ],
           const SizedBox(height: 14),
           Text(
             _metodo == 'wompi'
-                ? 'Paga de forma segura con Wompi. La factura se actualizará al confirmarse el pago.'
-                : 'El pago quedará pendiente hasta que el acueducto lo confirme.',
+                ? 'Se abrirá el checkout seguro de Wompi para completar el pago.'
+                : 'Selecciona una foto del comprobante para enviarla al acueducto.',
             style: TextStyle(fontSize: 12, color: secundario),
           ),
           const SizedBox(height: 12),
           FilledButton(
             onPressed: _confirmar,
-            child: Text(
-              _metodo == 'wompi' ? 'Continuar con Wompi' : 'Registrar pago',
-            ),
+            child: Text(_metodo == 'wompi' ? 'Continuar con Wompi' : 'Subir recibo'),
           ),
         ],
       ),

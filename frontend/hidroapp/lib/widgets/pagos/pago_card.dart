@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/pago.dart';
 import '../../theme/app_theme.dart';
@@ -17,7 +18,8 @@ class PagoCard extends StatelessWidget {
   final VoidCallback onPagar;
 
   static const _metodos = {
-    'efectivo': 'Efectivo',
+    'efectivo': 'Pago físico',
+    'fisico': 'Pago físico',
     'nequi': 'Nequi',
     'pse': 'PSE',
     'tarjeta': 'Tarjeta',
@@ -34,10 +36,13 @@ class PagoCard extends StatelessWidget {
       );
     }
     if (pago.rechazado) {
+      return (texto: 'Rechazado', color: colores.danger, icono: Icons.cancel);
+    }
+    if (pago.estadoWompi == 'PENDING') {
       return (
-        texto: 'Rechazado',
-        color: colores.danger,
-        icono: Icons.cancel,
+        texto: 'Esperando respuesta de Wompi',
+        color: colores.warning,
+        icono: Icons.hourglass_bottom,
       );
     }
     return (
@@ -106,12 +111,26 @@ class PagoCard extends StatelessWidget {
                 texto:
                     'Confirmado: ${Formato.fechaHora(pago.fechaConfirmacion)}',
               ),
-            if (pago.referencia != null)
+            if (pago.referencia != null && pago.metodo != 'fisico')
               FilaDetalle(
                 icono: Icons.tag,
                 texto: 'Referencia: ${pago.referencia}',
               ),
-            if (!pago.confirmado) ...[
+            if (pago.reciboUrl != null) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => launchUrl(
+                    Uri.parse(pago.reciboUrl!),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                  label: const Text('Ver recibo enviado'),
+                ),
+              ),
+            ],
+            if (!pago.confirmado && pago.rechazado) ...[
               const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: onPagar,

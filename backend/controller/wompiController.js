@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const paymentModel = require('../models/paymentModel');
 const { confirmarPago } = require('../services/pagosService');
+const { obtenerConfiguracionPublica } = require('../utils/wompiConfig');
 
 const EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET;
 
@@ -49,12 +50,21 @@ async function webhook(req, res) {
     return res.status(401).json({ error: 'Firma inválida' });
   }
 
-  // Respondemos 200 cuanto antes: Wompi reintenta si no recibe 2xx.
-  res.status(200).json({ received: true });
+  const configuracion = obtenerConfiguracionPublica();
+  if (evento.environment !== configuracion.ambiente) {
+    console.warn('[wompi] se rechazó un evento de un ambiente distinto al configurado.');
+    return res.status(400).json({ error: 'Ambiente de Wompi no coincide' });
+  }
+
+  if (evento.event !== 'transaction.updated') {
+    return res.status(200).json({ received: true, ignored: true });
+  }
 
   try {
     const trx = evento?.data?.transaction;
-    if (!trx) return;
+    if (!trx?.reference || !trx?.status || !trx?.id) {
+      return res.status(400).json({ error: 'Evento de transacción inválido' });
+    }
 
     const referencia = trx.reference; // id del registro en payments
     const estadoWompi = trx.status; // APPROVED | DECLINED | VOIDED | ERROR
@@ -62,17 +72,15 @@ async function webhook(req, res) {
 
     const { data: pago, error: pagoError } = await paymentModel.getById(referencia, 'id, confirmado, monto');
 
-    // Ya respondimos 200 a Wompi, así que no reintentará: si esto fue un
-    // error transitorio de la consulta (no "no encontrado"), lo dejamos bien
-    // distinguido en logs para poder reconciliar el pago a mano.
+    // Los errores operativos responden 500 para que Wompi vuelva a intentar.
     if (pagoError) {
       console.error('[wompi] error consultando pago para referencia', referencia, ':', pagoError.message);
-      return;
+      return res.status(500).json({ error: 'No se pudo consultar el pago' });
     }
 
     if (!pago) {
       console.warn('[wompi] pago no encontrado para referencia', referencia);
-      return;
+      return res.status(200).json({ received: true, ignored: true });
     }
 
     // Un pago ya confirmado no se toca: Wompi puede reenviar el evento o
@@ -89,8 +97,12 @@ async function webhook(req, res) {
         console.error(
           `[wompi] monto recibido (${montoRecibidoCentavos}) no coincide con el esperado (${montoEsperadoCentavos}) para el pago ${pago.id}; no se confirma.`
         );
-        await paymentModel.update(pago.id, { estado_wompi: 'MONTO_INVALIDO', transaccion_id: trx.id });
-        return;
+        const { error: updateError } = await paymentModel.update(pago.id, {
+          estado_wompi: 'MONTO_INVALIDO',
+          transaccion_id: trx.id,
+        });
+        if (updateError) throw updateError;
+        return res.status(200).json({ received: true });
       }
 
       const resultado = await confirmarPago(pago.id, {
@@ -102,16 +114,25 @@ async function webhook(req, res) {
         // Wompi cobró pero el trigger rechazó el pago (por ejemplo, la factura
         // ya estaba pagada). Se deja marcado para localizarlo y devolver el dinero.
         console.error('[wompi] confirmarPago no tuvo éxito para', pago.id, ':', resultado.error);
-        await paymentModel.update(pago.id, {
+        const { error: updateError } = await paymentModel.update(pago.id, {
           estado_wompi: 'APPROVED_NO_APLICADO',
           transaccion_id: trx.id,
         });
+        if (updateError) throw updateError;
       }
     } else {
-      await paymentModel.update(pago.id, { estado_wompi: estadoWompi, transaccion_id: trx.id });
+      const { error: updateError } = await paymentModel.update(pago.id, {
+        estado_wompi: estadoWompi,
+        transaccion_id: trx.id,
+      });
+      if (updateError) throw updateError;
     }
+
+    return res.status(200).json({ received: true });
   } catch (err) {
     console.error('[wompi] error procesando webhook:', err.message);
+    if (!res.headersSent) return res.status(500).json({ error: 'No se pudo procesar el evento de pago' });
+    return undefined;
   }
 }
 
@@ -120,10 +141,7 @@ async function webhook(req, res) {
 // firma cada transacción (reference + amount + currency); si el cliente lo
 // tuviera, podría falsificar la firma de integridad de cualquier monto.
 function config(req, res) {
-  return res.status(200).json({
-    publicKey: process.env.WOMPI_PUBLIC_KEY || null,
-    ambiente: process.env.WOMPI_AMBIENTE || 'test',
-  });
+  return res.status(200).json(obtenerConfiguracionPublica());
 }
 
 module.exports = { webhook, config };
