@@ -131,6 +131,11 @@ function apagarOrdenadamente(señal) {
   }, 10000).unref();
 }
 
+//montando las ruras de la API
+app.get('/health', (req, res) => {
+  res.status(200).send('ok');
+});
+
 process.on('SIGTERM', () => apagarOrdenadamente('SIGTERM'));
 process.on('SIGINT', () => apagarOrdenadamente('SIGINT'));
 
