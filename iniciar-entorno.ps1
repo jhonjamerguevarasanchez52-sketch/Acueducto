@@ -15,6 +15,8 @@ $env:ANDROID_USER_HOME = Join-Path $env:USERPROFILE '.android'
 $env:ANDROID_AVD_HOME = $avdHome
 $env:ANDROID_SDK_ROOT = $sdkAndroid
 $env:ANDROID_HOME = $sdkAndroid
+$env:ANDROID_SDK_HOME = $env:USERPROFILE
+$env:HOME = $env:USERPROFILE
 
 $flutter = (Get-Command 'flutter.bat' -ErrorAction Stop).Source
 $adb = Join-Path $sdkAndroid 'platform-tools\adb.exe'
