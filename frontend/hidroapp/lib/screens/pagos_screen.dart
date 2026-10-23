@@ -63,10 +63,12 @@ class _PagosScreenState extends State<PagosScreen> with WidgetsBindingObserver {
 
     try {
       if (eleccion.metodo == 'wompi') {
-        await WompiCheckoutService.pagar(
+        final abierto = await WompiCheckoutService.pagar(
+          context,
           context.read<AuthProvider>().api,
           pago.facturaId,
         );
+        if (!abierto) return;
         if (!mounted) return;
         AppSnackbar.success(
           context,

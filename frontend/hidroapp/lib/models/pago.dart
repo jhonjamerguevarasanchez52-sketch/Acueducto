@@ -28,13 +28,15 @@ class Pago {
 
   /// `true` si el pago llegó por Wompi y fue rechazado/anulado.
   bool get rechazado =>
-      const {
-        'DECLINED',
-        'VOIDED',
-        'ERROR',
+      const {'DECLINED', 'VOIDED', 'ERROR'}.contains(estadoWompi) && !confirmado;
+
+  /// Requiere conciliaciÃ³n; otro intento podrÃ­a cobrar dos veces.
+  bool get requiereRevision => !confirmado && const {
+        'APPROVED_NO_APLICADO',
         'MONTO_INVALIDO',
-      }.contains(estadoWompi) &&
-      !confirmado;
+      }.contains(estadoWompi);
+
+  bool get reemplazado => !confirmado && estadoWompi == 'SUPERSEDED';
 
   factory Pago.fromJson(Map<String, dynamic> json) {
     return Pago(

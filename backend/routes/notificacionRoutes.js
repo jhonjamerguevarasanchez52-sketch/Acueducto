@@ -11,8 +11,8 @@ const {
 const { verificarToken } = require('../middleware/authMiddleware');
 const { verificarRol } = require('../middleware/roleMiddleware');
 
-// Administrador y fontanero pueden publicar avisos generales del servicio.
-router.post('/', verificarToken, verificarRol('administrador', 'fontanero'), enviarNotificacion);
+// Solo el administrador puede publicar avisos del servicio.
+router.post('/', verificarToken, verificarRol('administrador'), enviarNotificacion);
 
 // --- Usuario final ---
 router.get('/', verificarToken, misNotificaciones);

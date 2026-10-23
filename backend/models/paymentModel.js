@@ -16,7 +16,9 @@ function list({ confirmado, perfil_id, limit, offset } = {}) {
   let query = supabaseAdmin.from(TABLE).select('*').order('fecha_pago', { ascending: false });
 
   if (confirmado === 'true') query = query.eq('confirmado', true);
-  if (confirmado === 'false') query = query.eq('confirmado', false);
+  if (confirmado === 'false') {
+    query = query.eq('confirmado', false).or('estado_wompi.is.null,estado_wompi.neq.SUPERSEDED');
+  }
   if (perfil_id) query = query.eq('perfil_id', perfil_id);
 
   return aplicarPaginacion(query, { limit, offset });
@@ -51,13 +53,15 @@ function countByInvoice(invoiceId) {
 }
 
 // Todo pago nuevo nace sin confirmar y con la fecha actual.
-function create({ factura_id, perfil_id, monto, metodo, referencia, estado_wompi }, db = supabaseAdmin) {
+function create({ factura_id, perfil_id, monto, cargo_wompi = 0, monto_total, metodo, referencia, estado_wompi }, db = supabaseAdmin) {
   return db
     .from(TABLE)
     .insert({
       factura_id,
       perfil_id,
       monto,
+      cargo_wompi,
+      monto_total: monto_total ?? Number(monto) + Number(cargo_wompi),
       metodo,
       referencia: referencia || null,
       confirmado: false,

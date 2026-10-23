@@ -5,6 +5,7 @@ const { confirmarPago } = require('../services/pagosService');
 const { calcularFirmaIntegridad } = require('../utils/wompiFirma');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { obtenerProblemaConfiguracion } = require('../utils/wompiConfig');
+const { cotizarWompi } = require('../utils/wompiTarifa');
 const recibosPagoService = require('../services/recibosPagoService');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
@@ -31,6 +32,21 @@ async function agregarUrlsRecibos(pagos = []) {
 }
 
 // ---------- USUARIO FINAL ----------
+
+async function cotizacionWompi(req, res) {
+  try {
+    const { data: factura, error } = await invoiceModel.getOwn(req.params.facturaId, req.usuario.id, {
+      columns: 'id, valor_total, estado', db: req.db,
+    });
+    if (error || !factura) return res.status(404).json({ error: 'Factura no encontrada o no te pertenece.' });
+    if (factura.estado === 'pagada' || factura.estado === 'anulada') {
+      return res.status(400).json({ error: 'Esta factura no se puede pagar.' });
+    }
+    return res.status(200).json(cotizarWompi(factura.valor_total));
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
 
 // Ver mis pagos
 async function misPagos(req, res) {
@@ -88,7 +104,8 @@ async function registrarPago(req, res) {
       return res.status(400).json({ error: 'Esta factura está anulada' });
     }
 
-    const monto = factura.valor_total;
+    const monto = Number(factura.valor_total);
+    const cotizacion = cotizarWompi(monto);
 
     // Evita ensuciar el panel de pagos pendientes con duplicados por doble
     // clic o reintentos del frontend: solo un pago sin confirmar a la vez
@@ -111,7 +128,8 @@ async function registrarPago(req, res) {
         ESTADOS_WOMPI_REINTENTABLES.has(pagoPendiente.estado_wompi);
 
       if (puedeReanudarCheckout) {
-        if (Number(pagoPendiente.monto) !== Number(monto)) {
+        if (Number(pagoPendiente.monto) !== monto ||
+            Number(pagoPendiente.cargo_wompi || 0) !== cotizacion.cargoWompi) {
           return res.status(409).json({
             error: 'El valor de la factura cambió. Actualiza la factura antes de iniciar otro pago.',
           });
@@ -130,18 +148,42 @@ async function registrarPago(req, res) {
           factura_id,
           perfil_id: userId,
           monto,
+          cargo_wompi: cotizacion.cargoWompi,
+          monto_total: cotizacion.totalCobrar,
           metodo,
           referencia,
           estado_wompi: 'PENDING',
-        },
-        req.db
+        }
       );
 
       if (error) {
-        return errorConsulta(res, error);
-      }
+        // El índice único parcial de la base de datos es la protección final
+        // contra dos solicitudes concurrentes. Si otra petición creó el pago
+        // primero, reusamos ese checkout en vez de dejar al cliente en error.
+        if (error.code === '23505') {
+          const { data: pagoConcurrente, error: errorConcurrente } =
+            await paymentModel.findPendingByInvoice(factura_id, req.db);
+          if (errorConcurrente) return errorConsulta(res, errorConcurrente);
+          if (!pagoConcurrente) return errorConsulta(res, error);
 
-      pago = data;
+          const esMismoCheckout = metodo === 'wompi' &&
+            pagoConcurrente.metodo === 'wompi' &&
+            [null, undefined, 'PENDING'].includes(pagoConcurrente.estado_wompi) &&
+            Number(pagoConcurrente.monto) === monto &&
+            Number(pagoConcurrente.cargo_wompi || 0) === cotizacion.cargoWompi;
+
+          if (!esMismoCheckout) {
+            return res.status(409).json({
+              error: 'Ya existe un pago pendiente de confirmación para esta factura',
+            });
+          }
+          pago = pagoConcurrente;
+        } else {
+          return errorConsulta(res, error);
+        }
+      } else {
+        pago = data;
+      }
     }
 
     const respuesta = {
@@ -152,11 +194,14 @@ async function registrarPago(req, res) {
     // Wompi signs the persisted payment ID and invoice amount server-side.
     if (metodo === 'wompi') {
       try {
-        const amountInCents = Math.round(Number(monto) * 100);
+        const amountInCents = Math.round(cotizacion.totalCobrar * 100);
         respuesta.wompi = {
           publicKey: process.env.WOMPI_PUBLIC_KEY,
           reference: pago.id,
           amountInCents,
+          valorServicio: cotizacion.valorServicio,
+          cargoWompi: cotizacion.cargoWompi,
+          totalCobrar: cotizacion.totalCobrar,
           currency: WOMPI_CURRENCY,
           signature: calcularFirmaIntegridad({
             reference: pago.id,
@@ -303,7 +348,7 @@ async function confirmarPagoManual(req, res) {
   const { id } = req.params;
 
   try {
-    const resultado = await confirmarPago(id);
+    const resultado = await confirmarPago(id, { metodo_confirmacion: 'manual' });
 
     if (!resultado.ok) {
       let status = 500;
@@ -371,6 +416,8 @@ async function registrarPagoAdmin(req, res) {
         factura_id,
         perfil_id: factura.perfil_id,
         monto: factura.valor_total,
+        cargo_wompi: 0,
+        monto_total: factura.valor_total,
         metodo,
         referencia: referencia || null,
         registrado_por: req.usuario.id,
@@ -380,7 +427,7 @@ async function registrarPagoAdmin(req, res) {
 
     if (errorPago) return errorConsulta(res, errorPago);
 
-    const resultado = await confirmarPago(pago.id);
+    const resultado = await confirmarPago(pago.id, { metodo_confirmacion: 'manual' });
 
     if (!resultado.ok) {
       // No dejamos un pago pendiente huérfano si la confirmación falló.
@@ -459,6 +506,7 @@ async function eliminarPago(req, res) {
 }
 
 module.exports = {
+  cotizacionWompi,
   misPagos,
   registrarPago,
   registrarPagoFisicoConRecibo,

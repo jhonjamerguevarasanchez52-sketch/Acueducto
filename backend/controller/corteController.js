@@ -87,7 +87,12 @@ async function crearCorte(req, res) {
       return res.status(409).json({ error: 'El usuario ya tiene un corte de servicio activo' });
     }
 
-    const { data, error } = await outageModel.create({ perfil_id, motivo, factura_id });
+    const { data, error } = await outageModel.create({
+      perfil_id,
+      motivo,
+      factura_id,
+      cortado_por: req.usuario.id,
+    });
 
     if (error) {
       // 23505 = unique_violation. Cubre la carrera: dos solicitudes
@@ -117,7 +122,7 @@ async function reconectar(req, res) {
   const { id } = req.params;
 
   try {
-    const { data, error } = await outageModel.reconnect(id);
+    const { data, error } = await outageModel.reconnect(id, req.usuario.id);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Corte no encontrado' });

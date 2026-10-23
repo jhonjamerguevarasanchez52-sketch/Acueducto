@@ -2,9 +2,11 @@
 
 ## Pagos en línea con Wompi
 
-El móvil solicita `POST /api/pagos` con `metodo: wompi`; el backend toma el valor
-de la factura, firma la referencia y la app abre el checkout hospedado de Wompi.
-La factura solo se marca pagada después de recibir y validar el webhook.
+El móvil consulta `GET /api/pagos/cotizacion-wompi/:facturaId` para mostrar el
+valor del servicio, el cargo estimado y el total. Después solicita `POST /api/pagos`
+con `metodo: wompi`; el backend firma el total y la app abre el checkout hospedado
+de Wompi. La factura se marca pagada por su valor de servicio solo tras validar el
+webhook.
 
 El pago físico se registra en `POST /api/pagos/:facturaId/recibo` con una imagen
 JPG, PNG o WEBP de hasta 5 MB. El backend crea el bucket privado `payment-receipts`
@@ -19,7 +21,35 @@ WOMPI_CURRENCY=COP
 WOMPI_PUBLIC_KEY=pub_test_...
 WOMPI_INTEGRITY_KEY=test_integrity_...
 WOMPI_EVENTS_SECRET=test_events_...
+WOMPI_FEE_RATE=0.0265
+WOMPI_FIXED_FEE_COP=700
+WOMPI_FEE_IVA_RATE=0.19
 ```
+
+Cuando Wompi confirma el pago, el backend conserva el valor del servicio en
+`payments.monto`, registra el cargo y total cobrados, y envía un comprobante al
+correo del perfil con la factura, periodo, desglose, medio y referencia. Para ese
+correo configura `BREVO_API_KEY` y `EMAIL_USER` en el backend. Ejecuta también
+`db/migrations/20261021_comprobante_pago_wompi.sql` para guardar el medio de pago y
+la fecha del comprobante enviado; los reintentos del webhook vuelven a intentar
+el correo si su envío falló.
+
+Ejecuta también `db/migrations/20261022_seguridad_perfil_y_pagos.sql`: evita que
+un usuario lea códigos internos o cambie su rol desde Supabase REST, reserva la
+creación de pagos y averías al backend y evita dos pagos pendientes para una
+misma factura, incluso si llegan solicitudes simultáneas.
+
+Ejecuta `db/migrations/20261023_consistencia_auditoria_y_cortes.sql` para añadir
+las columnas que usan los modelos de pagos/cortes y crear `admin_audit_log`.
+Ejecuta `db/migrations/20261024_triggers_pago_confirmado.sql` para que la
+confirmación del pago actualice la factura, reconecte el servicio, avise al
+usuario y cierre intentos pendientes en la misma transacción.
+
+El recargo se estima con la tarifa pública del Plan Avanzado (2,65% + $700 + IVA).
+El backend lo calcula y guarda separado del valor de la factura; ejecuta la migración
+`db/migrations/20261020_cargo_wompi.sql` antes de activar este cambio. Verifica en
+tu panel Wompi que tu plan y medio de pago usan esa tarifa y ajusta las variables
+si tu contrato es distinto.
 
 En el panel de Wompi, apunta la URL de eventos al endpoint HTTPS público
 `/api/wompi/webhook`, selecciona `transaction.updated` y usa llaves de Sandbox

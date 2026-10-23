@@ -56,10 +56,6 @@ async function editarPerfil(req, res) {
     const perfilActualIncompleto = CAMPOS_REQUERIDOS_PERFIL_COMPLETO.some((campo) =>
       !String(actual[campo] ?? '').trim()
     );
-    const perfilIncompleto = CAMPOS_REQUERIDOS_PERFIL_COMPLETO.some((campo) =>
-      !String(datosActualizar[campo] ?? actual[campo] ?? '').trim()
-    );
-
     if (!esAdministrador && !exento && !perfilActualIncompleto && actual.updated_at) {
       const proximaEdicion = new Date(actual.updated_at).getTime() + MS_LIMITE_EDICION_PERFIL;
       if (Date.now() < proximaEdicion) {
@@ -70,12 +66,8 @@ async function editarPerfil(req, res) {
       }
     }
 
-    // Mientras falte algún dato base, puede completar el perfil sin consumir
-    // el plazo. El conteo inicia al guardar el primer perfil completo.
-    datosActualizar.updated_at = esAdministrador
-      ? actual.updated_at
-      : perfilIncompleto ? null : new Date().toISOString();
-
+    // updated_at lo sella Postgres mediante un trigger para que un cliente no
+    // pueda alterar el límite de edición enviando su propio timestamp.
     const { data, error } = await profileModel.update(userId, datosActualizar, req.db);
 
     if (error) {

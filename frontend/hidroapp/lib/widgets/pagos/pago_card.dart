@@ -38,6 +38,20 @@ class PagoCard extends StatelessWidget {
     if (pago.rechazado) {
       return (texto: 'Rechazado', color: colores.danger, icono: Icons.cancel);
     }
+    if (pago.requiereRevision) {
+      return (
+        texto: 'Requiere revisión del acueducto',
+        color: colores.warning,
+        icono: Icons.support_agent,
+      );
+    }
+    if (pago.reemplazado) {
+      return (
+        texto: 'Cerrado: la factura se pagó con otro intento',
+        color: colores.secondaryText,
+        icono: Icons.info_outline,
+      );
+    }
     if (pago.estadoWompi == 'PENDING') {
       return (
         texto: 'Esperando respuesta de Wompi',

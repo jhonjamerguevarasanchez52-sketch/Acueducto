@@ -8,25 +8,17 @@ import '../core/mensaje_estado.dart';
 /// Tarjeta de una avería reportada: fecha, estado, descripción y, si el
 /// fontanero la dejó, su nota y la fecha de resolución.
 ///
-/// Cuando [onCambiarEstado] no es nulo (vista del fontanero) y la avería
-/// sigue abierta, muestra botones para marcarla "en proceso" o "resuelta".
-/// [actualizando] la controla la pantalla que la contiene: al vivir el flag
-/// fuera de esta tarjeta, no se pierde si la lista se reconstruye con datos
-/// frescos tras guardar el cambio (antes quedaba "pegado" mostrando el
-/// spinner para siempre porque esta tarjeta reutilizaba su propio estado).
+/// La administración puede ver los datos del reportante; los usuarios ven
+/// únicamente el estado y la descripción de sus propios reportes.
 class AveriaCard extends StatelessWidget {
   const AveriaCard({
     super.key,
     required this.averia,
-    this.onCambiarEstado,
-    this.actualizando = false,
-    this.bloqueadaPorOtra = false,
+    this.mostrarDetallesOperativos = false,
   });
 
   final Averia averia;
-  final void Function(String nuevoEstado)? onCambiarEstado;
-  final bool actualizando;
-  final bool bloqueadaPorOtra;
+  final bool mostrarDetallesOperativos;
 
   ({String texto, Color color}) _estado(AppColors colores) {
     switch (averia.estado) {
@@ -71,7 +63,7 @@ class AveriaCard extends StatelessWidget {
               averia.descripcion,
               style: const TextStyle(fontSize: 15, height: 1.35),
             ),
-            if (onCambiarEstado != null) ...[
+            if (mostrarDetallesOperativos) ...[
               const SizedBox(height: 12),
               _DatoAveria(
                 icono: Icons.person_outline,
@@ -144,46 +136,6 @@ class AveriaCard extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-            ],
-            if (onCambiarEstado != null && !averia.cerrada) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed:
-                      actualizando ||
-                          (bloqueadaPorOtra && averia.estado != 'en_proceso')
-                      ? null
-                      : () => onCambiarEstado!(
-                          averia.estado == 'en_proceso'
-                              ? 'resuelta'
-                              : 'en_proceso',
-                        ),
-                  icon: actualizando
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Icon(
-                          averia.estado == 'en_proceso'
-                              ? Icons.check_circle_outline
-                              : bloqueadaPorOtra
-                              ? Icons.lock_outline
-                              : Icons.play_arrow_rounded,
-                        ),
-                  label: Text(
-                    averia.estado == 'en_proceso'
-                        ? 'Marcar como solucionada'
-                        : bloqueadaPorOtra
-                        ? 'Termina la avería en curso para empezar otra'
-                        : 'Empezar',
-                  ),
-                ),
               ),
             ],
           ],
