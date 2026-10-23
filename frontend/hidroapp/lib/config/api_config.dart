@@ -4,41 +4,44 @@ import 'package:flutter/foundation.dart';
 
 /// URL base del backend del Acueducto Campo Amor.
 ///
-/// - En el emulador de Android, `localhost` apunta al propio teléfono, así que
-///   el host de la máquina de desarrollo se accede por `10.0.2.2`.
-/// - En web, Windows, macOS, Linux e iOS simulador se usa `localhost`.
-/// - Se puede sobreescribir en tiempo de compilación con:
+/// - Por defecto usa el servidor de Render (`useRemote = true`).
+/// - Con `useRemote = false`, en el emulador de Android usa `10.0.2.2`
+///   y en el resto de plataformas `localhost`.
+/// - Se puede sobreescribir al compilar con:
 ///   `flutter run --dart-define=API_BASE_URL=https://mi-servidor/api`
 class ApiConfig {
   ApiConfig._();
 
+  static const bool useRemote = true;
+
+  static const String _remoteUrl = 'https://hidro-app.onrender.com/api';
+
   static const String _override =
       String.fromEnvironment('API_BASE_URL', defaultValue: '');
   static const bool _allowInsecureLocalApi =
-      bool.fromEnvironment('ALLOW_INSECURE_LOCAL_API', defaultValue: false);
+      bool.fromEnvironment('ALLOW_INSECURE_LOCAL_API', defaultValue: true);
 
   static String get baseUrl {
-    if (kReleaseMode) {
-      // En un build de release no hay dev server local: si no se pasó
-      // --dart-define=API_BASE_URL=https://..., es un error de compilación,
-      // no algo que deba degradar silenciosamente a localhost/HTTP.
-      if (_override.isEmpty) {
-        throw StateError(
-          'API_BASE_URL no está definido. Compila con '
-          '--dart-define=API_BASE_URL=https://tu-backend/api',
-        );
-      }
-      if (_override.startsWith('https://')) return _override;
-      if (_allowInsecureLocalApi && _isPrivateHttpUrl(_override)) {
-        return _override;
-      }
-      if (!_override.startsWith('https://')) {
+    // 1. Si se pasó --dart-define, tiene prioridad (validado en release).
+    if (_override.isNotEmpty) {
+      if (kReleaseMode &&
+          !_override.startsWith('https://') &&
+          !(_allowInsecureLocalApi && _isPrivateHttpUrl(_override))) {
         throw StateError('API_BASE_URL debe ser https:// en un build de release.');
       }
+      return _override;
     }
 
-    if (_override.isNotEmpty) return _override;
+    // 2. Servidor remoto en Render.
+    if (useRemote) return _remoteUrl;
 
+    // 3. Desarrollo local.
+    if (kReleaseMode) {
+      throw StateError(
+        'Un build de release no puede usar el servidor local. '
+        'Activa useRemote o pasa --dart-define=API_BASE_URL=https://...',
+      );
+    }
     const port = 3000;
     if (!kIsWeb && Platform.isAndroid) {
       return 'http://10.0.2.2:$port/api';
