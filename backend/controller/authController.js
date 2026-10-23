@@ -1,472 +1,285 @@
-const crypto = require('crypto');
 const authModel = require('../models/authModel');
 const profileModel = require('../models/profileModel');
-const { enviarCorreo } = require('../config/mailer');
-const {
-  segundosDeBloqueo,
-  registrarFallo,
-  registrarExito,
-} = require('../utils/controlIntentos');
+const breakdownModel = require('../models/breakdownModel');
+const { CAMPOS_EDITABLES_PERFIL } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+const { generarPasswordTemporal } = require('../utils/passwords');
+const { enviarCorreo } = require('../config/mailer');
+const { notificar } = require('../utils/notificar');
+const { escaparHtml } = require('../utils/html');
 
-// Genera un código numérico de 6 dígitos
-function generarCodigo() {
-  return crypto.randomInt(100000, 999999).toString();
-}
+const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
 function normalizarCorreo(correo) {
   return String(correo || '').toLowerCase().trim();
 }
 
-
-// Errores de transporte de Supabase Auth no significan que la contraseña sea
-// incorrecta. Reconocemos también errores de DNS/TLS/socket que varían según
-// la versión de Node, el sistema operativo y el proveedor de hosting.
-function esErrorTransitorioAuth(error) {
-  const texto = [error?.name, error?.message, error?.code,
-    error?.cause?.code, error?.cause?.name, error?.cause?.message]
-    .filter(Boolean).join(' ').toLowerCase();
-  const estado = Number(error?.status ?? error?.statusCode ?? error?.cause?.status);
-  return [500, 502, 503, 504].includes(estado)
-    || /authretryablefetcherror|fetch failed|network|econnreset|econnrefused|etimedout|eai_again|enotfound|und_err_connect_timeout|socket hang up|tls|service unavailable|bad gateway|gateway timeout/.test(texto);
-}
-
-async function reintentarServicioSupabase(operacion) {
-  // Reintentos breves para recuperarse de fallos puntuales de red o de
-  // disponibilidad tanto en Auth como en la consulta de perfil.
-  for (let intento = 0; ; intento++) {
-    try {
-      const resultado = await operacion();
-      if (!resultado.error || !esErrorTransitorioAuth(resultado.error) || intento >= 2) {
-        return resultado;
-      }
-    } catch (error) {
-      if (!esErrorTransitorioAuth(error) || intento >= 2) throw error;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300 * (2 ** intento)));
-  }
-}
-
-async function iniciarSesionSupabase(correo, password) {
-  return reintentarServicioSupabase(() => authModel.signIn(correo, password));
-}
-
-function responderAuthNoDisponible(res, error) {
-  console.error('[login] Falló la conexión con Supabase Auth tras reintentos:', {
-    name: error?.name,
-    causeName: error?.cause?.name,
-    causeCode: error?.cause?.code,
-    causeMessage: error?.cause?.message,
-  });
-  return res.status(503).json({
-    error: 'No pudimos conectar con el servicio de acceso. Revisa tu conexión e inténtalo de nuevo.',
-  });
-
-async function verificarCorreoAdministrador(req, res) {
+// Crear un usuario con contraseña temporal generada automáticamente.
+// Pensado para que un administrador dé de alta a alguien sin tener que
+// inventarle una contraseña: se le envía por correo y queda obligado a
+// cambiarla apenas inicie sesión (ver authController.iniciarSesion).
+async function crearUsuario(req, res) {
   const correo = normalizarCorreo(req.body.correo);
-  if (!correo) return res.status(400).json({ error: 'El correo es obligatorio' });
-  try {
-    const { data: perfil, error } = await profileModel.findByEmail(correo, 'id, rol');
-    if (error && error.code !== 'PGRST116') return errorConsulta(res, error);
-    if (!perfil || perfil.rol !== 'administrador') {
-      return res.status(403).json({ esAdministrador: false, error: 'Este correo no está registrado en la base de datos.' });
-    }
-    return res.status(200).json({ esAdministrador: true });
-  } catch (err) { return errorInesperado(res, err); }
+  const { nombre, apellido } = req.body;
+  const rol = req.body.rol || 'usuario';
 
-}
-
-// No hay endpoint de auto-registro: las cuentas las crea el administrador con
-// `scripts/crearUsuario.js` (Auth + fila en `profiles` con is_verified = true).
-// El flujo de verificación por código de abajo sigue disponible por si una
-// cuenta se crea sin verificar.
-
-async function iniciarSesion(req, res) {
-  const correo = normalizarCorreo(req.body.correo);
-  const { password } = req.body;
-
-  if (!correo || !password) {
-    return res.status(400).json({ error: 'Correo y contraseña son obligatorios' });
+  if (!correo || !nombre || !apellido) {
+    return res.status(400).json({ error: 'Correo, nombre y apellido son obligatorios' });
   }
 
-  const bloqueo = segundosDeBloqueo('login', correo);
-  if (bloqueo) {
-    return res.status(429).json({
-      error: `Demasiados intentos fallidos. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
-    });
+  if (!ROLES_VALIDOS.includes(rol)) {
+    return res.status(400).json({ error: 'Rol inválido. Usa: administrador, usuario o fontanero' });
   }
+
+  const passwordTemporal = generarPasswordTemporal();
+  let userId;
 
   try {
-    const { data, error } = await iniciarSesionSupabase(correo, password);
-    const { data: adminPerfil, error: adminError } = await profileModel.findByEmail(correo, 'id, rol');
-    if (adminError && adminError.code !== 'PGRST116') return errorConsulta(res, adminError);
-    if (!adminPerfil || adminPerfil.rol !== 'administrador') {
-      return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
-    }
-    const { data, error } = await authModel.signIn(correo, password);
+    const { data: creado, error: crearError } = await authModel.createUser(correo, passwordTemporal);
 
-
-    if (error) {
-      // No contar fallos de red como intentos de contraseña.
-      if (esErrorTransitorioAuth(error)) return responderAuthNoDisponible(res, error);
-
-      registrarFallo('login', correo);
-      return res.status(401).json({ error: error.message });
-    }
-
-    // Exigimos que la cuenta esté verificada por código antes de permitir el acceso.
-    const { data: perfil, error: perfilError } = await reintentarServicioSupabase(
-      () => profileModel.getById(data.user.id, {
-        columns: 'is_verified, activo, debe_cambiar_password',
-      }),
-    );
-
-    if (perfilError) {
-      if (esErrorTransitorioAuth(perfilError)) {
-        return responderAuthNoDisponible(res, perfilError);
-      }
-      return errorConsulta(res, perfilError);
-    }
-
-    if (!perfil || perfil.is_verified !== true) {
-      return res.status(403).json({
-        error: 'Debes verificar tu cuenta antes de iniciar sesión.',
-        requiereVerificacion: true,
+    if (crearError) {
+      const yaExiste = /already been registered|already exists|duplicate/i.test(crearError.message);
+      return res.status(yaExiste ? 409 : 400).json({
+        error: yaExiste ? 'Ese correo ya está registrado' : crearError.message,
       });
     }
 
-    if (perfil.activo === false) {
-      return res.status(403).json({ error: 'Tu cuenta está desactivada. Contacta al administrador.' });
+    userId = creado.user.id;
+
+    // El acueducto contempla un único fontanero: si se asigna, se quita al anterior.
+    if (rol === 'fontanero') {
+      const { error: errorDegradacion } = await profileModel.demotePlumbers();
+
+      if (errorDegradacion) {
+        await authModel.deleteUser(userId).catch(() => {});
+        return errorConsulta(res, errorDegradacion);
+      }
     }
 
-    registrarExito('login', correo);
-    return res.status(200).json({
-      message: 'Inicio de sesión exitoso',
-      session: data.session,
-      user: data.user,
-      // El frontend usa esto para forzar la pantalla de cambio de contraseña
-      // cuando la cuenta fue creada por un administrador con clave temporal.
-      debeCambiarPassword: perfil.debe_cambiar_password === true,
-    });
-  } catch (err) {
-    if (esErrorTransitorioAuth(err)) return responderAuthNoDisponible(res, err);
-    return errorInesperado(res, err);
-  }
-}
-
-
-// --- VERIFICACIÓN DE CUENTA ---
-
-async function verificarCuenta(req, res) {
-  const correo = normalizarCorreo(req.body.correo);
-  const { codigo } = req.body;
-
-  if (!correo || !codigo) {
-    return res.status(400).json({ error: 'Correo y código son obligatorios' });
-  }
-
-  const bloqueo = segundosDeBloqueo('verificar', correo);
-  if (bloqueo) {
-    return res.status(429).json({
-      error: `Demasiados intentos fallidos. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
-    });
-  }
-
-  try {
-    const { data: perfil, error: buscarError } = await profileModel.findByEmail(
+    const { error: profileError } = await profileModel.create({
+      id: userId,
+      nombre,
+      apellido,
       correo,
-      'id, rol, is_verified, codigo_verificacion, codigo_verificacion_expiracion'
-    );
-
-    if (perfil?.rol !== 'administrador') return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
-
-    // No revelamos si el correo existe: mismo mensaje que un código incorrecto.
-    if (buscarError || !perfil) {
-      registrarFallo('verificar', correo);
-      return res.status(400).json({ error: 'Código incorrecto o expirado' });
-    }
-
-    if (perfil.is_verified) {
-      return res.status(400).json({ error: 'La cuenta ya está verificada' });
-    }
-
-    if (
-      !perfil.codigo_verificacion ||
-      perfil.codigo_verificacion !== codigo ||
-      new Date(perfil.codigo_verificacion_expiracion) < new Date()
-    ) {
-      registrarFallo('verificar', correo);
-      return res.status(400).json({ error: 'Código incorrecto o expirado' });
-    }
-
-    const { error: updateError } = await profileModel.saveFields(perfil.id, {
+      rol,
+      activo: true,
       is_verified: true,
-      codigo_verificacion: null,
-      codigo_verificacion_expiracion: null,
+      debe_cambiar_password: true,
     });
 
-    if (updateError) {
-      return errorConsulta(res, updateError);
-    }
-
-    registrarExito('verificar', correo);
-    return res.status(200).json({ message: 'Cuenta verificada con éxito' });
-  } catch (err) {
-    return errorInesperado(res, err);
-  }
-}
-
-async function reenviarCodigoVerificacion(req, res) {
-  const correo = normalizarCorreo(req.body.correo);
-
-  if (!correo) {
-    return res.status(400).json({ error: 'El correo es obligatorio' });
-  }
-
-  // Contamos cada solicitud (exista o no la cuenta) para no revelar por
-  // temporización/bloqueo si el correo está registrado, y para frenar el
-  // "email-bombing" de códigos a una bandeja de entrada real.
-  const bloqueo = segundosDeBloqueo('reenviar', correo);
-  if (bloqueo) {
-    return res.status(429).json({
-      error: `Demasiadas solicitudes. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
-    });
-  }
-  registrarFallo('reenviar', correo);
-
-  try {
-    const { data: perfil, error: buscarError } = await profileModel.findByEmail(
-      correo,
-      'id, rol, is_verified, nombre'
-    );
-
-    if (perfil?.rol !== 'administrador') return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
-
-    // No revelamos si el correo existe o ya está verificado: mismo mensaje siempre.
-    const mensajeGenerico = { message: 'Si el correo existe y no ha sido verificado, se enviará un nuevo código' };
-
-    if (buscarError || !perfil || perfil.is_verified) {
-      return res.status(200).json(mensajeGenerico);
-    }
-
-    const codigoVerificacion = generarCodigo();
-    const codigoVerificacionExpiracion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-
-    const { error: updateError } = await profileModel.saveFields(perfil.id, {
-      codigo_verificacion: codigoVerificacion,
-      codigo_verificacion_expiracion: codigoVerificacionExpiracion,
-    });
-
-    if (updateError) {
-      return errorConsulta(res, updateError);
+    if (profileError) {
+      // Evitamos dejar un usuario huérfano en auth.users sin perfil asociado.
+      await authModel.deleteUser(userId).catch(() => {});
+      return errorConsulta(res, profileError);
     }
 
     try {
       await enviarCorreo({
         to: correo,
-        subject: 'Nuevo código de verificación - Acueducto Campo Amor',
-        html: `<p>Tu nuevo código de verificación es:</p>
-               <h2>${codigoVerificacion}</h2>
-               <p>Este código expira en 15 minutos.</p>`,
+        subject: 'Tu cuenta en Acueducto Campo Amor',
+        html: `<p>Hola ${escaparHtml(nombre)},</p>
+          <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
+          <h2>${escaparHtml(passwordTemporal)}</h2>
+          <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
       });
     } catch (mailErr) {
-      console.error('Error enviando correo de verificación:', mailErr.message);
+      console.error('Error enviando correo de cuenta creada:', mailErr.message);
     }
 
-    return res.status(200).json(mensajeGenerico);
-  } catch (err) {
-    return errorInesperado(res, err);
-  }
-}
-
-// --- CAMBIO DE CONTRASEÑA (usuario autenticado) ---
-
-// Usada tras el primer login con una contraseña temporal generada por un
-// administrador, pero también sirve como cambio de contraseña voluntario.
-async function cambiarPasswordPropio(req, res) {
-  const userId = req.usuario.id;
-  const correo = normalizarCorreo(req.usuario.email);
-  const { passwordActual, passwordNueva } = req.body;
-
-  if (!passwordActual || !passwordNueva) {
-    return res.status(400).json({ error: 'La contraseña actual y la nueva son obligatorias' });
-  }
-
-  if (String(passwordNueva).length < 8) {
-    return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
-  }
-
-  if (passwordNueva === passwordActual) {
-    return res.status(400).json({ error: 'La nueva contraseña debe ser distinta de la actual' });
-  }
-
-  try {
-    // Confirmamos la contraseña actual reautenticando contra Supabase Auth,
-    // en vez de confiar en que quien llama con el token es realmente el dueño.
-    const { error: authError } = await authModel.signIn(correo, passwordActual);
-
-    if (authError) {
-      return res.status(400).json({ error: 'La contraseña actual es incorrecta' });
-    }
-
-    const { error: updateAuthError } = await authModel.changePassword(userId, passwordNueva);
-
-    if (updateAuthError) {
-      return errorConsulta(res, updateAuthError);
-    }
-
-    const { error: updatePerfilError } = await profileModel.saveFields(userId, {
-      debe_cambiar_password: false,
-    });
-
-    if (updatePerfilError) {
-      return errorConsulta(res, updatePerfilError);
-    }
-
-    return res.status(200).json({ message: 'Contraseña actualizada con éxito' });
-  } catch (err) {
-    return errorInesperado(res, err);
-  }
-}
-
-// --- RECUPERACIÓN DE CONTRASEÑA ---
-
-async function solicitarRecuperacion(req, res) {
-  const correo = normalizarCorreo(req.body.correo);
-
-  if (!correo) {
-    return res.status(400).json({ error: 'El correo es obligatorio' });
-  }
-
-  // Igual que en reenviarCodigoVerificacion: contamos cada solicitud exista o
-  // no la cuenta, para no filtrar su existencia vía el bloqueo por spam.
-  const bloqueo = segundosDeBloqueo('recuperar', correo);
-  if (bloqueo) {
-    return res.status(429).json({
-      error: `Demasiadas solicitudes. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
-    });
-  }
-  registrarFallo('recuperar', correo);
-
-  try {
-    const { data: perfil, error: buscarError } = await profileModel.findByEmail(correo, 'id, rol');
-
-    if (buscarError || !perfil || perfil.rol !== 'administrador') {
-      // No revelamos si el correo existe o no, por seguridad
-      return res.status(200).json({ message: 'Si el correo existe, se enviará un código de recuperación' });
-    }
-
-    const codigoRecuperacion = generarCodigo();
-    const codigoExpiracion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-
-    const { error: updateError } = await profileModel.saveFields(perfil.id, {
-      codigo_recuperacion: codigoRecuperacion,
-      codigo_expiracion: codigoExpiracion,
-    });
-
-    if (updateError) {
-      return errorConsulta(res, updateError);
-    }
-
-    try {
-      await enviarCorreo({
-        to: correo,
-        subject: 'Recuperación de contraseña - Acueducto Campo Amor',
-        html: `<p>Tu código de recuperación es:</p>
-              <h2>${codigoRecuperacion}</h2>
-              <p>Este código expira en 15 minutos. Si no solicitaste esto, ignora este correo.</p>`,
-      });
-    } catch (mailErr) {
-      console.error('Error enviando correo de recuperación:', mailErr.message);
-    }
-
-    return res.status(200).json({ message: 'Si el correo existe, se enviará un código de recuperación' });
-  } catch (err) {
-    return errorInesperado(res, err);
-  }
-}
-
-async function resetearPassword(req, res) {
-  const correo = normalizarCorreo(req.body.correo);
-  const { codigo, nuevaPassword } = req.body;
-
-  if (!correo || !codigo || !nuevaPassword) {
-    return res.status(400).json({ error: 'Correo, código y nueva contraseña son obligatorios' });
-  }
-
-  if (String(nuevaPassword).length < 8) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
-  }
-
-  const bloqueo = segundosDeBloqueo('reset', correo);
-  if (bloqueo) {
-    return res.status(429).json({
-      error: `Demasiados intentos fallidos. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
-    });
-  }
-
-  try {
-    const { data: perfil, error: buscarError } = await profileModel.findByEmail(
-      correo,
-      'id, rol, codigo_recuperacion, codigo_expiracion'
+    // Además del correo, dejamos un aviso dentro de la app para cuando inicie sesión.
+    await notificar(
+      userId,
+      'Tu cuenta fue creada con una contraseña temporal. Por seguridad, cámbiala desde tu perfil.',
+      'seguridad'
     );
 
-    if (perfil?.rol !== 'administrador') return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
+    return res.status(201).json({
+      message: 'Usuario creado con éxito. Se envió la contraseña temporal por correo.',
+      userId,
+      // Se devuelve también aquí (solo visible para el administrador que crea
+      // la cuenta) por si el envío de correo falla y hay que compartirla a mano.
+      passwordTemporal,
+    });
+  } catch (err) {
+    if (userId) {
+      await authModel.deleteUser(userId).catch(() => {});
+    }
+    return errorInesperado(res, err);
+  }
+}
 
-    if (buscarError || !perfil) {
+// Listar todos los usuarios
+async function verTodosUsuarios(req, res) {
+  const { rol, activo, limit, offset } = req.query;
+
+  try {
+    const { data, error } = await profileModel.list({ rol, activo, limit, offset });
+    if (error) return errorConsulta(res, error);
+
+    return res.status(200).json(data);
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+// Ver un usuario concreto
+async function verUsuario(req, res) {
+  const { userId } = req.params;
+
+  try {
+    const { data, error } = await profileModel.getById(userId);
+
+    if (error || !data) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    if (
-      !perfil.codigo_recuperacion ||
-      perfil.codigo_recuperacion !== codigo ||
-      new Date(perfil.codigo_expiracion) < new Date()
-    ) {
-      registrarFallo('reset', correo);
-      return res.status(400).json({ error: 'Código incorrecto o expirado' });
+    return res.status(200).json(data);
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+// Cambiar el rol de un usuario
+async function cambiarRol(req, res) {
+  const { userId } = req.params;
+  const { rol } = req.body;
+
+  if (!rol || !ROLES_VALIDOS.includes(rol)) {
+    return res.status(400).json({ error: 'Rol inválido. Usa: administrador, usuario o fontanero' });
+  }
+
+  // El acueducto contempla un único fontanero a la vez: si ya hay uno asignado
+  // a otro usuario, hay que quitarle el rol (o eliminarlo) antes de asignar uno nuevo.
+  try {
+    if (rol === 'fontanero') {
+      const { error: errorDegradacion } = await profileModel.demotePlumbers(userId);
+
+      if (errorDegradacion) {
+        return errorConsulta(res, errorDegradacion);
+      }
     }
 
-    // La contraseña real vive en auth.users, se actualiza vía admin API
-    const { error: authUpdateError } = await authModel.changePassword(perfil.id, nuevaPassword);
+    const { data, error } = await profileModel.update(userId, { rol });
 
-    if (authUpdateError) {
-      return errorConsulta(res, authUpdateError);
-    }
-
-    const { error: updateError } = await profileModel.saveFields(perfil.id, {
-      codigo_recuperacion: null,
-      codigo_expiracion: null,
-    });
-
-    if (updateError) {
-      return errorConsulta(res, updateError);
-    }
-
-    registrarExito('reset', correo);
-
-    try {
-      await enviarCorreo({
-        to: correo,
-        subject: 'Tu contraseña fue actualizada - Acueducto Campo Amor',
-        html: `<p>Tu contraseña se actualizó correctamente.</p>
-               <p>Si no realizaste este cambio, contacta de inmediato al administrador del acueducto.</p>`,
+    if (error?.code === '23505') {
+      return res.status(409).json({
+        error: 'Ya existe un fontanero asignado. Actualiza la lista de usuarios e inténtalo de nuevo.',
       });
-    } catch (mailErr) {
-      console.error('Error enviando correo de confirmación de cambio de contraseña:', mailErr.message);
+    }
+    if (error || !data) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    return res.status(200).json({ message: 'Contraseña actualizada con éxito' });
+    return res.status(200).json({ message: `Rol actualizado a "${rol}"`, perfil: data });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+// Editar datos administrativos de un usuario
+async function editarUsuario(req, res) {
+  const { userId } = req.params;
+
+  const cambios = {};
+  for (const campo of CAMPOS_EDITABLES_PERFIL) {
+    if (req.body[campo] !== undefined) cambios[campo] = req.body[campo];
+  }
+
+  if (Object.keys(cambios).length === 0) {
+    return res.status(400).json({ error: 'No hay campos válidos para actualizar' });
+  }
+
+  try {
+    const { data, error } = await profileModel.update(userId, cambios);
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    return res.status(200).json({ message: 'Usuario actualizado', perfil: data });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+// Activar o desactivar un usuario (bloquea/permite el acceso)
+async function cambiarEstadoUsuario(req, res) {
+  const { userId } = req.params;
+  const { activo } = req.body;
+
+  if (typeof activo !== 'boolean') {
+    return res.status(400).json({ error: 'El campo "activo" debe ser true o false' });
+  }
+
+  if (userId === req.usuario.id && activo === false) {
+    return res.status(400).json({ error: 'No puedes desactivar tu propia cuenta' });
+  }
+
+  try {
+    const { data, error } = await profileModel.update(userId, { activo });
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    return res.status(200).json({
+      message: activo ? 'Usuario activado' : 'Usuario desactivado',
+      perfil: data,
+    });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+// Eliminar un usuario definitivamente.
+// Borra la cuenta de Supabase Auth; por la cascada definida en el esquema
+// (profiles -> auth.users, y los datos del usuario como titular -> profiles),
+// esto también borra su perfil y su historial. Las averías asignadas a un
+// fontanero conservan su historial y quedan sin asignación. Es irreversible:
+// para solo bloquear el acceso sin perder el historial, usa
+// cambiarEstadoUsuario (activo: false) en su lugar.
+async function eliminarUsuario(req, res) {
+  const { userId } = req.params;
+
+  if (userId === req.usuario.id) {
+    return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta' });
+  }
+
+  try {
+    // Quita primero la asignación activa para que la eliminación también
+    // funcione en bases antiguas cuya FK aún no tiene ON DELETE SET NULL.
+    const { error: errorAverias } = await breakdownModel.unassignFromPlumber(userId);
+    if (errorAverias) return errorConsulta(res, errorAverias);
+
+    const { error } = await authModel.deleteUser(userId);
+
+    if (error) {
+      const noExiste = /not found|no rows/i.test(error.message);
+      if (noExiste) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+      const bloqueoPorRelacion = error.code === '23503'
+        || /foreign key|violates.*constraint|database error deleting user/i.test(error.message || '');
+      if (bloqueoPorRelacion) {
+        return res.status(409).json({
+          error: 'La base de datos aún tiene una relación que bloquea el borrado. Aplica la migración 20261014_breakdown_assignee_delete.sql en Supabase y vuelve a intentarlo.',
+        });
+      }
+      return errorConsulta(res, error);
+    }
+
+    return res.status(200).json({ message: 'Usuario eliminado permanentemente' });
   } catch (err) {
     return errorInesperado(res, err);
   }
 }
 
 module.exports = {
-  verificarCorreoAdministrador,
-  iniciarSesion,
-  verificarCuenta,
-  reenviarCodigoVerificacion,
-  cambiarPasswordPropio,
-  solicitarRecuperacion,
-  resetearPassword,
+  crearUsuario,
+  verTodosUsuarios,
+  verUsuario,
+  cambiarRol,
+  editarUsuario,
+  cambiarEstadoUsuario,
+  eliminarUsuario,
 };

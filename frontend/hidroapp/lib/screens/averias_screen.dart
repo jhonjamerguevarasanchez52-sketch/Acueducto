@@ -49,7 +49,7 @@ class _AveriasScreenState extends State<AveriasScreen> {
     _futuro = _cargar();
   }
 
-  @override
+  @override 
   void didChangeDependencies() {
     super.didChangeDependencies();
     final rol = Provider.of<AuthProvider>(context).profile?.rol;
