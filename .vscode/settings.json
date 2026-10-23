@@ -1,5 +1,5 @@
 {
     "postman.settings.dotenv-detection-notification-visibility": false,
     "task.allowAutomaticTasks": "always",
-    "hidroapp.androidAvd": "Pixel_9"
+    "hidroapp.androidAvd": "Pixel_10a"
 }
