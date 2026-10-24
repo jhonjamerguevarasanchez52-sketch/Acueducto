@@ -33,6 +33,7 @@ Thumbs.db
 !.env.example
 hidro-admin/.env
 hidro-admin/.env.*
+!hidro-admin/.env.example
 
 # Dependencias y compilaciones del panel web
 hidro-admin/node_modules/
