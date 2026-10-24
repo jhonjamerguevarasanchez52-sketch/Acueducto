@@ -8,8 +8,11 @@ const profileModelPath = path.join(__dirname, '../models/profileModel.js');
 const attemptsPath = path.join(__dirname, '../utils/controlIntentos.js');
 
 const attempts = { fallos: 0, exitos: 0 };
-const authModel = { signIn: async () => ({}) };
-const profileModel = { getById: async () => ({}) };
+const authModel = { signIn: async () => ({}), refreshSession: async () => ({}) };
+const profileModel = {
+  findByEmail: async () => ({ data: { id: 'user-1', rol: 'administrador' }, error: null }),
+  getById: async () => ({}),
+};
 
 function mockModule(filename, exports) {
   require.cache[filename] = {
@@ -28,7 +31,7 @@ mockModule(attemptsPath, {
   registrarExito: () => { attempts.exitos += 1; },
 });
 
-const { iniciarSesion } = require(controllerPath);
+const { iniciarSesion, renovarSesion } = require(controllerPath);
 
 function respuestaCapturada() {
   return {
@@ -43,6 +46,11 @@ function ejecutarLogin() {
   const res = respuestaCapturada();
   return iniciarSesion({ body: { correo: 'USUARIO@ejemplo.com', password: 'clave-valida' } }, res)
     .then(() => res);
+}
+
+function ejecutarRenovacion(refreshToken) {
+  const res = respuestaCapturada();
+  return renovarSesion({ body: { refreshToken } }, res).then(() => res);
 }
 
 test('reintenta un 503 de Auth y permite login cuando Supabase se recupera', async () => {
@@ -111,4 +119,36 @@ test('credenciales incorrectas responden 401 sin reintentos', async () => {
   assert.equal(res.statusCode, 401);
   assert.equal(llamadasAuth, 1);
   assert.equal(attempts.fallos, 1);
+});
+
+test('renueva la sesión biométrica y exige un perfil administrador activo', async () => {
+  authModel.refreshSession = async (refreshToken) => {
+    assert.equal(refreshToken, 'refresh-anterior');
+    return {
+      data: {
+        user: { id: 'admin-1' },
+        session: { access_token: 'access-nuevo', refresh_token: 'refresh-nuevo' },
+      },
+      error: null,
+    };
+  };
+  profileModel.getById = async (id, opciones) => {
+    assert.equal(id, 'admin-1');
+    assert.equal(opciones.columns, 'rol, is_verified, activo, debe_cambiar_password');
+    return {
+      data: { rol: 'administrador', is_verified: true, activo: true },
+      error: null,
+    };
+  };
+
+  const res = await ejecutarRenovacion('refresh-anterior');
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.session.access_token, 'access-nuevo');
+  assert.equal(res.body.session.refresh_token, 'refresh-nuevo');
+});
+
+test('rechaza una renovación biométrica sin refresh token válido', async () => {
+  const res = await ejecutarRenovacion('');
+  assert.equal(res.statusCode, 400);
 });
