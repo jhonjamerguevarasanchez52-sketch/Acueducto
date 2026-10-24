@@ -2,18 +2,18 @@ const notificationModel = require('../models/notificationModel');
 const profileModel = require('../models/profileModel');
 const { enviarCorreo } = require('../config/mailer');
 const { escaparHtml } = require('../utils/html');
+const { correoAviso } = require('../utils/emailtemplates');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 async function enviarAvisosCorreo(perfiles, mensaje) {
   const resultados = await Promise.all(perfiles.map(async (perfil) => {
     if (!perfil.correo) return false;
     try {
+      const correo = correoAviso(perfil.nombre || '', mensaje);
       const respuesta = await enviarCorreo({
         to: perfil.correo,
-        subject: 'Aviso del Acueducto Campo Amor',
-        html: `<p>Hola ${escaparHtml(perfil.nombre || '')},</p>
-               <p>${escaparHtml(mensaje).replace(/\r?\n/g, '<br>')}</p>
-               <p>Acueducto Campo Amor</p>`,
+        subject: correo.asunto,
+        html: correo.html,
       });
       if (!respuesta) throw new Error('El servicio de correo no confirmó el envío.');
       return true;
