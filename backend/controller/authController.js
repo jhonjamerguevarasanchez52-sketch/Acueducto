@@ -152,6 +152,34 @@ async function iniciarSesion(req, res) {
   }
 }
 
+// Renueva una sesión previamente guardada en el dispositivo. El refresh token
+// solo se envía después de que el sistema operativo valide biometría.
+async function renovarSesion(req, res) {
+  const refreshToken = String(req.body.refreshToken || '').trim();
+  if (!refreshToken) return res.status(400).json({ error: 'La sesión guardada no es válida.' });
+  try {
+    const { data, error } = await reintentarServicioSupabase(
+      () => authModel.refreshSession(refreshToken),
+    );
+    if (error || !data?.user || !data?.session) {
+      return res.status(401).json({ error: 'La sesión biométrica venció. Ingresa con tu correo y contraseña.' });
+    }
+    const { data: perfil, error: perfilError } = await profileModel.getById(data.user.id, {
+      columns: 'rol, is_verified, activo, debe_cambiar_password',
+    });
+    if (perfilError || !perfil || perfil.rol !== 'administrador' || perfil.is_verified !== true || perfil.activo === false) {
+      return res.status(403).json({ error: 'Esta cuenta no puede iniciar sesión. Contacta al administrador.' });
+    }
+    return res.status(200).json({
+      session: data.session,
+      debeCambiarPassword: perfil.debe_cambiar_password === true,
+    });
+  } catch (err) {
+    if (esErrorTransitorioAuth(err)) return responderAuthNoDisponible(res, err);
+    return errorInesperado(res, err);
+  }
+}
+
 
 // --- VERIFICACIÓN DE CUENTA ---
 
@@ -462,6 +490,7 @@ async function resetearPassword(req, res) {
 module.exports = {
   verificarCorreoAdministrador,
   iniciarSesion,
+  renovarSesion,
   verificarCuenta,
   reenviarCodigoVerificacion,
   cambiarPasswordPropio,

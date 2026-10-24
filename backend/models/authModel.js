@@ -8,6 +8,10 @@ function signIn(correo, password) {
   return supabase.auth.signInWithPassword({ email: correo, password });
 }
 
+function refreshSession(refreshToken) {
+  return supabase.auth.refreshSession({ refresh_token: refreshToken });
+}
+
 function getUserByToken(token) {
   return supabase.auth.getUser(token);
 }
@@ -29,4 +33,4 @@ function changePassword(id, password) {
   return supabaseAdmin.auth.admin.updateUserById(id, { password });
 }
 
-module.exports = { signIn, getUserByToken, userClient, createUser, deleteUser, changePassword };
+module.exports = { signIn, refreshSession, getUserByToken, userClient, createUser, deleteUser, changePassword };
