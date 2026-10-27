@@ -1,8 +1,9 @@
-﻿const API_URL = import.meta.env.VITE_API_URL || (
-  import.meta.env.PROD
-    ? 'https://hidro-app.onrender.com/api'
-    : 'http://localhost:3000/api'
-)
+﻿const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://hidro-app.onrender.com')
+  .trim()
+  .replace(/\/+$/, '')
+const API_URL = import.meta.env.DEV
+  ? '/api'
+  : API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`
 
 export function getToken() {
   return localStorage.getItem('hidro_token')
