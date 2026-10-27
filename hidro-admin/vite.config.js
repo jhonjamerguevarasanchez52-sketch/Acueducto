@@ -13,9 +13,6 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    optimizeDeps: {
-      include: ['exceljs'],
-    },
     server: {
       proxy: {
         '/api': {

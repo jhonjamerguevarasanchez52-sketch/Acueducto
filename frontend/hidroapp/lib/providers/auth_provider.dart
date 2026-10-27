@@ -7,16 +7,39 @@ import '../services/api_service.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
+abstract interface class AuthSessionStorage {
+  Future<String?> read(String key);
+  Future<void> write(String key, String value);
+  Future<void> delete(String key);
+}
+
+class FlutterAuthSessionStorage implements AuthSessionStorage {
+  FlutterAuthSessionStorage([FlutterSecureStorage? storage])
+    : _storage = storage ?? const FlutterSecureStorage();
+
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> read(String key) => _storage.read(key: key);
+
+  @override
+  Future<void> write(String key, String value) =>
+      _storage.write(key: key, value: value);
+
+  @override
+  Future<void> delete(String key) => _storage.delete(key: key);
+}
+
 /// Maneja la sesión del usuario: token de Supabase, perfil y llamadas de auth.
 class AuthProvider extends ChangeNotifier {
-  AuthProvider({ApiService? api, FlutterSecureStorage? storage})
-      : _api = api ?? ApiService(),
-        _storage = storage ?? const FlutterSecureStorage() {
+  AuthProvider({ApiService? api, AuthSessionStorage? storage})
+    : _api = api ?? ApiService(),
+      _storage = storage ?? FlutterAuthSessionStorage() {
     _api.onUnauthorized = _manejarSesionExpirada;
   }
 
   final ApiService _api;
-  final FlutterSecureStorage _storage;
+  final AuthSessionStorage _storage;
 
   static const _tokenKey = 'access_token';
   static const _refreshTokenKey = 'biometric_refresh_token';
@@ -41,24 +64,25 @@ class AuthProvider extends ChangeNotifier {
   /// Comprueba que el correo esté asociado a un administrador antes de
   /// permitir iniciar sesión o continuar un flujo de códigos en esta app.
   Future<void> verificarCorreoAdministrador(String correo) async {
-    await _api.post('/auth/verificar-administrador', body: {
-      'correo': correo.trim().toLowerCase(),
-    });
+    await _api.post(
+      '/auth/verificar-administrador',
+      body: {'correo': correo.trim().toLowerCase()},
+    );
   }
 
   /// Se llama al arrancar la app: intenta restaurar la sesión guardada.
   Future<void> bootstrap() async {
-    _biometricEnabled = await _storage.read(key: _biometricEnabledKey) == 'true';
+    _biometricEnabled = await _storage.read(_biometricEnabledKey) == 'true';
     if (_biometricEnabled) {
       // Si el usuario eligió biometría, cada apertura de la app pide su
       // confirmación antes de restaurar la sesión guardada.
-      await _storage.delete(key: _tokenKey);
+      await _storage.delete(_tokenKey);
       _api.authToken = null;
       _setStatus(AuthStatus.unauthenticated);
       return;
     }
     notifyListeners();
-    final token = await _storage.read(key: _tokenKey);
+    final token = await _storage.read(_tokenKey);
     if (token == null || token.isEmpty) {
       _setStatus(AuthStatus.unauthenticated);
       return;
@@ -87,10 +111,10 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> login(String correo, String password) async {
     await verificarCorreoAdministrador(correo);
-    final data = await _api.post('/auth/login', body: {
-      'correo': correo.trim(),
-      'password': password,
-    });
+    final data = await _api.post(
+      '/auth/login',
+      body: {'correo': correo.trim(), 'password': password},
+    );
 
     String? token;
     try {
@@ -102,13 +126,15 @@ class AuthProvider extends ChangeNotifier {
       token = null;
     }
     if (token == null || token.isEmpty) {
-      throw ApiException('La respuesta del servidor no incluyó una sesión válida.');
+      throw ApiException(
+        'La respuesta del servidor no incluyó una sesión válida.',
+      );
     }
 
-    await _storage.write(key: _tokenKey, value: token);
+    await _storage.write(_tokenKey, token);
     final refreshToken = (data['session'] as Map)['refresh_token'];
     if (refreshToken is String && refreshToken.isNotEmpty) {
-      await _storage.write(key: _refreshTokenKey, value: refreshToken);
+      await _storage.write(_refreshTokenKey, refreshToken);
     }
     _api.authToken = token;
     await _loadProfile();
@@ -127,42 +153,57 @@ class AuthProvider extends ChangeNotifier {
   Future<void> setBiometricEnabled(bool enabled) async {
     if (enabled) {
       final supported = await deviceSupportsBiometrics();
-      if (!supported) throw ApiException('Este dispositivo no tiene biometría configurada.');
-      final refreshToken = await _storage.read(key: _refreshTokenKey);
-      if (refreshToken == null || refreshToken.isEmpty) {
-        throw ApiException('Inicia sesión nuevamente para habilitar el acceso biométrico.');
+      if (!supported) {
+        throw ApiException('Este dispositivo no tiene biometría configurada.');
       }
-      await _storage.write(key: _biometricEnabledKey, value: 'true');
+      final refreshToken = await _storage.read(_refreshTokenKey);
+      if (refreshToken == null || refreshToken.isEmpty) {
+        throw ApiException(
+          'Inicia sesión nuevamente para habilitar el acceso biométrico.',
+        );
+      }
+      await _storage.write(_biometricEnabledKey, 'true');
     } else {
-      await _storage.delete(key: _biometricEnabledKey);
-      await _storage.delete(key: _refreshTokenKey);
+      await _storage.delete(_biometricEnabledKey);
+      await _storage.delete(_refreshTokenKey);
     }
     _biometricEnabled = enabled;
     notifyListeners();
   }
 
   Future<void> loginWithBiometrics() async {
-    if (!_biometricEnabled) throw ApiException('El acceso biométrico está desactivado.');
-    final refreshToken = await _storage.read(key: _refreshTokenKey);
+    if (!_biometricEnabled) {
+      throw ApiException('El acceso biométrico está desactivado.');
+    }
+    final refreshToken = await _storage.read(_refreshTokenKey);
     if (refreshToken == null || refreshToken.isEmpty) {
-      throw ApiException('Ingresa con tu correo y contraseña para volver a habilitar la biometría.');
+      throw ApiException(
+        'Ingresa con tu correo y contraseña para volver a habilitar la biometría.',
+      );
     }
     final ok = await _localAuth.authenticate(
       localizedReason: 'Confirma tu identidad para ingresar a HIDROAPP',
       options: const AuthenticationOptions(biometricOnly: true),
     );
     if (!ok) return;
-    final data = await _api.post('/auth/renovar-sesion', body: {'refreshToken': refreshToken});
+    final data = await _api.post(
+      '/auth/renovar-sesion',
+      body: {'refreshToken': refreshToken},
+    );
     if (data is! Map || data['session'] is! Map) {
-      throw ApiException('No se pudo renovar la sesión. Ingresa con tu contraseña.');
+      throw ApiException(
+        'No se pudo renovar la sesión. Ingresa con tu contraseña.',
+      );
     }
     final session = data['session'] as Map;
     final token = session['access_token'];
     final nuevoRefresh = session['refresh_token'];
-    if (token is! String || token.isEmpty) throw ApiException('La sesión recibida no es válida.');
-    await _storage.write(key: _tokenKey, value: token);
+    if (token is! String || token.isEmpty) {
+      throw ApiException('La sesión recibida no es válida.');
+    }
+    await _storage.write(_tokenKey, token);
     if (nuevoRefresh is String && nuevoRefresh.isNotEmpty) {
-      await _storage.write(key: _refreshTokenKey, value: nuevoRefresh);
+      await _storage.write(_refreshTokenKey, nuevoRefresh);
     }
     _api.authToken = token;
     await _loadProfile();
@@ -179,10 +220,10 @@ class AuthProvider extends ChangeNotifier {
     String password,
   ) async {
     await verificarCorreoAdministrador(correo);
-    await _api.post('/auth/verificar', body: {
-      'correo': correo.trim(),
-      'codigo': codigo.trim(),
-    });
+    await _api.post(
+      '/auth/verificar',
+      body: {'correo': correo.trim(), 'codigo': codigo.trim()},
+    );
     await login(correo, password);
   }
 
@@ -196,8 +237,10 @@ class AuthProvider extends ChangeNotifier {
   /// correo. Por seguridad responde igual exista o no la cuenta.
   Future<void> solicitarRecuperacion(String correo) async {
     await verificarCorreoAdministrador(correo);
-    await _api.post('/auth/solicitar-recuperacion',
-        body: {'correo': correo.trim()});
+    await _api.post(
+      '/auth/solicitar-recuperacion',
+      body: {'correo': correo.trim()},
+    );
   }
 
   /// Restablece la contraseña (sin sesión) con el código recibido por correo.
@@ -207,22 +250,28 @@ class AuthProvider extends ChangeNotifier {
     String nuevaPassword,
   ) async {
     await verificarCorreoAdministrador(correo);
-    await _api.post('/auth/resetear-password', body: {
-      'correo': correo.trim(),
-      'codigo': codigo.trim(),
-      'nuevaPassword': nuevaPassword,
-    });
+    await _api.post(
+      '/auth/resetear-password',
+      body: {
+        'correo': correo.trim(),
+        'codigo': codigo.trim(),
+        'nuevaPassword': nuevaPassword,
+      },
+    );
   }
 
   /// Cambia la contraseña de la cuenta ya autenticada. Se usa para el cambio
   /// obligatorio tras el primer login con una contraseña temporal, pero sirve
   /// igual para un cambio voluntario. Al terminar, refresca el perfil para
   /// que [debeCambiarPassword] pase a `false` y [AuthGate] deje entrar a la app.
-  Future<void> cambiarPassword(String passwordActual, String passwordNueva) async {
-    await _api.post('/auth/cambiar-password', body: {
-      'passwordActual': passwordActual,
-      'passwordNueva': passwordNueva,
-    });
+  Future<void> cambiarPassword(
+    String passwordActual,
+    String passwordNueva,
+  ) async {
+    await _api.post(
+      '/auth/cambiar-password',
+      body: {'passwordActual': passwordActual, 'passwordNueva': passwordNueva},
+    );
     await _loadProfile();
     notifyListeners();
   }
@@ -247,10 +296,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _clear({bool preserveBiometric = false}) async {
-    await _storage.delete(key: _tokenKey);
+    await _storage.delete(_tokenKey);
     if (!preserveBiometric) {
-      await _storage.delete(key: _refreshTokenKey);
-      await _storage.delete(key: _biometricEnabledKey);
+      await _storage.delete(_refreshTokenKey);
+      await _storage.delete(_biometricEnabledKey);
       _biometricEnabled = false;
     }
     _api.authToken = null;
