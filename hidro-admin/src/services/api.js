@@ -1,4 +1,17 @@
-﻿const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://hidro-app.onrender.com')
+const CONFIGURED_API_URL = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+const CONFIGURED_API_POINTS_TO_PANEL = (() => {
+  if (!CONFIGURED_API_URL || typeof window === 'undefined') return false
+  try {
+    return new URL(CONFIGURED_API_URL).origin === window.location.origin
+  } catch {
+    return false
+  }
+})()
+const API_BASE_URL = (
+  !CONFIGURED_API_URL || CONFIGURED_API_POINTS_TO_PANEL
+    ? 'https://hidro-app.onrender.com'
+    : CONFIGURED_API_URL
+)
   .trim()
   .replace(/\/+$/, '')
 const API_URL = import.meta.env.DEV
