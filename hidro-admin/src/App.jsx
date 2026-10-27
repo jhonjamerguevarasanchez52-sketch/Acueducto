@@ -715,34 +715,33 @@ function App() {
     setAuthError('')
     setAuthNotice('')
 
-    try {
-      const adminCheck = await apiRequest(endpoints.verifyAdminEmail, { method: 'POST', body: { correo: email } })
-      if (!adminCheck.esAdministrador) throw new Error('Este correo no está registrado en la base de datos.')
-      setEmailIsAdmin(true)
-    } catch (error) {
-      setEmailIsAdmin(false)
-      setAuthError(error.message || 'Este correo no está registrado en la base de datos.')
-      return
-    }
-
     if (authMode === 'reset' && newPassword !== confirmNewPassword) {
       setAuthError('Las contraseñas no coinciden.')
+      return
+    }
+    if (authMode === 'reset' && !/^\d{6}$/.test(recoveryCode.trim())) {
+      setAuthError('Ingresa el código de 6 dígitos que recibiste por correo.')
+      return
+    }
+    if (authMode === 'reset' && newPassword.length < 8) {
+      setAuthError('La contraseña debe tener al menos 8 caracteres.')
       return
     }
 
     setIsLoggingIn(true)
     try {
+      const correo = email.trim().toLowerCase()
       if (authMode === 'request-reset') {
         const result = await apiRequest(endpoints.requestPasswordReset, {
           method: 'POST',
-          body: { correo: email },
+          body: { correo },
         })
         setAuthMode('reset')
         setAuthNotice(result.message || 'Si el correo existe, recibirás un código de recuperación.')
       } else {
         const result = await apiRequest(endpoints.resetPassword, {
           method: 'POST',
-          body: { correo: email, codigo: recoveryCode, nuevaPassword: newPassword },
+          body: { correo, codigo: recoveryCode.trim(), nuevaPassword: newPassword },
         })
         setAuthMode('login')
         setPassword('')
@@ -757,7 +756,6 @@ function App() {
       setIsLoggingIn(false)
     }
   }
-
   const handleLogout = () => {
     clearToken()
     setProfile(null)
@@ -900,7 +898,7 @@ function App() {
             autoComplete="username"
             value={email}
             onChange={(event) => { setEmail(event.target.value); setEmailIsAdmin(null); setAuthError('') }}
-            onBlur={checkAdminEmail}
+            onBlur={authMode === 'login' ? checkAdminEmail : undefined}
             required
           />
           {authMode === 'login' && (
@@ -923,8 +921,10 @@ function App() {
                 id="recovery-code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
                 value={recoveryCode}
-                onChange={(event) => setRecoveryCode(event.target.value)}
+                onChange={(event) => setRecoveryCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                 required
               />
               <label htmlFor="new-password">Nueva contraseña</label>
@@ -957,10 +957,7 @@ function App() {
               : authMode === 'login' ? 'Iniciar sesión' : authMode === 'request-reset' ? 'Enviar código' : 'Actualizar contraseña'}
           </button>
           {authMode === 'login' ? (
-            <button type="button" className="link-button auth-link" disabled={checkingAdminEmail || emailIsAdmin === false} onClick={async () => {
-              if (emailIsAdmin !== true && !(await checkAdminEmail())) return
-              setAuthMode('request-reset'); setAuthError(''); setAuthNotice('')
-            }}>
+            <button type="button" className="link-button auth-link" onClick={() => { setAuthMode('request-reset'); setAuthError(''); setAuthNotice('') }}>
               Olvidé mi contraseña
             </button>
           ) : (
