@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:local_auth/local_auth.dart';
 
 import '../models/profile.dart';
 import '../services/api_service.dart';
@@ -18,6 +19,8 @@ class AuthProvider extends ChangeNotifier {
   final FlutterSecureStorage _storage;
 
   static const _tokenKey = 'access_token';
+  static const _refreshTokenKey = 'biometric_refresh_token';
+  static const _biometricEnabledKey = 'biometric_enabled';
 
   AuthStatus _status = AuthStatus.unknown;
   Profile? _profile;
@@ -25,6 +28,9 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus get status => _status;
   Profile? get profile => _profile;
   ApiService get api => _api;
+  bool get biometricEnabled => _biometricEnabled;
+  bool _biometricEnabled = false;
+  final LocalAuthentication _localAuth = LocalAuthentication();
 
   /// `true` cuando la cuenta tiene pendiente cambiar una contraseña temporal
   /// (generada por un administrador al crearla). Mientras sea `true`,
@@ -42,6 +48,16 @@ class AuthProvider extends ChangeNotifier {
 
   /// Se llama al arrancar la app: intenta restaurar la sesión guardada.
   Future<void> bootstrap() async {
+    _biometricEnabled = await _storage.read(key: _biometricEnabledKey) == 'true';
+    if (_biometricEnabled) {
+      // Si el usuario eligió biometría, cada apertura de la app pide su
+      // confirmación antes de restaurar la sesión guardada.
+      await _storage.delete(key: _tokenKey);
+      _api.authToken = null;
+      _setStatus(AuthStatus.unauthenticated);
+      return;
+    }
+    notifyListeners();
     final token = await _storage.read(key: _tokenKey);
     if (token == null || token.isEmpty) {
       _setStatus(AuthStatus.unauthenticated);
@@ -58,7 +74,7 @@ class AuthProvider extends ChangeNotifier {
       // un nuevo login: seguimos mostrando la pantalla de acceso, pero el
       // usuario podrá reintentar sin perder el token guardado.
       if (e.statusCode == 401 || e.statusCode == 403) {
-        await _clear();
+        await _clear(preserveBiometric: _biometricEnabled);
       } else {
         _api.authToken = null;
       }
@@ -90,6 +106,64 @@ class AuthProvider extends ChangeNotifier {
     }
 
     await _storage.write(key: _tokenKey, value: token);
+    final refreshToken = (data['session'] as Map)['refresh_token'];
+    if (refreshToken is String && refreshToken.isNotEmpty) {
+      await _storage.write(key: _refreshTokenKey, value: refreshToken);
+    }
+    _api.authToken = token;
+    await _loadProfile();
+    _setStatus(AuthStatus.authenticated);
+  }
+
+  Future<bool> deviceSupportsBiometrics() async {
+    try {
+      return await _localAuth.isDeviceSupported() &&
+          (await _localAuth.getAvailableBiometrics()).isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> setBiometricEnabled(bool enabled) async {
+    if (enabled) {
+      final supported = await deviceSupportsBiometrics();
+      if (!supported) throw ApiException('Este dispositivo no tiene biometría configurada.');
+      final refreshToken = await _storage.read(key: _refreshTokenKey);
+      if (refreshToken == null || refreshToken.isEmpty) {
+        throw ApiException('Inicia sesión nuevamente para habilitar el acceso biométrico.');
+      }
+      await _storage.write(key: _biometricEnabledKey, value: 'true');
+    } else {
+      await _storage.delete(key: _biometricEnabledKey);
+      await _storage.delete(key: _refreshTokenKey);
+    }
+    _biometricEnabled = enabled;
+    notifyListeners();
+  }
+
+  Future<void> loginWithBiometrics() async {
+    if (!_biometricEnabled) throw ApiException('El acceso biométrico está desactivado.');
+    final refreshToken = await _storage.read(key: _refreshTokenKey);
+    if (refreshToken == null || refreshToken.isEmpty) {
+      throw ApiException('Ingresa con tu correo y contraseña para volver a habilitar la biometría.');
+    }
+    final ok = await _localAuth.authenticate(
+      localizedReason: 'Confirma tu identidad para ingresar a HIDROAPP',
+      options: const AuthenticationOptions(biometricOnly: true),
+    );
+    if (!ok) return;
+    final data = await _api.post('/auth/renovar-sesion', body: {'refreshToken': refreshToken});
+    if (data is! Map || data['session'] is! Map) {
+      throw ApiException('No se pudo renovar la sesión. Ingresa con tu contraseña.');
+    }
+    final session = data['session'] as Map;
+    final token = session['access_token'];
+    final nuevoRefresh = session['refresh_token'];
+    if (token is! String || token.isEmpty) throw ApiException('La sesión recibida no es válida.');
+    await _storage.write(key: _tokenKey, value: token);
+    if (nuevoRefresh is String && nuevoRefresh.isNotEmpty) {
+      await _storage.write(key: _refreshTokenKey, value: nuevoRefresh);
+    }
     _api.authToken = token;
     await _loadProfile();
     _setStatus(AuthStatus.authenticated);
@@ -161,7 +235,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await _clear();
+    await _clear(preserveBiometric: _biometricEnabled);
     _setStatus(AuthStatus.unauthenticated);
   }
 
@@ -172,8 +246,13 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _clear() async {
+  Future<void> _clear({bool preserveBiometric = false}) async {
     await _storage.delete(key: _tokenKey);
+    if (!preserveBiometric) {
+      await _storage.delete(key: _refreshTokenKey);
+      await _storage.delete(key: _biometricEnabledKey);
+      _biometricEnabled = false;
+    }
     _api.authToken = null;
     _profile = null;
   }
@@ -189,7 +268,7 @@ class AuthProvider extends ChangeNotifier {
   void _manejarSesionExpirada() {
     if (_status != AuthStatus.authenticated) return;
     _setStatus(AuthStatus.unauthenticated);
-    _clear();
+    _clear(preserveBiometric: _biometricEnabled);
   }
 
   @override
