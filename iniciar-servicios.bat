@@ -7,7 +7,7 @@ start "HIDROAPP API" /D "%RAIZ%backend" cmd /k npm.cmd start
 start "HIDROAPP Panel" /D "%RAIZ%hidro-admin" cmd /k npm.cmd run dev -- --host 0.0.0.0 --port 5173 --strictPort
 
 echo.
-echo API:   http://hidro-app.onrender.com/api
-echo Panel: http://hidro-app.onrender.com/api
+echo API local:   http://localhost:3000/api
+echo Panel local: http://localhost:5173
 echo Cierra cada ventana para detener su servicio.
 endlocal
