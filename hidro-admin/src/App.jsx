@@ -166,8 +166,6 @@ function App() {
   const [sessionStatus, setSessionStatus] = useState(getToken() ? 'checking' : 'signed-out')
   const [profile, setProfile] = useState(null)
   const [email, setEmail] = useState('')
-  const [emailIsAdmin, setEmailIsAdmin] = useState(null)
-  const [checkingAdminEmail, setCheckingAdminEmail] = useState(false)
   const [password, setPassword] = useState('')
   const [recoveryCode, setRecoveryCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -619,25 +617,18 @@ function App() {
   const checkAdminEmail = async () => {
     const normalizedEmail = email.trim().toLowerCase()
     if (!normalizedEmail) {
-      setEmailIsAdmin(false)
       setAuthError('Ingresa el correo de un administrador.')
       return false
     }
-    setCheckingAdminEmail(true)
     try {
       await apiRequest(endpoints.verifyAdminEmail, { method: 'POST', body: { correo: normalizedEmail } })
-      setEmailIsAdmin(true)
       setAuthError('')
       return true
     } catch (error) {
-      setEmailIsAdmin(false)
       setAuthError(error.message || 'Este correo no está registrado en la base de datos.')
       return false
-    } finally {
-      setCheckingAdminEmail(false)
     }
   }
-
   const openProfile = () => {
     setProfileForm({
       nombre: profile?.nombre || '',
@@ -897,7 +888,7 @@ function App() {
             type="email"
             autoComplete="username"
             value={email}
-            onChange={(event) => { setEmail(event.target.value); setEmailIsAdmin(null); setAuthError('') }}
+            onChange={(event) => { setEmail(event.target.value); setAuthError('') }}
             onBlur={authMode === 'login' ? checkAdminEmail : undefined}
             required
           />
