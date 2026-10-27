@@ -395,15 +395,22 @@ async function solicitarRecuperacion(req, res) {
     }
 
     try {
-      await enviarCorreo({
+      const resultadoCorreo = await enviarCorreo({
         to: correo,
         subject: 'Recuperación de contraseña - Acueducto Campo Amor',
         html: `<p>Tu código de recuperación es:</p>
               <h2>${codigoRecuperacion}</h2>
               <p>Este código expira en 15 minutos. Si no solicitaste esto, ignora este correo.</p>`,
       });
+      if (!resultadoCorreo) throw new Error('El servicio de correo no está configurado.');
     } catch (mailErr) {
       console.error('Error enviando correo de recuperación:', mailErr.message);
+      const { error: limpiarError } = await profileModel.saveFields(perfil.id, {
+        codigo_recuperacion: null,
+        codigo_expiracion: null,
+      });
+      if (limpiarError) console.error('No se pudo invalidar el código de recuperación:', limpiarError.message);
+      return res.status(503).json({ error: 'No pudimos enviar el código de recuperación. Intenta de nuevo más tarde.' });
     }
 
     return res.status(200).json({ message: 'Si el correo existe, se enviará un código de recuperación' });
