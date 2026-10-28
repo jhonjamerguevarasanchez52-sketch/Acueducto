@@ -81,4 +81,4 @@ const correoPasswordActualizada = (nombre) => ({
   html: plantillaCorreo({ titulo: 'Contraseña actualizada', nombre, mensaje: 'Tu contraseña se actualizó correctamente. Si no realizaste este cambio, contacta de inmediato al administrador del acueducto.', avisoSeguridad: true }),
 });
 
-module.exports = { plantillaCorreo, correoAviso, correoVerificacion, correoRecuperacion, correoPasswordActualizada, escapar };
+module.exports = { MARCA, plantillaCorreo, correoAviso, correoVerificacion, correoRecuperacion, correoPasswordActualizada, escapar };

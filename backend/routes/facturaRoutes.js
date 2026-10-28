@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const {
   misFacturas,
+  obtenerOpcionesPlanPago,
+  configurarPlanPago,
   verFactura,
   listarFacturas,
   generarFacturasMensuales,
@@ -23,6 +25,8 @@ router.delete('/:id', verificarToken, verificarRol('administrador'), eliminarFac
 
 // --- Usuario final ---
 router.get('/', verificarToken, misFacturas);
+router.get('/:id/opciones-pago', verificarToken, obtenerOpcionesPlanPago);
+router.post('/:id/plan-pago', verificarToken, configurarPlanPago);
 router.get('/:id', verificarToken, verFactura);
 
 module.exports = router;
