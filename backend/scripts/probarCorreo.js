@@ -31,6 +31,7 @@ async function main() {
              <p>Fecha: ${new Date().toLocaleString('es-CO')}</p>
              <p>Si lo recibes, la configuración de Brevo funciona correctamente. 🚰</p>`,
     });
+    if (!respuesta) throw new Error('El correo no se envió: revisa BREVO_API_KEY y EMAIL_USER.');
     console.log('Correo enviado ✅');
     console.log('Respuesta de Brevo:', JSON.stringify(respuesta, null, 2));
   } catch (err) {

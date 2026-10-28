@@ -24,7 +24,7 @@ class MemoryAuthSessionStorage implements AuthSessionStorage {
 }
 
 void main() {
-  test('login valida administrador, guarda tokens y carga el perfil', () async {
+  test('login de cualquier rol guarda tokens y carga el perfil', () async {
     final storage = MemoryAuthSessionStorage();
     final paths = <String>[];
     final client = MockClient((request) async {
@@ -72,12 +72,10 @@ void main() {
     expect(storage.values['biometric_refresh_token'], 'refresh-token');
     expect(
       paths,
-      containsAllInOrder([
-        '/api/auth/verificar-administrador',
-        '/api/auth/login',
-        '/api/profile/mi-perfil',
-      ]),
+      containsAllInOrder(['/api/auth/login', '/api/profile/mi-perfil']),
     );
+    // La app móvil ya no exige que la cuenta sea de administrador.
+    expect(paths, isNot(contains('/api/auth/verificar-administrador')));
   });
 
   test(

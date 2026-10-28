@@ -1,4 +1,3 @@
-const crypto = require('crypto');
 const authModel = require('../models/authModel');
 const profileModel = require('../models/profileModel');
 const { enviarCorreo } = require('../config/mailer');
@@ -8,11 +7,10 @@ const {
   registrarExito,
 } = require('../utils/controlIntentos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+const { generarCodigoSeguridad } = require('../utils/securityCode');
 
 // Genera un código numérico de 6 dígitos
-function generarCodigo() {
-  return crypto.randomInt(100000, 999999).toString();
-}
+function generarCodigo() { return generarCodigoSeguridad(); }
 
 function normalizarCorreo(correo) {
   return String(correo || '').toLowerCase().trim();
@@ -99,11 +97,6 @@ async function iniciarSesion(req, res) {
 
   try {
     const { data, error } = await iniciarSesionSupabase(correo, password);
-    const { data: adminPerfil, error: adminError } = await profileModel.findByEmail(correo, 'id, rol');
-    if (adminError && adminError.code !== 'PGRST116') return errorConsulta(res, adminError);
-    if (!adminPerfil || adminPerfil.rol !== 'administrador') {
-      return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
-    }
     if (error) {
       // No contar fallos de red como intentos de contraseña.
       if (esErrorTransitorioAuth(error)) return responderAuthNoDisponible(res, error);
@@ -115,7 +108,7 @@ async function iniciarSesion(req, res) {
     // Exigimos que la cuenta esté verificada por código antes de permitir el acceso.
     const { data: perfil, error: perfilError } = await reintentarServicioSupabase(
       () => profileModel.getById(data.user.id, {
-        columns: 'is_verified, activo, debe_cambiar_password',
+        columns: 'rol, is_verified, activo, debe_cambiar_password',
       }),
     );
 
@@ -126,7 +119,11 @@ async function iniciarSesion(req, res) {
       return errorConsulta(res, perfilError);
     }
 
-    if (!perfil || perfil.is_verified !== true) {
+    if (!perfil || !perfil.rol) {
+      return res.status(403).json({ error: 'La cuenta no tiene un perfil activo en Acueducto Campo Amor.' });
+    }
+
+    if (perfil.is_verified !== true) {
       return res.status(403).json({
         error: 'Debes verificar tu cuenta antes de iniciar sesión.',
         requiereVerificacion: true,
@@ -167,7 +164,7 @@ async function renovarSesion(req, res) {
     const { data: perfil, error: perfilError } = await profileModel.getById(data.user.id, {
       columns: 'rol, is_verified, activo, debe_cambiar_password',
     });
-    if (perfilError || !perfil || perfil.rol !== 'administrador' || perfil.is_verified !== true || perfil.activo === false) {
+    if (perfilError || !perfil || !perfil.rol || perfil.is_verified !== true || perfil.activo === false) {
       return res.status(403).json({ error: 'Esta cuenta no puede iniciar sesión. Contacta al administrador.' });
     }
     return res.status(200).json({
@@ -204,7 +201,6 @@ async function verificarCuenta(req, res) {
       'id, rol, is_verified, codigo_verificacion, codigo_verificacion_expiracion'
     );
 
-    if (perfil?.rol !== 'administrador') return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
 
     // No revelamos si el correo existe: mismo mensaje que un código incorrecto.
     if (buscarError || !perfil) {
@@ -266,7 +262,6 @@ async function reenviarCodigoVerificacion(req, res) {
       'id, rol, is_verified, nombre'
     );
 
-    if (perfil?.rol !== 'administrador') return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
 
     // No revelamos si el correo existe o ya está verificado: mismo mensaje siempre.
     const mensajeGenerico = { message: 'Si el correo existe y no ha sido verificado, se enviará un nuevo código' };
@@ -288,15 +283,21 @@ async function reenviarCodigoVerificacion(req, res) {
     }
 
     try {
-      await enviarCorreo({
+      const respuestaCorreo = await enviarCorreo({
         to: correo,
         subject: 'Nuevo código de verificación - Acueducto Campo Amor',
         html: `<p>Tu nuevo código de verificación es:</p>
                <h2>${codigoVerificacion}</h2>
                <p>Este código expira en 15 minutos.</p>`,
       });
+      if (!respuestaCorreo) throw new Error('Brevo no confirmó el envío.');
     } catch (mailErr) {
       console.error('Error enviando correo de verificación:', mailErr.message);
+      await profileModel.saveFields(perfil.id, {
+        codigo_verificacion: null,
+        codigo_verificacion_expiracion: null,
+      });
+      return res.status(503).json({ error: 'No pudimos enviar el código. Intenta de nuevo más tarde.' });
     }
 
     return res.status(200).json(mensajeGenerico);
@@ -375,9 +376,9 @@ async function solicitarRecuperacion(req, res) {
   registrarFallo('recuperar', correo);
 
   try {
-    const { data: perfil, error: buscarError } = await profileModel.findByEmail(correo, 'id, rol');
+    const { data: perfil, error: buscarError } = await profileModel.findByEmail(correo, 'id');
 
-    if (buscarError || !perfil || perfil.rol !== 'administrador') {
+    if (buscarError || !perfil) {
       // No revelamos si el correo existe o no, por seguridad
       return res.status(200).json({ message: 'Si el correo existe, se enviará un código de recuperación' });
     }
@@ -395,15 +396,22 @@ async function solicitarRecuperacion(req, res) {
     }
 
     try {
-      await enviarCorreo({
+      const resultadoCorreo = await enviarCorreo({
         to: correo,
         subject: 'Recuperación de contraseña - Acueducto Campo Amor',
         html: `<p>Tu código de recuperación es:</p>
               <h2>${codigoRecuperacion}</h2>
               <p>Este código expira en 15 minutos. Si no solicitaste esto, ignora este correo.</p>`,
       });
+      if (!resultadoCorreo) throw new Error('El servicio de correo no está configurado.');
     } catch (mailErr) {
       console.error('Error enviando correo de recuperación:', mailErr.message);
+      const { error: limpiarError } = await profileModel.saveFields(perfil.id, {
+        codigo_recuperacion: null,
+        codigo_expiracion: null,
+      });
+      if (limpiarError) console.error('No se pudo invalidar el código de recuperación:', limpiarError.message);
+      return res.status(503).json({ error: 'No pudimos enviar el código de recuperación. Intenta de nuevo más tarde.' });
     }
 
     return res.status(200).json({ message: 'Si el correo existe, se enviará un código de recuperación' });
@@ -437,7 +445,6 @@ async function resetearPassword(req, res) {
       'id, rol, codigo_recuperacion, codigo_expiracion'
     );
 
-    if (perfil?.rol !== 'administrador') return res.status(403).json({ error: 'Este correo no está registrado en la base de datos.' });
 
     if (buscarError || !perfil) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
