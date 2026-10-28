@@ -7,7 +7,6 @@ import '../services/api_service.dart';
 import '../services/recibo_pago_service.dart';
 import '../services/wompi_checkout_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/formato.dart';
 import '../widgets/core/core.dart';
 import '../widgets/facturas/facturas.dart';
 import 'pagos_screen.dart';
@@ -52,24 +51,22 @@ class _FacturasScreenState extends State<FacturasScreen>
 
   Future<void> _refrescar() async {
     final futuro = _cargar();
-    setState(() => _futuro = futuro);
+    setState(() {
+      _futuro = futuro;
+    });
     await futuro.catchError((_) => <Factura>[]);
   }
 
   Future<void> _pagar(Factura factura) async {
-    final eleccion = await mostrarPagarSheet(
-      context,
-      subtitulo:
-          '${Formato.periodo(factura.periodo)} · '
-          '${Formato.pesos(factura.valorTotal)}',
-    );
-    if (eleccion == null || !mounted) return;
-
     try {
+      final api = context.read<AuthProvider>().api;
+      final eleccion = await elegirPlanYMedioDePago(context, api, factura);
+      if (eleccion == null || !mounted) return;
+
       if (eleccion.metodo == 'wompi') {
         final abierto = await WompiCheckoutService.pagar(
           context,
-          context.read<AuthProvider>().api,
+          api,
           factura.id,
         );
         if (!abierto) return;
@@ -82,18 +79,18 @@ class _FacturasScreenState extends State<FacturasScreen>
         return;
       }
       if (eleccion.metodo == 'fisico') {
-        final subido = await ReciboPagoService.subir(
-          context.read<AuthProvider>().api,
-          factura.id,
-        );
+        final subido = await ReciboPagoService.subir(api, factura.id);
         if (!mounted) return;
         if (subido) {
-          AppSnackbar.success(context, 'Recibo enviado. Pago pendiente de revisión.');
+          AppSnackbar.success(
+            context,
+            'Recibo enviado. Pago pendiente de revisión.',
+          );
           _refrescar();
         }
         return;
       }
-      await context.read<AuthProvider>().api.post(
+      await api.post(
         '/pagos',
         body: {
           'factura_id': factura.id,
