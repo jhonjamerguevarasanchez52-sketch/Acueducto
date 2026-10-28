@@ -276,13 +276,15 @@ async function registrarPagoFisicoConRecibo(req, res) {
       return res.status(502).json({ error: 'No se pudo guardar el recibo. Intenta de nuevo.' });
     }
 
+    // La factura ya se validó como propia con req.db; la escritura va por el
+    // cliente de servicio porque la app no tiene permiso de insertar pagos.
     const { data: pago, error: errorPago } = await paymentModel.create({
       factura_id: facturaId,
       perfil_id: userId,
       monto: factura.valor_total,
       metodo: 'fisico',
       referencia: path,
-    }, req.db);
+    });
 
     if (errorPago) {
       await recibosPagoService.eliminarRecibo(path);

@@ -1,7 +1,7 @@
 const authModel = require('../models/authModel');
 const profileModel = require('../models/profileModel');
 const breakdownModel = require('../models/breakdownModel');
-const { CAMPOS_EDITABLES_PERFIL } = require('../utils/perfilCampos');
+const { extraerCambiosPerfil } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
 const { enviarCorreo } = require('../config/mailer');
@@ -180,10 +180,8 @@ async function cambiarRol(req, res) {
 async function editarUsuario(req, res) {
   const { userId } = req.params;
 
-  const cambios = {};
-  for (const campo of CAMPOS_EDITABLES_PERFIL) {
-    if (req.body[campo] !== undefined) cambios[campo] = req.body[campo];
-  }
+  const { cambios, error: errorCampos } = extraerCambiosPerfil(req.body);
+  if (errorCampos) return res.status(400).json({ error: errorCampos });
 
   if (Object.keys(cambios).length === 0) {
     return res.status(400).json({ error: 'No hay campos válidos para actualizar' });
