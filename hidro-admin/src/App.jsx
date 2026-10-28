@@ -1,163 +1,28 @@
 import { useEffect, useState } from 'react'
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import {
   AlertTriangle,
   ArrowUpRight,
   BellRing,
   CheckCircle2,
-  ChevronRight,
-  Clock3,
   CreditCard,
   Download,
-  Eye,
   FileText,
-  Gauge,
+  KeyRound,
   Menu,
-  Plus,
   Printer,
   Search,
-  ShieldCheck,
-  Trash2,
-  TrendingUp,
-  Upload,
   UserRound,
   UserRoundPlus,
-  Waves,
-  KeyRound,
 } from 'lucide-react'
 import Sidebar from './components/Sidebar.jsx'
-import StatCard from './components/StatCard.jsx'
+import AuthScreen from './features/auth/AuthScreen.jsx'
+import exportTreasuryWorkbookFile from './features/reports/exportTreasuryWorkbook.js'
+import SectionViews from './features/sections/SectionViews.jsx'
+import { quickActions, resourceEndpointBySection, MAX_BULK_USERS, MAX_USER_FILE_SIZE_BYTES, operationDefinitions, roleColors } from './config/adminConfig.js'
 import { apiRequest, clearToken, endpoints, getToken, login } from './services/api.js'
+import { formatMoney, formatDate, formatInvoiceNumber } from './utils/formatters.js'
 import { parseUsersCsv, parseUsersExcel } from './utils/usersCsv.js'
 import hidroAppLogo from './assets/hidroapp-logo.png'
-
-const quickActions = [
-  { label: 'Usuarios', section: 'usuarios', icon: UserRoundPlus },
-  { label: 'Facturación', section: 'facturas', icon: FileText },
-  { label: 'Cortes', section: 'cortes', icon: Gauge },
-]
-
-const resourceEndpointBySection = {
-  usuarios: 'adminUsers',
-  facturas: 'facturasTodas',
-  pagos: 'pagos',
-  cortes: 'cortes',
-  notificaciones: 'notificaciones',
-  tarifas: 'tarifas',
-}
-
-const MAX_BULK_USERS = 100
-const MAX_USER_FILE_SIZE_BYTES = 5 * 1024 * 1024
-
-const operationDefinitions = {
-  factura: {
-    title: 'Emitir factura', section: 'facturas', endpoint: endpoints.facturas, method: 'POST',
-    fields: [
-      { name: 'perfil_id', label: 'Suscriptor', type: 'user', required: true },
-      { name: 'periodo', label: 'Periodo', required: true },
-      { name: 'valor_total', label: 'Valor total', type: 'number', required: true },
-      { name: 'fecha_vencimiento', label: 'Fecha de vencimiento', type: 'date' },
-      { name: 'tipo', label: 'Tipo', type: 'select', options: ['servicio', 'extraordinaria'], defaultValue: 'servicio' },
-      { name: 'observacion', label: 'Observación' },
-    ],
-  },
-  facturaExtraordinaria: {
-    title: 'Factura extraordinaria', section: 'facturas', endpoint: endpoints.facturaExtraordinaria, method: 'POST',
-    fields: [
-      { name: 'perfil_ids', label: 'Destinatarios', type: 'recipient', required: true, defaultValue: 'todos' },
-      { name: 'periodo', label: 'Periodo', required: true },
-      { name: 'valor_total', label: 'Valor total', type: 'number', required: true },
-      { name: 'concepto', label: 'Concepto', required: true },
-      { name: 'fecha_vencimiento', label: 'Fecha de vencimiento', type: 'date' },
-    ],
-  },
-  facturacionMensual: {
-    title: 'Generar facturas mensuales', section: 'facturas', endpoint: endpoints.generarFacturasMensuales, method: 'POST',
-    fields: [
-      { name: 'periodo', label: 'Periodo · usuarios activos · $12.000 por factura', type: 'month', required: true },
-    ],
-  },
-  editarFactura: {
-    title: 'Editar factura', section: 'facturas', endpoint: endpoints.facturas, method: 'PUT',
-    fields: [
-      { name: 'estado', label: 'Estado', type: 'select', options: ['pendiente', 'pagada', 'anulada', 'vencida'] },
-      { name: 'valor_total', label: 'Valor total', type: 'number' },
-      { name: 'fecha_vencimiento', label: 'Fecha de vencimiento', type: 'date' },
-      { name: 'observacion', label: 'Observación' },
-    ],
-  },
-  corte: {
-    title: 'Programar corte', section: 'cortes', endpoint: endpoints.cortes, method: 'POST',
-    fields: [
-      { name: 'perfil_id', label: 'Suscriptor', type: 'user', required: true },
-      { name: 'motivo', label: 'Motivo', required: true },
-      { name: 'factura_id', label: 'ID de factura asociada' },
-    ],
-  },
-  tarifa: {
-    title: 'Crear tarifa', section: 'tarifas', endpoint: endpoints.tarifas, method: 'POST',
-    fields: [
-      { name: 'tipo', label: 'Tipo', type: 'select', options: ['residencial', 'comercial', 'industrial'], defaultValue: 'residencial' },
-      { name: 'cuota_fija', label: 'Cuota fija', type: 'number', required: true },
-      { name: 'vigente_desde', label: 'Vigente desde', type: 'date', required: true },
-      { name: 'vigente_hasta', label: 'Vigente hasta', type: 'date' },
-    ],
-  },
-  editarTarifa: {
-    title: 'Editar tarifa', section: 'tarifas', endpoint: endpoints.tarifas, method: 'PUT',
-    fields: [
-      { name: 'tipo', label: 'Tipo', type: 'select', options: ['residencial', 'comercial', 'industrial'] },
-      { name: 'cuota_fija', label: 'Cuota fija', type: 'number', required: true },
-      { name: 'vigente_desde', label: 'Vigente desde', type: 'date', required: true },
-      { name: 'vigente_hasta', label: 'Vigente hasta', type: 'date' },
-    ],
-  },
-  notificacion: {
-    title: 'Publicar aviso', section: 'notificaciones', endpoint: endpoints.notificaciones, method: 'POST',
-    fields: [
-      { name: 'perfil_id', label: 'Destinatario', type: 'recipient', defaultValue: 'todos' },
-      { name: 'tipo', label: 'Tipo', type: 'select', options: ['general', 'servicio', 'factura', 'corte'], defaultValue: 'general' },
-      { name: 'mensaje', label: 'Mensaje', type: 'textarea', required: true },
-      { name: 'enviar_correo', label: 'Enviar también al correo', type: 'checkbox', defaultValue: true },
-    ],
-  },
-  editarUsuario: {
-    title: 'Editar usuario', section: 'usuarios', endpoint: endpoints.adminUsers, method: 'PUT',
-    fields: [
-      { name: 'nombre', label: 'Nombre' },
-      { name: 'apellido', label: 'Apellido' },
-      { name: 'telefono', label: 'Teléfono' },
-      { name: 'numero_lote', label: 'Número de lote' },
-      { name: 'direccion', label: 'Dirección' },
-      { name: 'ocupacion', label: 'Ocupación' },
-      { name: 'zona', label: 'Zona' },
-    ],
-  },
-}
-
-const formatMoney = (value) => Number(value || 0).toLocaleString('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-})
-
-const formatDate = (value) => value ? new Date(value).toLocaleDateString('es-CO') : '—'
-const formatInvoiceNumber = (invoice) => invoice.numero_factura
-  ? `FAC-${String(invoice.numero_factura).padStart(6, '0')}`
-  : `FAC-${String(invoice.id || '').slice(0, 8).toUpperCase()}`
 
 function App() {
   const [activeSection, setActiveSection] = useState('dashboard')
@@ -182,6 +47,7 @@ function App() {
   const [newUser, setNewUser] = useState({ nombre: '', apellido: '', correo: '', rol: 'usuario' })
   const [createUserError, setCreateUserError] = useState('')
   const [createdTemporaryPassword, setCreatedTemporaryPassword] = useState('')
+  const [createdUserEmailSent, setCreatedUserEmailSent] = useState(false)
   const [isCreatingUser, setIsCreatingUser] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [profileForm, setProfileForm] = useState({})
@@ -307,6 +173,7 @@ function App() {
         body: newUser,
       })
       setCreatedTemporaryPassword(result.passwordTemporal || '')
+      setCreatedUserEmailSent(result.correoEnviado === true)
       await loadSection('usuarios')
     } catch (error) {
       setCreateUserError(error.message || 'No fue posible crear el usuario')
@@ -405,7 +272,13 @@ function App() {
             rol: user.rol,
           },
         })
-        result = { ...user, status: 'success', message: response.message || 'Cuenta creada.' }
+        result = {
+          ...user,
+          status: response.correoEnviado === false ? 'warning' : 'success',
+          message: response.correoEnviado === false
+            ? `${response.message || 'Cuenta creada, pero el correo falló.'} Contraseña temporal: ${response.passwordTemporal || 'no disponible'}`
+            : response.message || 'Cuenta creada.',
+        }
       } catch (error) {
         result = { ...user, status: 'error', message: error.message || 'No fue posible crear la cuenta.' }
       }
@@ -435,6 +308,7 @@ function App() {
   const openCreateUser = () => {
     setCreateUserError('')
     setCreatedTemporaryPassword('')
+    setCreatedUserEmailSent(false)
     setNewUser({ nombre: '', apellido: '', correo: '', rol: 'usuario' })
     setCreateUserOpen(true)
   }
@@ -812,7 +686,6 @@ function App() {
     .sort(([first], [second]) => first.localeCompare(second))
     .slice(-8)
     .map(([, item]) => item)
-  const roleColors = { administrador: '#1f8fff', usuario: '#53c18b', fontanero: '#ff9d42' }
   const roleCounts = users.reduce((counts, user) => {
     const role = user.rol || 'sin rol'
     counts[role] = (counts[role] || 0) + 1
@@ -852,870 +725,84 @@ function App() {
 
   if (sessionStatus !== 'authenticated') {
     return (
-      <main className="auth-shell">
-        <section className="auth-showcase" aria-label="Acueducto Campoamor">
-          <div className="auth-showcase-top">
-            <img src={hidroAppLogo} alt="" className="auth-brand-logo" />
-            <span>ACUEDUCTO CAMPOAMOR</span>
-          </div>
-          <div className="auth-showcase-copy">
-            <span className="auth-kicker"><span /> SERVICIO Y COMUNIDAD</span>
-            <h2>El agua de nuestra comunidad, bajo control.</h2>
-            <p>Gestiona usuarios, facturación y novedades del servicio desde un solo lugar.</p>
-          </div>
-          <div className="auth-showcase-footer">
-            <div className="auth-watermark"><Waves size={118} strokeWidth={1} /></div>
-            <span>PLATAFORMA DE ADMINISTRACIÓN</span>
-            <span className="auth-status"><i /> Sistema de gestión</span>
-          </div>
-        </section>
-        <form className="auth-panel" onSubmit={authMode === 'login' ? handleLogin : handleRecoverySubmit}>
-          <div className="auth-form-heading">
-            <div className="auth-mark"><Waves size={22} /></div>
-            <p className="eyebrow">BIENVENIDO</p>
-            <h1>{authMode === 'login' ? 'Inicia sesión' : authMode === 'request-reset' ? 'Recupera tu acceso' : 'Crea una contraseña'}</h1>
-          <p className="auth-description">
-            {authMode === 'login'
-              ? 'Ingresa con tu cuenta de administrador.'
-              : authMode === 'request-reset'
-                ? 'Te enviaremos un código al correo de tu cuenta.'
-                : 'Ingresa el código recibido y define una contraseña de al menos 8 caracteres.'}
-          </p>
-          </div>
-          <label htmlFor="admin-email">Correo electrónico</label>
-          <input
-            id="admin-email"
-            type="email"
-            autoComplete="username"
-            value={email}
-            onChange={(event) => { setEmail(event.target.value); setAuthError('') }}
-            onBlur={authMode === 'login' ? checkAdminEmail : undefined}
-            required
-          />
-          {authMode === 'login' && (
-            <>
-              <label htmlFor="admin-password">Contraseña</label>
-              <input
-                id="admin-password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </>
-          )}
-          {authMode === 'reset' && (
-            <>
-              <label htmlFor="recovery-code">Código de recuperación</label>
-              <input
-                id="recovery-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                maxLength={6}
-                value={recoveryCode}
-                onChange={(event) => setRecoveryCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                required
-              />
-              <label htmlFor="new-password">Nueva contraseña</label>
-              <input
-                id="new-password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
-                required
-              />
-              <label htmlFor="confirm-password">Confirmar contraseña</label>
-              <input
-                id="confirm-password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                value={confirmNewPassword}
-                onChange={(event) => setConfirmNewPassword(event.target.value)}
-                required
-              />
-            </>
-          )}
-          {authNotice && <p className="auth-notice" role="status">{authNotice}</p>}
-          {authError && <p className="auth-error" role="alert">{authError}</p>}
-          <button className="primary-button auth-submit" type="submit" disabled={isLoggingIn}>
-            {isLoggingIn
-              ? authMode === 'login' ? 'Ingresando...' : authMode === 'request-reset' ? 'Enviando código...' : 'Actualizando...'
-              : authMode === 'login' ? 'Iniciar sesión' : authMode === 'request-reset' ? 'Enviar código' : 'Actualizar contraseña'}
-          </button>
-          {authMode === 'login' ? (
-            <button type="button" className="link-button auth-link" onClick={() => { setAuthMode('request-reset'); setAuthError(''); setAuthNotice('') }}>
-              Olvidé mi contraseña
-            </button>
-          ) : (
-            <button type="button" className="link-button auth-link" onClick={() => { setAuthMode('login'); setAuthError(''); setAuthNotice('') }}>
-              Volver a iniciar sesión
-            </button>
-          )}
-          <p className="auth-security"><ShieldCheck size={15} /> Acceso seguro para administradores</p>
-        </form>
-      </main>
+      <AuthScreen
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        email={email}
+        setEmail={setEmail}
+        password={password}
+        setPassword={setPassword}
+        recoveryCode={recoveryCode}
+        setRecoveryCode={setRecoveryCode}
+        newPassword={newPassword}
+        setNewPassword={setNewPassword}
+        confirmNewPassword={confirmNewPassword}
+        setConfirmNewPassword={setConfirmNewPassword}
+        authNotice={authNotice}
+        setAuthNotice={setAuthNotice}
+        authError={authError}
+        setAuthError={setAuthError}
+        isLoggingIn={isLoggingIn}
+        onLogin={handleLogin}
+        onRecoverySubmit={handleRecoverySubmit}
+        onCheckAdminEmail={checkAdminEmail}
+      />
     )
   }
-
-  const renderDashboard = () => (
-    <>
-      <section className="kpi-grid">
-        {dashboardKpis.map((item) => (
-          <StatCard
-            key={item.id}
-            title={item.title}
-            value={item.value}
-            detail={item.detail}
-            icon={item.icon}
-            tone={item.tone}
-          />
-        ))}
-      </section>
-
-      <section className="analytics-grid">
-        <div className="panel chart-panel large-panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Estadísticas</p>
-              <h3>Ingresos del servicio</h3>
-            </div>
-            <button type="button" className="soft-button" onClick={() => exportTreasuryWorkbook('pagos')}>
-              <Download size={16} />
-              Excel
-            </button>
-          </div>
-
-          <div className="chart-wrap">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueTrend}>
-                <defs>
-                  <linearGradient id="revenueFill" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="5%" stopColor="#1f8fff" stopOpacity={0.42} />
-                    <stop offset="95%" stopColor="#1f8fff" stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="#dfeaf9" strokeDasharray="4 4" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Area type="monotone" dataKey="valor" stroke="#1f8fff" fill="url(#revenueFill)" strokeWidth={3} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="panel chart-panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Distribución</p>
-              <h3>Tipo de usuarios</h3>
-            </div>
-          </div>
-
-          <div className="donut-wrap">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={serviceMix} dataKey="value" innerRadius={50} outerRadius={80} paddingAngle={3}>
-                  {serviceMix.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="legend-list">
-            {serviceMix.map((item) => (
-              <div key={item.name} className="legend-item">
-                <span className="legend-dot" style={{ background: item.color }} />
-                <span>{item.name}</span>
-                <strong>{item.value}%</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="content-grid">
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Clientes</p>
-              <h3>Usuarios recientes</h3>
-            </div>
-            <button type="button" className="link-button" onClick={() => handleNavigate('usuarios')}>
-              Ver todos <ChevronRight size={16} />
-            </button>
-          </div>
-          <div className="stack-list">
-            {recentUsers.map((user) => (
-              <div key={`${user.name}-${user.date}`} className="user-row">
-                <div className="user-avatar">{user.name.charAt(0)}</div>
-                <div className="user-summary">
-                  <strong>{user.name}</strong>
-                  <span>{user.zone}</span>
-                </div>
-                <span className={`status-badge ${user.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                  {user.status}
-                </span>
-                <small>{user.date}</small>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Resumen</p>
-              <h3>Reportes rápidos</h3>
-            </div>
-          </div>
-          <div className="report-grid">
-            {reportSummary.map((item) => (
-              <div key={item.label} className="mini-report">
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-              </div>
-            ))}
-          </div>
-          <div className="notice-card">
-            <div className="notice-icon">
-              <ShieldCheck size={18} />
-            </div>
-            <div>
-              <strong>Estado del servicio</strong>
-              <p>{metricValue('cortes', `${activeCuts.length} cortes activos registrados.`)}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-    </>
-  )
-
-  const renderUsers = () => (
-    <div className="panel">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Gestión de usuarios</p>
-          <h3>Suscriptores y clientes</h3>
-        </div>
-        <div className="hero-actions">
-          <button type="button" className="secondary-button" onClick={openBulkUserImport}>
-            <Upload size={16} />
-            Carga masiva
-          </button>
-          <button type="button" className="primary-button" onClick={openCreateUser}>
-            <Plus size={16} />
-            Nuevo usuario
-          </button>
-        </div>
-      </div>
-
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Usuario</th>
-              <th>Correo</th>
-              <th>Rol</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sectionErrors.usuarios ? (
-              <tr><td colSpan="5" className="table-message error-text">{sectionErrors.usuarios}</td></tr>
-            ) : loadingSections.usuarios ? (
-              <tr><td colSpan="5" className="table-message">Cargando usuarios...</td></tr>
-            ) : filterRows(sectionData.usuarios || []).length === 0 ? (
-              <tr><td colSpan="5" className="table-message">No hay resultados.</td></tr>
-            ) : filterRows(sectionData.usuarios).map((user) => (
-              <tr key={user.id}>
-                <td>{[user.nombre, user.apellido].filter(Boolean).join(' ') || 'Sin nombre'}</td>
-                <td>{user.correo || '—'}</td>
-                <td>{user.rol || '—'}</td>
-                <td><span className={`status-badge ${user.activo ? 'activo' : 'inactivo'}`}>{user.activo ? 'Activo' : 'Inactivo'}</span></td>
-                <td className="row-actions">
-                  <button type="button" className="link-button" onClick={() => openOperation('editarUsuario', user)}>Editar</button>
-                  {user.id !== profile?.id && <>
-                    <button type="button" className="link-button" onClick={() => performAction('usuarios', `${endpoints.adminUsers}/${user.id}/estado`, 'PUT', { activo: !user.activo })}>
-                      {user.activo ? 'Desactivar' : 'Activar'}
-                    </button>
-                    <select aria-label={`Rol de ${user.correo}`} value={user.rol} onChange={(event) => performAction('usuarios', `${endpoints.adminUsers}/${user.id}/rol`, 'PUT', { rol: event.target.value })}>
-                      <option value="usuario">Usuario</option>
-                      <option value="fontanero">Fontanero</option>
-                      <option value="administrador">Administrador</option>
-                    </select>
-                    <button type="button" className="link-button danger-link" onClick={() => performAction('usuarios', `${endpoints.adminUsers}/${user.id}`, 'DELETE', undefined, 'La eliminación es permanente y borra el historial asociado a esta cuenta. No se puede deshacer. ¿Continuar?')}><Trash2 size={14} />Eliminar</button>
-                  </>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-
-  const renderFacturas = () => (
-    <div className="panel">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Facturación</p>
-          <h3>Facturas y vencimientos</h3>
-        </div>
-        <div className="hero-actions">
-          <button type="button" className="secondary-button" onClick={() => openOperation('facturacionMensual')}>Generar para todos</button>
-          <button type="button" className="secondary-button" onClick={() => openOperation('facturaExtraordinaria')}>Factura extraordinaria</button>
-          <button type="button" className="primary-button" onClick={() => openOperation('factura')}><Plus size={16} />Nueva factura</button>
-        </div>
-      </div>
-
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Factura</th>
-              <th>Suscriptor</th>
-              <th>Periodo</th>
-              <th>Valor</th>
-              <th>Vencimiento</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sectionErrors.facturas ? <tr><td colSpan="7" className="table-message error-text">{sectionErrors.facturas}</td></tr>
-              : loadingSections.facturas ? <tr><td colSpan="7" className="table-message">Cargando facturas...</td></tr>
-                  : filterRows(sectionData.facturas || []).length === 0 ? <tr><td colSpan="7" className="table-message">No hay resultados.</td></tr>
-                    : filterRows(sectionData.facturas).map((invoice) => (
-                    <tr key={invoice.id}>
-                      <td>{formatInvoiceNumber(invoice)}</td>
-                      <td>
-                        {(() => {
-                          const user = users.find((profileItem) => profileItem.id === invoice.perfil_id)
-                          const name = [user?.nombre, user?.apellido].filter(Boolean).join(' ')
-                          return (
-                            <div className="identity-cell">
-                              <strong>{name || 'Perfil sin nombre'}</strong>
-                              <span>{user?.correo || 'Correo no disponible'}</span>
-                              <small>{user?.direccion || user?.zona || 'Ubicación no registrada'}</small>
-                            </div>
-                          )
-                        })()}
-                      </td>
-                      <td>{invoice.periodo}</td>
-                      <td>{formatMoney(invoice.valor_total)}</td>
-                      <td>{formatDate(invoice.fecha_vencimiento)}</td>
-                      <td><span className={`status-badge ${invoice.estado}`}>{invoice.estado}</span></td>
-                      <td className="row-actions">
-                        <button type="button" className="link-button" onClick={() => openInvoicePreview(invoice)}><Eye size={14} />Ver</button>
-                        <button type="button" className="link-button" onClick={() => openOperation('editarFactura', invoice)}>Editar</button>
-                        <button type="button" className="link-button danger-link" onClick={() => performAction('facturas', `${endpoints.facturas}/${invoice.id}`, 'DELETE', undefined, '¿Eliminar esta factura? Si ya tiene pagos, el backend rechazará la operación; anúlala en ese caso.')}>Eliminar</button>
-                      </td>
-                    </tr>
-                  ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-
-  const renderPagos = () => (
-    <div className="panel">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Pagos</p>
-          <h3>Últimas transacciones</h3>
-        </div>
-      </div>
-
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Perfil</th>
-              <th>Factura</th>
-              <th>Monto</th>
-              <th>Método</th>
-              <th>Fecha</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sectionErrors.pagos ? <tr><td colSpan="8" className="table-message error-text">{sectionErrors.pagos}</td></tr>
-              : loadingSections.pagos ? <tr><td colSpan="8" className="table-message">Cargando pagos...</td></tr>
-                  : filterRows(sectionData.pagos || []).length === 0 ? <tr><td colSpan="8" className="table-message">No hay resultados.</td></tr>
-                    : filterRows(sectionData.pagos).map((payment) => (
-                    <tr key={payment.id}>
-                      <td>{payment.id}</td>
-                      <td>
-                        {(() => {
-                          const user = users.find((profileItem) => profileItem.id === payment.perfil_id)
-                          const name = [user?.nombre, user?.apellido].filter(Boolean).join(' ')
-                          return (
-                            <div className="identity-cell">
-                              <strong>{name || 'Perfil sin nombre'}</strong>
-                              <span>{user?.correo || 'Correo no disponible'}</span>
-                              <small>{user?.direccion || user?.zona || 'Ubicación no registrada'}</small>
-                            </div>
-                          )
-                        })()}
-                      </td>
-                      <td>{formatInvoiceNumber(invoices.find((invoice) => invoice.id === payment.factura_id) || { id: payment.factura_id })}</td>
-                      <td>{formatMoney(payment.monto)}</td>
-                      <td>{payment.metodo === 'fisico' ? 'Pago físico' : payment.metodo === 'wompi' ? 'Wompi' : payment.metodo || '—'}</td>
-                      <td>{formatDate(payment.fecha_pago)}</td>
-                      <td>{payment.confirmado ? 'Confirmado' : 'Pendiente'}</td>
-                      <td className="row-actions">
-                        {payment.recibo_url && <a className="link-button" href={payment.recibo_url} target="_blank" rel="noreferrer">Ver recibo</a>}
-                        {!payment.confirmado && <>
-                          <button type="button" className="link-button" onClick={() => performAction('pagos', `${endpoints.pagos}/${payment.id}/confirmar`, 'PUT')}>Confirmar</button>
-                          <button type="button" className="link-button danger-link" onClick={() => performAction('pagos', `${endpoints.pagos}/${payment.id}`, 'DELETE', undefined, '¿Eliminar este pago pendiente?')}>Eliminar</button>
-                        </>}
-                      </td>
-                    </tr>
-                  ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-
-  const renderCortes = () => (
-    <div className="panel">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Servicio</p>
-          <h3>Cortes y reconexiones</h3>
-        </div>
-        <button type="button" className="primary-button" onClick={() => openOperation('corte')}><Plus size={16} />Programar corte</button>
-      </div>
-
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Perfil</th>
-              <th>Motivo</th>
-              <th>Fecha de corte</th>
-              <th>Fecha de reconexión</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sectionErrors.cortes ? <tr><td colSpan="7" className="table-message error-text">{sectionErrors.cortes}</td></tr>
-              : loadingSections.cortes ? <tr><td colSpan="7" className="table-message">Cargando cortes...</td></tr>
-                  : filterRows(sectionData.cortes || []).length === 0 ? <tr><td colSpan="7" className="table-message">No hay resultados.</td></tr>
-                    : filterRows(sectionData.cortes).map((cut) => (
-                    <tr key={cut.id}>
-                      <td>{cut.id}</td>
-                      <td>{cut.perfil_id}</td>
-                      <td>{cut.motivo}</td>
-                      <td>{formatDate(cut.fecha_corte)}</td>
-                      <td>{formatDate(cut.fecha_reconexion)}</td>
-                      <td><span className={`status-badge ${cut.estado}`}>{cut.estado}</span></td>
-                      <td className="row-actions">
-                        {cut.estado === 'activo' && <button type="button" className="link-button" onClick={() => performAction('cortes', `${endpoints.cortes}/${cut.id}/reconectar`, 'PUT')}>Reconectar</button>}
-                        <button type="button" className="link-button danger-link" onClick={() => performAction('cortes', `${endpoints.cortes}/${cut.id}`, 'DELETE', undefined, '¿Eliminar este registro de corte?')}>Eliminar</button>
-                      </td>
-                    </tr>
-                  ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-
-  const renderNotificaciones = () => (
-    <div className="panel">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Comunicaciones</p>
-          <h3>Notificaciones de la cuenta</h3>
-        </div>
-        <button type="button" className="primary-button" onClick={() => openOperation('notificacion')}><Plus size={16} />Publicar aviso</button>
-        <button type="button" className="link-button" onClick={() => performAction('notificaciones', endpoints.marcarNotificacionesLeidas, 'PUT')}>Marcar todas leídas</button>
-      </div>
-
-      {sectionErrors.notificaciones ? <p className="table-message error-text">{sectionErrors.notificaciones}</p>
-        : loadingSections.notificaciones ? <p className="table-message">Cargando notificaciones...</p>
-          : filterRows(sectionData.notificaciones || []).length === 0 ? <p className="table-message">No hay resultados para esta cuenta.</p>
-            : <div className="stack-list compact-list">
-              {filterRows(sectionData.notificaciones).map((alert) => (
-                <div key={alert.id} className="notification-row">
-                  <div className="notification-icon"><BellRing size={16} /></div>
-                  <div className="notification-copy">
-                    <strong>{alert.mensaje}</strong>
-                    <span>{alert.tipo}</span>
-                  </div>
-                  <span className={`tag ${alert.estado === 'no_leido' ? 'alta' : 'media'}`}>{alert.estado}</span>
-                  <small>{formatDate(alert.fecha)}</small>
-                  {alert.estado === 'no_leido' && <button type="button" className="link-button" onClick={() => performAction('notificaciones', `${endpoints.notificaciones}/${alert.id}/leida`, 'PUT')}>Marcar leída</button>}
-                  <button type="button" className="link-button danger-link" onClick={() => performAction('notificaciones', `${endpoints.notificaciones}/${alert.id}`, 'DELETE', undefined, '¿Eliminar esta notificación?')}>Eliminar</button>
-                </div>
-              ))}
-            </div>}
-    </div>
-  )
-
-  const renderTarifas = () => (
-    <div className="panel">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Tarifas</p>
-          <h3>Plan de cobro por categoría</h3>
-        </div>
-        <button type="button" className="primary-button" onClick={() => openOperation('tarifa')}><Plus size={16} />Nueva tarifa</button>
-      </div>
-
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Tipo</th>
-              <th>Cuota fija</th>
-              <th>Vigente desde</th>
-              <th>Vigente hasta</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sectionErrors.tarifas ? <tr><td colSpan="5" className="table-message error-text">{sectionErrors.tarifas}</td></tr>
-              : loadingSections.tarifas ? <tr><td colSpan="5" className="table-message">Cargando tarifas...</td></tr>
-                  : filterRows(sectionData.tarifas || []).length === 0 ? <tr><td colSpan="5" className="table-message">No hay resultados.</td></tr>
-                    : filterRows(sectionData.tarifas).map((tariff) => (
-                    <tr key={tariff.id}>
-                      <td>{tariff.tipo}</td>
-                      <td>{formatMoney(tariff.cuota_fija)}</td>
-                      <td>{formatDate(tariff.vigente_desde)}</td>
-                      <td>{formatDate(tariff.vigente_hasta)}</td>
-                      <td className="row-actions">
-                        <button type="button" className="link-button" onClick={() => openOperation('editarTarifa', tariff)}>Editar</button>
-                        <button type="button" className="link-button danger-link" onClick={() => performAction('tarifas', `${endpoints.tarifas}/${tariff.id}`, 'DELETE', undefined, '¿Eliminar esta tarifa?')}>Eliminar</button>
-                      </td>
-                    </tr>
-                  ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-
-  const exportTreasuryWorkbook = async (report = 'todos') => {
-    const required = report === 'balance' || report === 'pagos'
-      ? ['pagos', 'usuarios', 'facturas']
-      : report === 'facturas'
-        ? ['facturas', 'usuarios']
-        : ['usuarios', 'facturas', 'pagos']
-    const missing = required.find((section) => sectionData[section] === undefined)
-    if (missing) {
-      setActionError(`No fue posible preparar el informe: revisa la carga de ${missing}.`)
-      return
-    }
-    let ExcelJS
-    try {
-      ExcelJS = (await import('exceljs')).default
-    } catch (error) {
-      console.error('No fue posible cargar el generador Excel:', error)
-      setActionError('No se pudo cargar el generador Excel. Reinicia el servidor del panel e inténtalo de nuevo.')
-      return
-    }
-
-    const profileById = new Map(users.map((user) => [user.id, user]))
-    const invoiceById = new Map(invoices.map((invoice) => [invoice.id, invoice]))
-    const userName = (id) => {
-      const user = profileById.get(id)
-      return [user?.nombre, user?.apellido].filter(Boolean).join(' ') || 'Sin nombre'
-    }
-    const paymentRows = reportPayments.map((payment) => {
-      const user = profileById.get(payment.perfil_id)
-      const invoice = invoiceById.get(payment.factura_id)
-      return {
-        Fecha: formatDate(payment.fecha_pago),
-        Suscriptor: userName(payment.perfil_id),
-        Correo: user?.correo || '',
-        Dirección: user?.direccion || user?.zona || '',
-        Factura: formatInvoiceNumber(invoice || { id: payment.factura_id }),
-        Periodo: invoice?.periodo || '',
-        Monto: Number(payment.monto || 0),
-        Método: payment.metodo || '',
-        Estado: payment.confirmado ? 'Confirmado' : 'Pendiente por confirmar',
-        Referencia: payment.referencia || payment.transaccion_id || '',
-        'ID de pago': payment.id,
-      }
-    })
-    const invoiceRows = reportInvoices.map((invoice) => {
-      const user = profileById.get(invoice.perfil_id)
-      return {
-        'Fecha de emisión': formatDate(invoice.fecha_emision),
-        Factura: formatInvoiceNumber(invoice),
-        Periodo: invoice.periodo,
-        Suscriptor: userName(invoice.perfil_id),
-        Correo: user?.correo || '',
-        Dirección: user?.direccion || user?.zona || '',
-        Tipo: invoice.tipo || 'servicio',
-        Valor: Number(invoice.valor_total || 0),
-        Estado: invoice.estado,
-        Vencimiento: formatDate(invoice.fecha_vencimiento),
-        Observación: invoice.observacion || '',
-      }
-    })
-    const accountRows = users.filter((user) => user.rol === 'usuario').map((user) => {
-      const billed = reportInvoices.filter((invoice) => invoice.perfil_id === user.id)
-        .reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0)
-      const paid = reportConfirmedPayments.filter((payment) => payment.perfil_id === user.id)
-        .reduce((sum, payment) => sum + Number(payment.monto || 0), 0)
-      const dueInvoices = reportInvoices.filter((invoice) => invoice.perfil_id === user.id && ['pendiente', 'vencida'].includes(invoice.estado))
-      return {
-        Suscriptor: [user.nombre, user.apellido].filter(Boolean).join(' '),
-        Correo: user.correo || '',
-        Teléfono: user.telefono || '',
-        Dirección: user.direccion || user.zona || '',
-        Lote: user.numero_lote || '',
-        Estado: user.activo ? 'Activo' : 'Inactivo',
-        'Facturado en el periodo': billed,
-        'Pagado confirmado en el periodo': paid,
-        'Saldo de facturas pendientes': dueInvoices.reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0),
-        'Facturas pendientes': dueInvoices.length,
-      }
-    })
-    const monthlyTotals = new Map()
-    reportConfirmedPayments.forEach((payment) => {
-      const month = String(payment.fecha_pago || '').slice(0, 7) || 'Sin fecha'
-      monthlyTotals.set(month, (monthlyTotals.get(month) || 0) + Number(payment.monto || 0))
-    })
-    const balanceRows = [
-      { Concepto: 'Ingresos recibidos y confirmados', Cantidad: reportConfirmedPayments.length, Valor: reportRevenue },
-      { Concepto: 'Pagos pendientes de confirmar', Cantidad: reportPayments.filter((payment) => !payment.confirmado).length, Valor: reportPendingRevenue },
-      { Concepto: 'Facturas emitidas', Cantidad: reportInvoices.length, Valor: reportInvoices.reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0) },
-      { Concepto: 'Facturas pendientes o vencidas', Cantidad: reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).length, Valor: reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0) },
-      ...[...monthlyTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, value]) => ({ Concepto: `Recaudo confirmado · ${month}`, Cantidad: '', Valor: value })),
-    ]
-    const sheetRows = {
-      balance: { 'Balance de ingresos': balanceRows },
-      pagos: { 'Pagos de usuarios': paymentRows },
-      facturas: { 'Facturas emitidas': invoiceRows },
-      usuarios: { 'Estado por usuario': accountRows },
-      todos: {
-        'Balance de ingresos': balanceRows,
-        'Pagos de usuarios': paymentRows,
-        'Facturas emitidas': invoiceRows,
-        'Estado por usuario': accountRows,
-      },
-    }
-    const workbook = new ExcelJS.Workbook()
-    workbook.creator = 'HIDRO-APP · Acueducto Campoamor'
-    workbook.subject = 'Informes de tesorería'
-    workbook.title = `Informe ${report}`
-    workbook.created = new Date()
-    const logoResponse = await fetch(hidroAppLogo)
-    const logoBlob = await logoResponse.blob()
-    const logoBitmap = await createImageBitmap(logoBlob)
-    const watermarkCanvas = document.createElement('canvas')
-    watermarkCanvas.width = logoBitmap.width
-    watermarkCanvas.height = logoBitmap.height
-    const watermarkContext = watermarkCanvas.getContext('2d')
-    watermarkContext.globalAlpha = 0.075
-    watermarkContext.drawImage(logoBitmap, 0, 0)
-    const watermarkBase64 = watermarkCanvas.toDataURL('image/png').split(',')[1]
-    const logoBase64 = await logoBlob.arrayBuffer().then((buffer) => {
-      let binary = ''
-      new Uint8Array(buffer).forEach((byte) => { binary += String.fromCharCode(byte) })
-      return btoa(binary)
-    })
-    const brandImage = workbook.addImage({ base64: logoBase64, extension: 'png' })
-    const watermarkImage = workbook.addImage({ base64: watermarkBase64, extension: 'png' })
-    const reportTitles = {
-      balance: 'Balance de ingresos',
-      pagos: 'Pagos de usuarios',
-      facturas: 'Facturas emitidas',
-      usuarios: 'Estado de cuenta por usuario',
-      todos: 'Informe integral de tesorería',
-    }
-    Object.entries(sheetRows[report]).forEach(([name, rows]) => {
-      const safeRows = rows.length ? rows : [{ 'Sin registros en el periodo': 'No hay información para las fechas seleccionadas.' }]
-      const columns = Object.keys(safeRows[0])
-      const worksheet = workbook.addWorksheet(name, {
-        views: [{ state: 'frozen', ySplit: 4 }],
-        pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
-      })
-      worksheet.columns = columns.map((key) => ({
-        key,
-        width: Math.min(34, Math.max(key.length + 3, ...safeRows.slice(0, 100).map((row) => String(row[key] ?? '').length + 2))),
-      }))
-      worksheet.mergeCells(1, 1, 1, columns.length)
-      worksheet.mergeCells(2, 1, 2, columns.length)
-      worksheet.getCell('A1').value = `${reportTitles[report]} · ${name}`
-      worksheet.getCell('A1').font = { name: 'Aptos Display', size: 18, bold: true, color: { argb: 'FFFFFFFF' } }
-      worksheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left', indent: 3 }
-      worksheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF123B5D' } }
-      worksheet.getCell('A2').value = `ACUEDUCTO CAMPOAMOR  |  Periodo: ${reportFrom || 'Sin límite'} al ${reportTo || 'Sin límite'}  |  Generado: ${new Date().toLocaleString('es-CO')}`
-      worksheet.getCell('A2').font = { name: 'Aptos', size: 10, color: { argb: 'FF426579' }, italic: true }
-      worksheet.getCell('A2').alignment = { vertical: 'middle', horizontal: 'left', indent: 3 }
-      worksheet.getRow(1).height = 43
-      worksheet.getRow(2).height = 25
-      worksheet.getRow(3).height = 9
-      worksheet.addImage(brandImage, { tl: { col: 0.18, row: 0.08 }, ext: { width: 38, height: 38 } })
-      worksheet.addImage(watermarkImage, { tl: { col: Math.max(1, columns.length - 4), row: 5 }, ext: { width: 190, height: 190 } })
-      const header = worksheet.getRow(4)
-      header.values = columns
-      header.height = 30
-      header.eachCell((cell) => {
-        cell.font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF087F82' } }
-        cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true }
-        cell.border = { bottom: { style: 'medium', color: { argb: 'FF65C9B5' } } }
-      })
-      safeRows.forEach((record, index) => {
-        const row = worksheet.addRow(columns.map((column) => record[column] ?? ''))
-        row.height = 23
-        row.eachCell((cell, columnNumber) => {
-          cell.font = { name: 'Aptos', size: 10, color: { argb: 'FF263B4D' } }
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: index % 2 === 0 ? 'FFF2F8FA' : 'FFFFFFFF' } }
-          cell.alignment = { vertical: 'middle', horizontal: typeof cell.value === 'number' ? 'right' : 'left' }
-          cell.border = { bottom: { style: 'hair', color: { argb: 'FFDCE8EC' } } }
-          const headerName = columns[columnNumber - 1]
-          if (/monto|valor|facturado|pagado|saldo/i.test(headerName) && typeof cell.value === 'number') {
-            cell.numFmt = '"$" #,##0;[Red]-"$" #,##0'
-            cell.font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FF145B4B' } }
-          }
-          if (headerName === 'Estado') {
-            const status = String(cell.value || '').toLowerCase()
-            const color = status.includes('confirmado') || status === 'pagada' || status === 'activo'
-              ? 'FFE1F4EB'
-              : status.includes('pendiente') || status === 'vencida'
-                ? 'FFFFF1D8'
-                : status === 'anulada' || status === 'inactivo' ? 'FFFCE6E6' : null
-            if (color) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } }
-          }
-        })
-      })
-      worksheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: Math.max(4, worksheet.rowCount), column: columns.length } }
-      worksheet.getColumn(1).alignment = { vertical: 'middle' }
-      worksheet.headerFooter.oddFooter = '&L&HAcueducto Campoamor&CInforme de tesorería&R&P de &N'
-    })
-    const suffix = `${reportFrom || 'inicio'}-${reportTo || 'hoy'}`
-    const buffer = await workbook.xlsx.writeBuffer()
-    const file = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-    const url = URL.createObjectURL(file)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `informe-${report}-${suffix}.xlsx`
-    link.click()
-    URL.revokeObjectURL(url)
-    setActionError('')
-    setActionMessage('Informe Excel descargado. Los ingresos incluyen solo pagos confirmados.')
+  const exportTreasuryWorkbook = (report = 'todos') => exportTreasuryWorkbookFile({
+    report,
+    sectionData,
+    users,
+    invoices,
+    reportPayments,
+    reportInvoices,
+    reportConfirmedPayments,
+    reportRevenue,
+    reportPendingRevenue,
+    reportFrom,
+    reportTo,
+    setActionError,
+    setActionMessage,
+  })
+  const sectionContext = {
+    sectionData,
+    sectionErrors,
+    loadingSections,
+    filterRows,
+    profile,
+    endpoints,
+    handleNavigate,
+    openBulkUserImport,
+    openCreateUser,
+    openOperation,
+    performAction,
+    openInvoicePreview,
+    exportTreasuryWorkbook,
+    formatInvoiceNumber,
+    formatMoney,
+    formatDate,
+    users,
+    invoices,
+    payments,
+    confirmedPayments,
+    activeUsers,
+    activeCuts,
+    reportPayments,
+    reportInvoices,
+    reportConfirmedPayments,
+    reportRevenue,
+    reportPendingRevenue,
+    reportFrom,
+    setReportFrom,
+    reportTo,
+    setReportTo,
+    dashboardKpis,
+    revenueTrend,
+    serviceMix,
+    recentUsers,
+    reportSummary,
+    metricValue,
   }
-
-  const renderReportes = () => (
-    <>
-      <section className="panel treasury-report-panel">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Tesorería</p>
-            <h3>Informes financieros del acueducto</h3>
-            <p className="report-caption">Consulta recaudos confirmados, pagos pendientes y facturación por periodo.</p>
-          </div>
-          <button type="button" className="primary-button" onClick={() => exportTreasuryWorkbook('todos')}>
-            <Download size={16} /> Descargar informes Excel
-          </button>
-        </div>
-        <div className="report-filters">
-          <label>Desde<input type="date" value={reportFrom} max={reportTo || undefined} onChange={(event) => setReportFrom(event.target.value)} /></label>
-          <label>Hasta<input type="date" value={reportTo} min={reportFrom || undefined} onChange={(event) => setReportTo(event.target.value)} /></label>
-          <span>Periodo aplicado a pagos y facturas emitidas</span>
-        </div>
-        <div className="treasury-kpis">
-          <div><span>Ingresos recaudados</span><strong>{sectionErrors.pagos ? '—' : formatMoney(reportRevenue)}</strong><small>{reportConfirmedPayments.length} pagos confirmados</small></div>
-          <div><span>Pagos por confirmar</span><strong>{sectionErrors.pagos ? '—' : formatMoney(reportPendingRevenue)}</strong><small>{reportPayments.filter((payment) => !payment.confirmado).length} transacciones</small></div>
-          <div><span>Facturas emitidas</span><strong>{sectionErrors.facturas ? '—' : formatMoney(reportInvoices.reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0))}</strong><small>{reportInvoices.length} facturas del periodo</small></div>
-          <div><span>Facturas pendientes</span><strong>{sectionErrors.facturas ? '—' : reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).length}</strong><small>Incluye vencidas</small></div>
-        </div>
-        <div className="report-downloads">
-          <button type="button" className="secondary-button" onClick={() => exportTreasuryWorkbook('balance')}><Download size={15} /> Balance de ingresos</button>
-          <button type="button" className="secondary-button" onClick={() => exportTreasuryWorkbook('pagos')}><Download size={15} /> Pagos de usuarios</button>
-          <button type="button" className="secondary-button" onClick={() => exportTreasuryWorkbook('facturas')}><Download size={15} /> Facturas emitidas</button>
-          <button type="button" className="secondary-button" onClick={() => exportTreasuryWorkbook('usuarios')}><Download size={15} /> Estado por usuario</button>
-        </div>
-      </section>
-      <section className="analytics-grid">
-        <div className="panel chart-panel large-panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Reporte</p>
-              <h3>Ingresos y metas</h3>
-            </div>
-          </div>
-          <div className="chart-wrap">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={revenueTrend}>
-                <CartesianGrid stroke="#dfeaf9" strokeDasharray="4 4" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Bar dataKey="valor" radius={[10, 10, 0, 0]} fill="#53c18b" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Indicadores</p>
-              <h3>Desempeño</h3>
-            </div>
-          </div>
-          <div className="mini-overview">
-            <div className="overview-item">
-              <div className="overview-icon green"><TrendingUp size={16} /></div>
-              <div>
-                <strong>{metricValue('pagos', confirmedPayments.length)}</strong>
-                <span>Pagos confirmados</span>
-              </div>
-            </div>
-            <div className="overview-item">
-              <div className="overview-icon blue"><Clock3 size={16} /></div>
-              <div>
-                <strong>{metricValue('pagos', payments.filter((payment) => !payment.confirmado).length)}</strong>
-                <span>Pagos por confirmar</span>
-              </div>
-            </div>
-            <div className="overview-item">
-              <div className="overview-icon amber"><CheckCircle2 size={16} /></div>
-              <div>
-                <strong>{metricValue('usuarios', users.length ? `${Math.round((activeUsers.length / users.length) * 100)}%` : '0%')}</strong>
-                <span>Usuarios activos</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </>
-  )
-
-  const sectionMap = {
-    dashboard: renderDashboard(),
-    usuarios: renderUsers(),
-    facturas: renderFacturas(),
-    pagos: renderPagos(),
-    cortes: renderCortes(),
-    notificaciones: renderNotificaciones(),
-    tarifas: renderTarifas(),
-    reportes: renderReportes(),
-  }
-
   return (
     <div className="app-shell">
       <Sidebar
@@ -1778,7 +865,7 @@ function App() {
 
           {actionMessage && <p className="action-feedback" role="status">{actionMessage}</p>}
           {actionError && <p className="auth-error" role="alert">{actionError}</p>}
-          {sectionMap[activeSection]}
+          <SectionViews activeSection={activeSection} context={sectionContext} />
         </main>
       </div>
       {profileOpen && (
@@ -1845,7 +932,9 @@ function App() {
                 <CheckCircle2 size={22} />
                 <div>
                   <strong>Usuario creado</strong>
-                  <p>La contraseña temporal también fue enviada al correo registrado.</p>
+                  <p>{createdUserEmailSent
+                    ? 'Enviamos al correo registrado la contraseña temporal y el código para verificar la cuenta.'
+                    : 'No se pudo enviar el correo. Comparte la contraseña temporal; el usuario podrá solicitar un nuevo código desde la pantalla de acceso.'}</p>
                   <code>{createdTemporaryPassword}</code>
                 </div>
               </div>
@@ -1909,7 +998,7 @@ function App() {
                       {!isImportingUsers && (
                         <>
                           <p className="bulk-summary form-wide" role="status">
-                            {bulkUserResults.filter((user) => user.status === 'success').length} cuentas creadas · {bulkUserResults.filter((user) => user.status === 'error').length} con errores
+                            {bulkUserResults.filter((user) => ['success', 'warning'].includes(user.status)).length} cuentas creadas · {bulkUserResults.filter((user) => user.status === 'warning').length} con correo fallido · {bulkUserResults.filter((user) => user.status === 'error').length} con errores
                           </p>
                           {bulkUserResults.some((user) => user.status === 'error') && (
                             <button type="button" className="secondary-button form-wide" onClick={handleDownloadBulkErrors}>
@@ -1930,7 +1019,7 @@ function App() {
                                 <td>{user.line}</td>
                                 <td>{[user.nombre, user.apellido].filter(Boolean).join(' ') || '—'}</td>
                                 <td>{user.correo || '—'}</td>
-                                <td className={user.status === 'success' ? 'bulk-success' : user.status === 'error' ? 'error-text' : ''}>
+                                <td className={user.status === 'success' ? 'bulk-success' : user.status === 'warning' ? 'bulk-warning' : user.status === 'error' ? 'error-text' : ''}>
                                   {user.message}
                                 </td>
                               </tr>

@@ -15,9 +15,9 @@ function formatearMoneda(valor) {
 }
 
 async function enviarCorreoFactura({ correo, nombre, periodo, valorTotal, fechaVencimiento }) {
-  if (!correo) return;
+  if (!correo) return false;
   try {
-    await enviarCorreo({
+    const respuesta = await enviarCorreo({
       to: correo,
       subject: `Nueva factura - periodo ${periodo} - Acueducto Campo Amor`,
       html: `<p>Hola ${escaparHtml(nombre)},</p>
@@ -26,8 +26,10 @@ async function enviarCorreoFactura({ correo, nombre, periodo, valorTotal, fechaV
              ${fechaVencimiento ? `<p>Fecha límite de pago: ${new Date(fechaVencimiento).toLocaleDateString('es-CO')}.</p>` : ''}
              <p>Puedes consultar el detalle desde la aplicación de Acueducto Campo Amor.</p>`,
     });
+    return Boolean(respuesta);
   } catch (mailErr) {
     console.error('Error enviando correo de factura:', mailErr.message);
+    return false;
   }
 }
 
@@ -141,7 +143,7 @@ async function crearFactura(req, res) {
       'factura'
     );
 
-    await enviarCorreoFactura({
+    const correoEnviado = await enviarCorreoFactura({
       correo: perfil.correo,
       nombre: perfil.nombre,
       periodo,
@@ -149,7 +151,14 @@ async function crearFactura(req, res) {
       fechaVencimiento: fecha_vencimiento,
     });
 
-    return res.status(201).json({ message: 'Factura creada', factura: data });
+    return res.status(201).json({
+      message: correoEnviado
+        ? 'Factura creada y enviada por correo.'
+        : 'Factura creada, pero no se pudo enviar el correo al suscriptor.',
+      correos_enviados: correoEnviado ? 1 : 0,
+      correos_fallidos: correoEnviado ? 0 : 1,
+      factura: data,
+    });
   } catch (err) {
     return errorInesperado(res, err);
   }

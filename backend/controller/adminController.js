@@ -4,6 +4,7 @@ const breakdownModel = require('../models/breakdownModel');
 const { CAMPOS_EDITABLES_PERFIL } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
+const { generarCodigoSeguridad } = require('../utils/securityCode');
 const { enviarCorreo } = require('../config/mailer');
 const { notificar } = require('../utils/notificar');
 const { escaparHtml } = require('../utils/html');
@@ -32,6 +33,8 @@ async function crearUsuario(req, res) {
   }
 
   const passwordTemporal = generarPasswordTemporal();
+  const codigoVerificacion = generarCodigoSeguridad();
+  const codigoVerificacionExpiracion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   let userId;
 
   try {
@@ -63,8 +66,10 @@ async function crearUsuario(req, res) {
       correo,
       rol,
       activo: true,
-      is_verified: true,
+      is_verified: false,
       debe_cambiar_password: true,
+      codigo_verificacion: codigoVerificacion,
+      codigo_verificacion_expiracion: codigoVerificacionExpiracion,
     });
 
     if (profileError) {
@@ -73,17 +78,26 @@ async function crearUsuario(req, res) {
       return errorConsulta(res, profileError);
     }
 
+    let correoEnviado = false;
     try {
-      await enviarCorreo({
+      const respuestaCorreo = await enviarCorreo({
         to: correo,
         subject: 'Tu cuenta en Acueducto Campo Amor',
         html: `<p>Hola ${escaparHtml(nombre)},</p>
           <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
           <h2>${escaparHtml(passwordTemporal)}</h2>
+          <p><strong>Código de verificación:</strong></p>
+          <h2>${codigoVerificacion}</h2>
           <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
       });
+      if (!respuestaCorreo) throw new Error('Brevo no confirmó el envío.');
+      correoEnviado = true;
     } catch (mailErr) {
       console.error('Error enviando correo de cuenta creada:', mailErr.message);
+      await profileModel.saveFields(userId, {
+        codigo_verificacion: null,
+        codigo_verificacion_expiracion: null,
+      });
     }
 
     // Además del correo, dejamos un aviso dentro de la app para cuando inicie sesión.
@@ -94,8 +108,11 @@ async function crearUsuario(req, res) {
     );
 
     return res.status(201).json({
-      message: 'Usuario creado con éxito. Se envió la contraseña temporal por correo.',
+      message: correoEnviado
+        ? 'Usuario creado. Se enviaron la contraseña temporal y el código de verificación por correo.'
+        : 'Usuario creado, pero no se pudo enviar el correo. Comparte la contraseña temporal y solicita el reenvío del código desde el inicio de sesión.',
       userId,
+      correoEnviado,
       // Se devuelve también aquí (solo visible para el administrador que crea
       // la cuenta) por si el envío de correo falla y hay que compartirla a mano.
       passwordTemporal,
