@@ -7,23 +7,28 @@ notificaciones y tarifas del Acueducto Campo Amor.
 
 ```text
 hidro-admin/
-├── public/              # Archivos estáticos servidos tal cual
+├── public/                  # Recursos estaticos
 ├── src/
-│   ├── assets/          # Imágenes y recursos importados por la app
-│   ├── components/      # Componentes reutilizables
-│   ├── services/        # Comunicación con la API
-│   ├── utils/            # Funciones auxiliares
-│   ├── App.jsx           # Interfaz principal del panel
-│   ├── App.css           # Estilos de la interfaz
-│   ├── index.css         # Estilos globales
-│   └── main.jsx          # Entrada de React
-├── .env.example         # Ejemplo de configuración local
-├── index.html           # Documento HTML de entrada
-├── package.json         # Scripts y dependencias
-└── vite.config.js       # Configuración de Vite y proxy local
+│   ├── assets/              # Imagenes usadas por la aplicacion
+│   ├── components/          # Componentes compartidos
+│   ├── config/              # Acciones y formularios administrativos
+│   ├── features/
+│   │   ├── auth/            # Acceso y recuperacion
+│   │   ├── reports/         # Generacion de informes
+│   │   └── sections/        # Vistas por seccion del panel
+│   ├── services/            # Comunicacion con la API
+│   ├── styles/              # Estilos base y tema
+│   ├── utils/               # Formateadores y procesamiento CSV/Excel
+│   ├── App.jsx              # Estado y coordinacion del panel
+│   ├── index.css            # Punto de entrada de estilos
+│   └── main.jsx             # Punto de entrada de React
+├── .env.example             # Ejemplo de configuracion local
+├── index.html               # Documento HTML de entrada
+├── package.json             # Scripts y dependencias
+└── vite.config.js            # Configuracion de Vite y proxy local
 ```
 
-La configuración de Render está en `../render.yaml`, en la raíz del repositorio.
+La configuracion de Render esta en `../render.yaml`, en la raiz del repositorio.
 
 ## Desarrollo local
 

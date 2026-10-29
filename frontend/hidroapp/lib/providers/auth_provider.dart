@@ -32,8 +32,8 @@ class AuthProvider extends ChangeNotifier {
   /// app normal.
   bool get debeCambiarPassword => _profile?.debeCambiarPassword ?? false;
 
-  /// Comprueba que el correo esté asociado a un administrador antes de
-  /// permitir iniciar sesión o continuar un flujo de códigos en esta app.
+  /// Comprueba que el correo esté asociado a un administrador. Lo usa el
+  /// panel administrativo; los suscriptores inician sesión directamente.
   Future<void> verificarCorreoAdministrador(String correo) async {
     await _api.post('/auth/verificar-administrador', body: {
       'correo': correo.trim().toLowerCase(),
@@ -70,7 +70,6 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> login(String correo, String password) async {
-    await verificarCorreoAdministrador(correo);
     final data = await _api.post('/auth/login', body: {
       'correo': correo.trim(),
       'password': password,
@@ -104,7 +103,6 @@ class AuthProvider extends ChangeNotifier {
     String codigo,
     String password,
   ) async {
-    await verificarCorreoAdministrador(correo);
     await _api.post('/auth/verificar', body: {
       'correo': correo.trim(),
       'codigo': codigo.trim(),
@@ -114,14 +112,12 @@ class AuthProvider extends ChangeNotifier {
 
   /// Pide al backend que reenvíe el código de verificación a [correo].
   Future<void> reenviarCodigoVerificacion(String correo) async {
-    await verificarCorreoAdministrador(correo);
     await _api.post('/auth/reenviar-codigo', body: {'correo': correo.trim()});
   }
 
   /// Pide al backend que envíe un código de recuperación de contraseña al
   /// correo. Por seguridad responde igual exista o no la cuenta.
   Future<void> solicitarRecuperacion(String correo) async {
-    await verificarCorreoAdministrador(correo);
     await _api.post('/auth/solicitar-recuperacion',
         body: {'correo': correo.trim()});
   }
@@ -132,7 +128,6 @@ class AuthProvider extends ChangeNotifier {
     String codigo,
     String nuevaPassword,
   ) async {
-    await verificarCorreoAdministrador(correo);
     await _api.post('/auth/resetear-password', body: {
       'correo': correo.trim(),
       'codigo': codigo.trim(),
