@@ -1,58 +1,10 @@
 const breakdownModel = require('../models/breakdownModel');
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
-const { enviarCorreo } = require('../config/mailer');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
-const { escaparHtml } = require('../utils/html');
+const { notificarNuevaAveria } = require('../services/notificarAveria');
 
 const ESTADOS_VALIDOS = ['reportada', 'en_proceso', 'resuelta', 'cancelada'];
-
-// Avisa por correo al/los fontanero(s) activos de una nueva avería reportada.
-// No lanza: si falla el envío, se registra el error y se sigue, para no
-// tumbar el reporte de la avería por un problema de correo.
-async function avisarFontaneroPorCorreo(averia) {
-  try {
-    const [{ data: fontaneros, error }, { data: reportante }] = await Promise.all([
-      supabaseAdmin
-      .from('profiles')
-      .select('id,correo')
-      .eq('rol', 'fontanero')
-      .eq('activo', true),
-      supabaseAdmin
-        .from('profiles')
-        .select('nombre,apellido,correo,telefono,zona,direccion')
-        .eq('id', averia.perfil_id)
-        .maybeSingle(),
-    ]);
-
-    if (error) throw error;
-    if (!fontaneros || fontaneros.length === 0) return;
-
-    const nombre = [reportante?.nombre, reportante?.apellido].filter(Boolean).join(' ') || 'No disponible';
-    const ubicacion = [averia.direccion || reportante?.direccion, averia.zona || reportante?.zona]
-      .filter(Boolean).join(' · ') || 'No registrada';
-    const html = `<p>Se reportó una nueva avería:</p>
-      <p><strong>Reportó:</strong> ${escaparHtml(nombre)}</p>
-      <p><strong>Correo:</strong> ${escaparHtml(reportante?.correo)}</p>
-      <p><strong>Teléfono:</strong> ${escaparHtml(reportante?.telefono)}</p>
-      <p><strong>Ubicación:</strong> ${escaparHtml(ubicacion)}</p>
-      <p><strong>Descripción:</strong> ${escaparHtml(averia.descripcion)}</p>
-      <p><strong>Fecha:</strong> ${new Date(averia.fecha_reporte).toLocaleString('es-CO')}</p>`;
-
-    await Promise.all(
-      fontaneros.flatMap((f) => [
-        enviarCorreo({
-          to: f.correo,
-          subject: 'Nueva avería reportada - Acueducto Campo Amor',
-          html,
-        }),
-        notificar(f.id, `Nueva avería de ${nombre}, en ${ubicacion}. ${averia.descripcion}`, 'averia'),
-      ])
-    );
-  } catch (err) {
-    console.error('Error avisando al fontanero por correo:', err.message);
-  }
-}
 
 // ---------- USUARIO FINAL ----------
 
@@ -96,7 +48,7 @@ async function reportarAveria(req, res) {
     // El reporte ya quedó guardado. Correo y aviso al fontanero son tareas
     // secundarias: no dejamos al usuario esperando ni convertimos un fallo de
     // correo en un falso error de reporte.
-    void avisarFontaneroPorCorreo(data);
+    void notificarNuevaAveria(data);
 
     res.status(201).json({ data });
   } catch (err) {

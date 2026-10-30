@@ -1,6 +1,7 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const profileModel = require('../models/profileModel');
 const mailer = require('../config/mailer');
+const { fechaLarga } = require('../utils/fechas');
 
 const VALOR_MENSUAL = 12000;
 const ZONA_HORARIA = 'America/Bogota';
@@ -140,7 +141,7 @@ async function generarFacturasMensuales({
         html: `<p>Hola ${escaparHtml(perfil.nombre || '')},</p>
                <p>Se generó tu factura del periodo <strong>${periodo}</strong> por un valor de
                <strong>$${VALOR_MENSUAL.toLocaleString('es-CO')}</strong>.</p>
-               <p>Fecha límite de pago: ${new Date(`${vencimiento}T12:00:00`).toLocaleDateString('es-CO')}.</p>
+               <p>Fecha límite de pago: ${fechaLarga(vencimiento)}.</p>
                <p>Puedes consultar el detalle desde la aplicación de Acueducto Campoamor.</p>`,
       });
       if (!respuesta) throw new Error('El servicio de correo no confirmó el envío.');

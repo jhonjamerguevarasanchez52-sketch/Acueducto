@@ -59,7 +59,7 @@ async function crearFacturaExtraordinaria(req, res) {
       perfilesSeleccionados.map((perfil) =>
         notificar(
           perfil.id,
-          `Se generó una cuota extraordinaria de $${valor_total} por concepto de ${concepto}.`,
+          `Se generó una cuota extraordinaria de $${formatearMoneda(valor_total)} por concepto de ${concepto}.`,
           'cuota_extraordinaria'
         )
       )

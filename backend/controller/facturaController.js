@@ -19,6 +19,7 @@ const {
 const { cotizarWompi } = require('../utils/wompiTarifa');
 
 const { escaparHtml } = require('../utils/html');
+const { fechaLarga } = require('../utils/fechas');
 
 
 function formatearMoneda(valor) {
@@ -34,7 +35,7 @@ async function enviarCorreoFactura({ correo, nombre, periodo, valorTotal, fechaV
       html: `<p>Hola ${escaparHtml(nombre)},</p>
              <p>Se generó tu factura del periodo <strong>${escaparHtml(periodo)}</strong> por un valor de
              <strong>$${formatearMoneda(valorTotal)}</strong>.</p>
-             ${fechaVencimiento ? `<p>Fecha límite de pago: ${new Date(fechaVencimiento).toLocaleDateString('es-CO')}.</p>` : ''}
+             ${fechaVencimiento ? `<p>Fecha límite de pago: ${escaparHtml(fechaLarga(fechaVencimiento))}.</p>` : ''}
              <p>Puedes consultar el detalle desde la aplicación de Acueducto Campo Amor.</p>`,
     });
     return Boolean(respuesta);
