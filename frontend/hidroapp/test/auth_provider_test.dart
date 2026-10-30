@@ -102,6 +102,81 @@ void main() {
     },
   );
 
+  test('bootstrap con biometría pide la huella automáticamente una vez', () async {
+    final storage = MemoryAuthSessionStorage()
+      ..values['biometric_enabled'] = 'true'
+      ..values['biometric_refresh_token'] = 'refresh-seguro';
+    final provider = AuthProvider(
+      api: ApiService(
+        client: MockClient((_) async => http.Response('{}', 500)),
+      ),
+      storage: storage,
+    );
+    addTearDown(provider.dispose);
+
+    await provider.bootstrap();
+
+    expect(provider.tomarBiometriaAlIniciar(), isTrue);
+    // Tras usarlo (o tras un logout manual) ya no se vuelve a lanzar sola.
+    expect(provider.tomarBiometriaAlIniciar(), isFalse);
+  });
+
+  test(
+    'token vencido se renueva con el refresh token y se reintenta la petición',
+    () async {
+      final storage = MemoryAuthSessionStorage()
+        ..values['access_token'] = 'token-vencido'
+        ..values['biometric_refresh_token'] = 'refresh-1';
+      var renovaciones = 0;
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('/auth/renovar-sesion')) {
+          renovaciones += 1;
+          expect(jsonDecode(request.body)['refreshToken'], 'refresh-1');
+          return http.Response(
+            jsonEncode({
+              'session': {
+                'access_token': 'token-nuevo',
+                'refresh_token': 'refresh-2',
+              },
+            }),
+            200,
+          );
+        }
+        if (request.headers['Authorization'] != 'Bearer token-nuevo') {
+          return http.Response(jsonEncode({'error': 'jwt expired'}), 401);
+        }
+        return http.Response(
+          jsonEncode({
+            'id': 'u-1',
+            'correo': 'u@example.com',
+            'nombre': 'Ana',
+            'apellido': 'Pérez',
+            'rol': 'suscriptor',
+          }),
+          200,
+        );
+      });
+      final provider = AuthProvider(
+        api: ApiService(client: client),
+        storage: storage,
+      );
+      addTearDown(provider.dispose);
+
+      await provider.bootstrap();
+      // Varias peticiones con 401 a la vez comparten una sola renovación.
+      await Future.wait([
+        provider.refreshProfile(),
+        provider.refreshProfile(),
+      ]);
+
+      expect(provider.status, AuthStatus.authenticated);
+      expect(renovaciones, 1);
+      expect(provider.api.authToken, 'token-nuevo');
+      expect(storage.values['access_token'], 'token-nuevo');
+      expect(storage.values['biometric_refresh_token'], 'refresh-2');
+    },
+  );
+
   test('desactivar biometría elimina el refresh token guardado', () async {
     final storage = MemoryAuthSessionStorage()
       ..values['biometric_enabled'] = 'true'

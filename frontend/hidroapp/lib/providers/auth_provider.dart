@@ -36,12 +36,15 @@ class AuthProvider extends ChangeNotifier {
     : _api = api ?? ApiService(),
       _storage = storage ?? FlutterAuthSessionStorage() {
     _api.onUnauthorized = _manejarSesionExpirada;
+    _api.onRenovarSesion = _renovarSesion;
   }
 
   final ApiService _api;
   final AuthSessionStorage _storage;
 
   static const _tokenKey = 'access_token';
+  // Se conserva el nombre histórico de la clave para no perder las sesiones
+  // ya guardadas; hoy guarda el refresh token de cualquier sesión.
   static const _refreshTokenKey = 'biometric_refresh_token';
   static const _biometricEnabledKey = 'biometric_enabled';
 
@@ -54,6 +57,21 @@ class AuthProvider extends ChangeNotifier {
   bool get biometricEnabled => _biometricEnabled;
   bool _biometricEnabled = false;
   final LocalAuthentication _localAuth = LocalAuthentication();
+
+  /// Renovación del access token en curso, compartida por todas las
+  /// peticiones que reciban 401 a la vez (el refresh token es de un solo uso).
+  Future<bool>? _renovacionEnCurso;
+
+  bool _biometriaAlIniciar = false;
+
+  /// Devuelve `true` una sola vez tras abrir la app con biometría activa, para
+  /// que el login lance la huella automáticamente sin esperar a que se toque
+  /// el botón. Tras un cierre de sesión manual ya no se lanza sola.
+  bool tomarBiometriaAlIniciar() {
+    final pendiente = _biometriaAlIniciar;
+    _biometriaAlIniciar = false;
+    return pendiente && _biometricEnabled;
+  }
 
   /// `true` cuando la cuenta tiene pendiente cambiar una contraseña temporal
   /// (generada por un administrador al crearla). Mientras sea `true`,
@@ -78,6 +96,7 @@ class AuthProvider extends ChangeNotifier {
       // confirmación antes de restaurar la sesión guardada.
       await _storage.delete(_tokenKey);
       _api.authToken = null;
+      _biometriaAlIniciar = true;
       _setStatus(AuthStatus.unauthenticated);
       return;
     }
@@ -185,6 +204,15 @@ class AuthProvider extends ChangeNotifier {
       options: const AuthenticationOptions(biometricOnly: true),
     );
     if (!ok) return;
+    await _pedirNuevaSesion(refreshToken);
+    await _loadProfile();
+    _setStatus(AuthStatus.authenticated);
+  }
+
+  /// Cambia el refresh token por una sesión nueva y la guarda. Supabase rota
+  /// el refresh token en cada uso, así que siempre guardamos el nuevo: si se
+  /// conservara el viejo, la siguiente renovación fallaría.
+  Future<void> _pedirNuevaSesion(String refreshToken) async {
     final data = await _api.post(
       '/auth/renovar-sesion',
       body: {'refreshToken': refreshToken},
@@ -205,8 +233,25 @@ class AuthProvider extends ChangeNotifier {
       await _storage.write(_refreshTokenKey, nuevoRefresh);
     }
     _api.authToken = token;
-    await _loadProfile();
-    _setStatus(AuthStatus.authenticated);
+  }
+
+  /// Renueva en silencio el access token vencido (dura ≈1 h) para que la
+  /// sesión no se cierre mientras se usa la app. Lo invoca [ApiService] al
+  /// recibir un 401.
+  Future<bool> _renovarSesion() =>
+      _renovacionEnCurso ??= _intentarRenovar().whenComplete(
+        () => _renovacionEnCurso = null,
+      );
+
+  Future<bool> _intentarRenovar() async {
+    final refreshToken = await _storage.read(_refreshTokenKey);
+    if (refreshToken == null || refreshToken.isEmpty) return false;
+    try {
+      await _pedirNuevaSesion(refreshToken);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   // No hay auto-registro: las cuentas las crea el administrador del acueducto.

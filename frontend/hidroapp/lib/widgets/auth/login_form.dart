@@ -30,6 +30,19 @@ class _LoginFormState extends State<LoginForm> {
   bool _verPassword = false;
   bool _habilitarBiometria = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Al abrir la app con la huella activada, la pedimos de una vez en lugar
+    // de esperar a que toquen el botón.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (context.read<AuthProvider>().tomarBiometriaAlIniciar()) {
+        _ingresarBiometria();
+      }
+    });
+  }
+
   Future<void> _ingresarBiometria() async {
     setState(() => _cargando = true);
     try {

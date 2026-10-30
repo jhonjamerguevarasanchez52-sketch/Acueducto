@@ -42,6 +42,13 @@ class ApiService {
   /// para que quien mantiene la sesión (el [AuthProvider]) pueda reaccionar.
   void Function()? onUnauthorized;
 
+  /// Se invoca cuando una petición autenticada recibe 401, antes de dar la
+  /// sesión por perdida: debe renovar [authToken] con el refresh token
+  /// guardado y devolver `true` si lo logró, para reintentar la petición.
+  Future<bool> Function()? onRenovarSesion;
+
+  static const _rutaRenovarSesion = '/auth/renovar-sesion';
+
   static const Duration _timeout = Duration(seconds: 20);
 
   Uri _uri(String path) => Uri.parse('${ApiConfig.baseUrl}$path');
@@ -51,11 +58,11 @@ class ApiService {
         if (authToken != null) 'Authorization': 'Bearer $authToken',
       };
 
-  Future<dynamic> get(String path) => _send(() => _client
+  Future<dynamic> get(String path) => _send(path, () => _client
       .get(_uri(path), headers: _headers)
       .timeout(_timeout));
 
-  Future<dynamic> post(String path, {Object? body}) => _send(() => _client
+  Future<dynamic> post(String path, {Object? body}) => _send(path, () => _client
       .post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
       .timeout(_timeout));
 
@@ -65,6 +72,7 @@ class ApiService {
     required String contentType,
   }) =>
       _send(
+        path,
         () => _client
             .post(
               _uri(path),
@@ -77,24 +85,26 @@ class ApiService {
             .timeout(_timeout),
       );
 
-  Future<dynamic> put(String path, {Object? body}) => _send(() => _client
+  Future<dynamic> put(String path, {Object? body}) => _send(path, () => _client
       .put(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
       .timeout(_timeout));
 
-  Future<dynamic> _send(Future<http.Response> Function() request) async {
-    http.Response res;
-    try {
-      res = await request();
-    } on TimeoutException catch (e) {
-      if (kDebugMode) debugPrint('[ApiService] timeout: $e');
-      throw ApiException('El servidor no respondió a tiempo. Verifica tu conexión.');
-    } catch (e, st) {
-      // No filtramos el error real al usuario (podría ser un detalle técnico
-      // sin sentido para él), pero sí lo dejamos en el log para poder
-      // diagnosticar problemas reales (DNS, certificado, etc.) en vez de que
-      // todo se vea igual que "sin internet".
-      if (kDebugMode) debugPrint('[ApiService] fallo de red: $e\n$st');
-      throw ApiException('No se pudo conectar con el servidor.');
+  Future<dynamic> _send(
+    String path,
+    Future<http.Response> Function() request,
+  ) async {
+    final tokenUsado = authToken;
+    var res = await _ejecutar(request);
+
+    // El access token de Supabase vence (≈1 h). Antes de dar la sesión por
+    // perdida pedimos uno nuevo con el refresh token y repetimos la petición
+    // una sola vez. Si otra petición ya lo renovó, basta con reintentar.
+    if (res.statusCode == 401 &&
+        tokenUsado != null &&
+        path != _rutaRenovarSesion) {
+      final renovado = authToken != tokenUsado ||
+          (onRenovarSesion != null && await onRenovarSesion!());
+      if (renovado && authToken != null) res = await _ejecutar(request);
     }
 
     dynamic data;
@@ -119,6 +129,24 @@ class ApiService {
     }
 
     throw ApiException(msg, statusCode: res.statusCode, data: data);
+  }
+
+  Future<http.Response> _ejecutar(
+    Future<http.Response> Function() request,
+  ) async {
+    try {
+      return await request();
+    } on TimeoutException catch (e) {
+      if (kDebugMode) debugPrint('[ApiService] timeout: $e');
+      throw ApiException('El servidor no respondió a tiempo. Verifica tu conexión.');
+    } catch (e, st) {
+      // No filtramos el error real al usuario (podría ser un detalle técnico
+      // sin sentido para él), pero sí lo dejamos en el log para poder
+      // diagnosticar problemas reales (DNS, certificado, etc.) en vez de que
+      // todo se vea igual que "sin internet".
+      if (kDebugMode) debugPrint('[ApiService] fallo de red: $e\n$st');
+      throw ApiException('No se pudo conectar con el servidor.');
+    }
   }
 
   void dispose() => _client.close();
