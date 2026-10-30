@@ -50,6 +50,7 @@ export default function SectionViews({ activeSection, context }) {
     setReportFrom,
     reportTo,
     setReportTo,
+    applyReportPreset,
     dashboardKpis,
     revenueTrend,
     serviceMix,
@@ -503,6 +504,11 @@ export default function SectionViews({ activeSection, context }) {
           </button>
         </div>
         <div className="report-filters">
+          <div className="report-presets" aria-label="Periodos rápidos">
+            <button type="button" className="secondary-button" onClick={() => applyReportPreset('month')}>Mes actual</button>
+            <button type="button" className="secondary-button" onClick={() => applyReportPreset('year')}>Año actual</button>
+            <button type="button" className="secondary-button" onClick={() => applyReportPreset('semester')}>Semestre actual</button>
+          </div>
           <label>Desde<input type="date" value={reportFrom} max={reportTo || undefined} onChange={(event) => setReportFrom(event.target.value)} /></label>
           <label>Hasta<input type="date" value={reportTo} min={reportFrom || undefined} onChange={(event) => setReportTo(event.target.value)} /></label>
           <span>Periodo aplicado a pagos y facturas emitidas</span>

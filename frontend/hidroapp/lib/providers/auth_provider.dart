@@ -35,7 +35,7 @@ class AuthProvider extends ChangeNotifier {
   AuthProvider({ApiService? api, AuthSessionStorage? storage})
     : _api = api ?? ApiService(),
       _storage = storage ?? FlutterAuthSessionStorage() {
-    _api.onUnauthorized = _manejarSesionExpirada;
+    _api.onUnauthorized = _renovarSesion;
   }
 
   final ApiService _api;
@@ -43,10 +43,12 @@ class AuthProvider extends ChangeNotifier {
 
   static const _tokenKey = 'access_token';
   static const _refreshTokenKey = 'biometric_refresh_token';
+  static const _legacyRefreshTokenKey = 'refresh_token';
   static const _biometricEnabledKey = 'biometric_enabled';
 
   AuthStatus _status = AuthStatus.unknown;
   Profile? _profile;
+  Future<bool>? _refreshInFlight;
 
   AuthStatus get status => _status;
   Profile? get profile => _profile;
@@ -134,6 +136,10 @@ class AuthProvider extends ChangeNotifier {
     final refreshToken = (data['session'] as Map)['refresh_token'];
     if (refreshToken is String && refreshToken.isNotEmpty) {
       await _storage.write(_refreshTokenKey, refreshToken);
+      await _storage.delete(_legacyRefreshTokenKey);
+    } else {
+      await _storage.delete(_refreshTokenKey);
+      await _storage.delete(_legacyRefreshTokenKey);
     }
     _api.authToken = token;
     await _loadProfile();
@@ -155,7 +161,8 @@ class AuthProvider extends ChangeNotifier {
       if (!supported) {
         throw ApiException('Este dispositivo no tiene biometría configurada.');
       }
-      final refreshToken = await _storage.read(_refreshTokenKey);
+      final refreshToken = await _storage.read(_refreshTokenKey) ??
+          await _storage.read(_legacyRefreshTokenKey);
       if (refreshToken == null || refreshToken.isEmpty) {
         throw ApiException(
           'Inicia sesión nuevamente para habilitar el acceso biométrico.',
@@ -164,7 +171,6 @@ class AuthProvider extends ChangeNotifier {
       await _storage.write(_biometricEnabledKey, 'true');
     } else {
       await _storage.delete(_biometricEnabledKey);
-      await _storage.delete(_refreshTokenKey);
     }
     _biometricEnabled = enabled;
     notifyListeners();
@@ -174,7 +180,8 @@ class AuthProvider extends ChangeNotifier {
     if (!_biometricEnabled) {
       throw ApiException('El acceso biométrico está desactivado.');
     }
-    final refreshToken = await _storage.read(_refreshTokenKey);
+    final refreshToken = await _storage.read(_refreshTokenKey) ??
+        await _storage.read(_legacyRefreshTokenKey);
     if (refreshToken == null || refreshToken.isEmpty) {
       throw ApiException(
         'Ingresa con tu correo y contraseña para volver a habilitar la biometría.',
@@ -185,10 +192,7 @@ class AuthProvider extends ChangeNotifier {
       options: const AuthenticationOptions(biometricOnly: true),
     );
     if (!ok) return;
-    final data = await _api.post(
-      '/auth/renovar-sesion',
-      body: {'refreshToken': refreshToken},
-    );
+    final data = await _api.renewSession(refreshToken);
     if (data is! Map || data['session'] is! Map) {
       throw ApiException(
         'No se pudo renovar la sesión. Ingresa con tu contraseña.',
@@ -203,6 +207,7 @@ class AuthProvider extends ChangeNotifier {
     await _storage.write(_tokenKey, token);
     if (nuevoRefresh is String && nuevoRefresh.isNotEmpty) {
       await _storage.write(_refreshTokenKey, nuevoRefresh);
+      await _storage.delete(_legacyRefreshTokenKey);
     }
     _api.authToken = token;
     await _loadProfile();
@@ -289,6 +294,7 @@ class AuthProvider extends ChangeNotifier {
     await _storage.delete(_tokenKey);
     if (!preserveBiometric) {
       await _storage.delete(_refreshTokenKey);
+      await _storage.delete(_legacyRefreshTokenKey);
       await _storage.delete(_biometricEnabledKey);
       _biometricEnabled = false;
     }
@@ -301,13 +307,57 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Se llama cuando cualquier llamada autenticada recibe un 401 en medio de
-  /// la sesión (token expirado): cierra sesión y vuelve a la pantalla de
-  /// acceso en vez de dejar al usuario viendo un error suelto.
-  void _manejarSesionExpirada() {
-    if (_status != AuthStatus.authenticated) return;
-    _setStatus(AuthStatus.unauthenticated);
-    _clear(preserveBiometric: _biometricEnabled);
+  /// Renueva la sesión después de un 401. ApiService repite la petición con
+  /// el token nuevo; varias peticiones concurrentes comparten esta renovación.
+  Future<bool> _renovarSesion() {
+    final currentRefresh = _refreshInFlight;
+    if (currentRefresh != null) return currentRefresh;
+    final refresh = _renovarSesionInterno().whenComplete(() {
+      _refreshInFlight = null;
+    });
+    _refreshInFlight = refresh;
+    return refresh;
+  }
+
+  Future<bool> _renovarSesionInterno() async {
+    final refreshToken = await _storage.read(_refreshTokenKey) ??
+        await _storage.read(_legacyRefreshTokenKey);
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await _clear();
+      _setStatus(AuthStatus.unauthenticated);
+      return false;
+    }
+
+    try {
+      final data = await _api.renewSession(refreshToken);
+      if (data is! Map || data['session'] is! Map) {
+        throw ApiException('El servidor no devolvió una sesión renovada válida.');
+      }
+      final session = data['session'] as Map;
+      final accessToken = session['access_token'];
+      final nextRefreshToken = session['refresh_token'];
+      if (accessToken is! String || accessToken.isEmpty) {
+        throw ApiException('El servidor no devolvió un token de acceso válido.');
+      }
+      await _storage.write(_tokenKey, accessToken);
+      _api.authToken = accessToken;
+      if (nextRefreshToken is String && nextRefreshToken.isNotEmpty) {
+        await _storage.write(_refreshTokenKey, nextRefreshToken);
+        await _storage.delete(_legacyRefreshTokenKey);
+      }
+      return true;
+    } catch (error) {
+      final statusCode = error is ApiException ? error.statusCode : null;
+      if (statusCode == null || statusCode >= 500 || statusCode == 408 || statusCode == 429) {
+        // Ante una falla temporal se conserva el refresh token para reintentar.
+        _api.authToken = null;
+        _setStatus(AuthStatus.unauthenticated);
+        return false;
+      }
+      await _clear();
+      _setStatus(AuthStatus.unauthenticated);
+      return false;
+    }
   }
 
   @override

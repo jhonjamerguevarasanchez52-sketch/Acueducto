@@ -154,15 +154,27 @@ test('rechaza una renovación biométrica sin refresh token válido', async () =
 });
 
 test('un usuario (no administrador) activo y verificado puede iniciar sesión', async () => {
-  authModel.signIn = async () => ({ data: { user: { id: 'user-1' }, session: { access_token: 'token' } }, error: null });
-  profileModel.getById = async () => ({ data: { rol: 'usuario', is_verified: true, activo: true }, error: null });
+  authModel.signIn = async () => ({
+    data: { user: { id: 'user-1' }, session: { access_token: 'token' } },
+    error: null,
+  });
+  profileModel.getById = async () => ({
+    data: { rol: 'usuario', is_verified: true, activo: true },
+    error: null,
+  });
   const res = await ejecutarLogin();
   assert.equal(res.statusCode, 200);
 });
 
 test('un perfil sin rol no puede iniciar sesión', async () => {
-  authModel.signIn = async () => ({ data: { user: { id: 'user-1' }, session: { access_token: 'token' } }, error: null });
-  profileModel.getById = async () => ({ data: { rol: null, is_verified: true, activo: true }, error: null });
+  authModel.signIn = async () => ({
+    data: { user: { id: 'user-1' }, session: { access_token: 'token' } },
+    error: null,
+  });
+  profileModel.getById = async () => ({
+    data: { rol: null, is_verified: true, activo: true },
+    error: null,
+  });
   const res = await ejecutarLogin();
   assert.equal(res.statusCode, 403);
 });

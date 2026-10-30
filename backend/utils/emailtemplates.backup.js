@@ -1,4 +1,4 @@
-git restore frontend/hidroapp/pubspec.lock// backend/utils/emailTemplates.js
+// Copia histórica de la plantilla de correo; no se importa en producción.
 // Plantilla HTML corporativa para los correos de HIDROAPP.
 // Usa tablas + estilos en línea para que se vea igual en Gmail, Outlook y móvil.
 
