@@ -1,17 +1,4 @@
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { lazy, Suspense } from 'react'
 import {
   BellRing,
   CheckCircle2,
@@ -26,6 +13,9 @@ import {
   Upload,
 } from 'lucide-react'
 import StatCard from '../../components/StatCard.jsx'
+
+// Las gráficas (recharts) se cargan bajo demanda para que el panel abra más rápido.
+const AnalyticsCharts = lazy(() => import('../../components/AnalyticsCharts.jsx'))
 
 export default function SectionViews({ activeSection, context }) {
   const {
@@ -97,21 +87,9 @@ export default function SectionViews({ activeSection, context }) {
           </div>
 
           <div className="chart-wrap">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueTrend}>
-                <defs>
-                  <linearGradient id="revenueFill" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="5%" stopColor="#1f8fff" stopOpacity={0.42} />
-                    <stop offset="95%" stopColor="#1f8fff" stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="#dfeaf9" strokeDasharray="4 4" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Area type="monotone" dataKey="valor" stroke="#1f8fff" fill="url(#revenueFill)" strokeWidth={3} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="chart-loading" role="status">Cargando gráfica...</div>}>
+              <AnalyticsCharts kind="area" data={revenueTrend} />
+            </Suspense>
           </div>
         </div>
 
@@ -124,16 +102,9 @@ export default function SectionViews({ activeSection, context }) {
           </div>
 
           <div className="donut-wrap">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={serviceMix} dataKey="value" innerRadius={50} outerRadius={80} paddingAngle={3}>
-                  {serviceMix.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="chart-loading" role="status">Cargando gráfica...</div>}>
+              <AnalyticsCharts kind="pie" data={serviceMix} />
+            </Suspense>
           </div>
           <div className="legend-list">
             {serviceMix.map((item) => (
@@ -558,15 +529,9 @@ export default function SectionViews({ activeSection, context }) {
             </div>
           </div>
           <div className="chart-wrap">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={revenueTrend}>
-                <CartesianGrid stroke="#dfeaf9" strokeDasharray="4 4" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Bar dataKey="valor" radius={[10, 10, 0, 0]} fill="#53c18b" />
-              </BarChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="chart-loading" role="status">Cargando gráfica...</div>}>
+              <AnalyticsCharts kind="bar" data={revenueTrend} />
+            </Suspense>
           </div>
         </div>
 

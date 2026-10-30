@@ -105,12 +105,14 @@ async function chatearConAsistente(req, res) {
         return res.status(200).json({ respuesta: 'Esta avería ya quedó registrada y el fontanero está siendo notificado.', averia: { estado: anterior.estado } });
       }
 
+      // perfilId sale del token; la app no tiene permiso de insertar averías,
+      // así que la escritura va por el cliente de servicio (como en averiaController).
       const { data: averia, error } = await breakdownModel.create({
         perfil_id: perfilId,
         descripcion,
         zona: perfil.zona,
         direccion: perfil.direccion,
-      }, req.db);
+      });
       if (error) throw error;
       void notificarNuevaAveria(averia);
       return res.status(201).json({ respuesta: 'Avería registrada. Ya estoy avisando al fontanero.', averia: { id: averia.id, estado: averia.estado } });

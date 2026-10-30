@@ -41,7 +41,7 @@ function markAllRead(profileId, db) {
 }
 
 // Elimina una notificación, solo si es del perfil indicado.
-function removeOwn(id, profileId, db) {
+function removeOwn(id, profileId, db = supabaseAdmin) {
   return db.from(TABLE).delete().eq('id', id).eq('perfil_id', profileId).select().single();
 }
 

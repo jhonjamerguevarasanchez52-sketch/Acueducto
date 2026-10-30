@@ -112,7 +112,9 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
 
   Future<void> _refrescar() async {
     final futuro = _cargar();
-    setState(() => _futuro = futuro);
+    setState(() {
+      _futuro = futuro;
+    });
     await futuro.catchError((_) => <Notificacion>[]);
   }
 

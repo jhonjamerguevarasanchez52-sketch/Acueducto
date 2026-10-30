@@ -52,6 +52,12 @@ function countByInvoice(invoiceId) {
   return supabaseAdmin.from(TABLE).select('*', { count: 'exact', head: true }).eq('factura_id', invoiceId);
 }
 
+// true si la factura tiene un pago confirmado, manual o en curso en Wompi.
+// Los intentos rechazados o reemplazados no cuentan (ver factura_tiene_pago_activo).
+function hasActiveByInvoice(invoiceId) {
+  return supabaseAdmin.rpc('factura_tiene_pago_activo', { p_factura_id: invoiceId });
+}
+
 // Todo pago nuevo nace sin confirmar y con la fecha actual.
 function create({ factura_id, perfil_id, monto, cargo_wompi = 0, monto_total, metodo, referencia, estado_wompi }, db = supabaseAdmin) {
   return db
@@ -79,6 +85,7 @@ module.exports = {
   findById,
   findPendingByInvoice,
   countByInvoice,
+  hasActiveByInvoice,
   create,
   ...crudBase(TABLE),
 };

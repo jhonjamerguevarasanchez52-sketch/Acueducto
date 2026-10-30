@@ -64,7 +64,7 @@ test('reintenta un 503 de Auth y permite login cuando Supabase se recupera', asy
   };
   profileModel.getById = async () => {
     llamadasPerfil += 1;
-    return { data: { is_verified: true, activo: true }, error: null };
+    return { data: { rol: 'usuario', is_verified: true, activo: true }, error: null };
   };
 
   const res = await ejecutarLogin();
@@ -83,7 +83,7 @@ test('reintenta la lectura del perfil y devuelve sesión si la base se recupera'
   profileModel.getById = async () => {
     llamadasPerfil += 1;
     if (llamadasPerfil === 1) return { data: null, error: { status: 502, message: 'Bad gateway' } };
-    return { data: { is_verified: true, activo: true }, error: null };
+    return { data: { rol: 'usuario', is_verified: true, activo: true }, error: null };
   };
 
   const res = await ejecutarLogin();
@@ -151,4 +151,18 @@ test('renueva la sesión biométrica y exige un perfil administrador activo', as
 test('rechaza una renovación biométrica sin refresh token válido', async () => {
   const res = await ejecutarRenovacion('');
   assert.equal(res.statusCode, 400);
+});
+
+test('un usuario (no administrador) activo y verificado puede iniciar sesión', async () => {
+  authModel.signIn = async () => ({ data: { user: { id: 'user-1' }, session: { access_token: 'token' } }, error: null });
+  profileModel.getById = async () => ({ data: { rol: 'usuario', is_verified: true, activo: true }, error: null });
+  const res = await ejecutarLogin();
+  assert.equal(res.statusCode, 200);
+});
+
+test('un perfil sin rol no puede iniciar sesión', async () => {
+  authModel.signIn = async () => ({ data: { user: { id: 'user-1' }, session: { access_token: 'token' } }, error: null });
+  profileModel.getById = async () => ({ data: { rol: null, is_verified: true, activo: true }, error: null });
+  const res = await ejecutarLogin();
+  assert.equal(res.statusCode, 403);
 });

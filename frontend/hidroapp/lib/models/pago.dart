@@ -13,6 +13,10 @@ class Pago {
     this.fechaConfirmacion,
     this.estadoWompi,
     this.reciboUrl,
+    this.cargoWompi = 0,
+    this.montoTotal,
+    this.transaccionId,
+    this.medioPagoWompi,
   });
 
   final String id;
@@ -25,16 +29,20 @@ class Pago {
   final DateTime? fechaConfirmacion;
   final String? estadoWompi; // APPROVED | DECLINED | VOIDED | ERROR
   final String? reciboUrl;
+  final double cargoWompi;
+  final double? montoTotal;
+  final String? transaccionId;
+  final String? medioPagoWompi;
 
   /// `true` si el pago llegó por Wompi y fue rechazado/anulado.
   bool get rechazado =>
-      const {'DECLINED', 'VOIDED', 'ERROR'}.contains(estadoWompi) && !confirmado;
+      const {'DECLINED', 'VOIDED', 'ERROR'}.contains(estadoWompi) &&
+      !confirmado;
 
   /// Requiere conciliaciÃ³n; otro intento podrÃ­a cobrar dos veces.
-  bool get requiereRevision => !confirmado && const {
-        'APPROVED_NO_APLICADO',
-        'MONTO_INVALIDO',
-      }.contains(estadoWompi);
+  bool get requiereRevision =>
+      !confirmado &&
+      const {'APPROVED_NO_APLICADO', 'MONTO_INVALIDO'}.contains(estadoWompi);
 
   bool get reemplazado => !confirmado && estadoWompi == 'SUPERSEDED';
 
@@ -56,6 +64,15 @@ class Pago {
       reciboUrl: (json['recibo_url']?.toString().trim().isEmpty ?? true)
           ? null
           : json['recibo_url'].toString(),
+      cargoWompi: double.tryParse(json['cargo_wompi']?.toString() ?? '') ?? 0,
+      montoTotal: double.tryParse(json['monto_total']?.toString() ?? ''),
+      transaccionId: (json['transaccion_id']?.toString().trim().isEmpty ?? true)
+          ? null
+          : json['transaccion_id'].toString(),
+      medioPagoWompi:
+          (json['medio_pago_wompi']?.toString().trim().isEmpty ?? true)
+          ? null
+          : json['medio_pago_wompi'].toString(),
     );
   }
 

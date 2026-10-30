@@ -1110,7 +1110,11 @@ function App() {
                     <span className="invoice-logo-frame"><img className="invoice-logo" src={hidroAppLogo} alt="" /></span>
                     <div>
                       <span className="invoice-brand">HidroApp · Acueducto Campo Amor</span>
-                      <h2>{invoicePreview.tipo === 'extraordinaria' ? 'Factura extraordinaria' : 'Factura de servicio'}</h2>
+                      <h2>{invoicePreview.tipo === 'extraordinaria'
+                        ? 'Factura extraordinaria'
+                        : Number(invoicePreview.meses_cubiertos) > 1
+                          ? `Factura de servicio · ${Number(invoicePreview.meses_cubiertos)} meses`
+                          : 'Factura de servicio'}</h2>
                     </div>
                   </div>
                   <div className="invoice-number">
@@ -1119,7 +1123,12 @@ function App() {
                   </div>
                 </header>
                 <div className="invoice-meta">
-                  <div><span>Periodo facturado</span><strong>{invoicePreview.periodo || '—'}</strong></div>
+                  <div><span>Periodo facturado</span><strong>{Number(invoicePreview.meses_cubiertos) > 1
+                    ? `${invoicePreview.periodo_inicio || invoicePreview.periodo} a ${invoicePreview.periodo_fin}`
+                    : invoicePreview.periodo || '—'}</strong></div>
+                  {invoicePreview.fecha_proxima_facturacion && (
+                    <div><span>Próxima facturación</span><strong>{formatDate(invoicePreview.fecha_proxima_facturacion)}</strong></div>
+                  )}
                   <div><span>Estado</span><strong>{invoicePreview.estado || '—'}</strong></div>
                   <div><span>Fecha de emisión</span><strong>{formatDate(invoicePreview.fecha_emision)}</strong></div>
                   <div><span>Fecha límite de pago</span><strong>{formatDate(invoicePreview.fecha_vencimiento)}</strong></div>
@@ -1135,8 +1144,10 @@ function App() {
                 <table className="invoice-lines">
                   <thead><tr><th>Concepto</th><th>Periodo</th><th>Valor</th></tr></thead>
                   <tbody><tr>
-                    <td>{invoicePreview.observacion || (invoicePreview.tipo === 'extraordinaria' ? 'Cuota extraordinaria' : 'Servicio de acueducto')}</td>
-                    <td>{invoicePreview.periodo || '—'}</td>
+                    <td>{invoicePreview.observacion || invoicePreview.detalle_prepago || (invoicePreview.tipo === 'extraordinaria' ? 'Cuota extraordinaria' : 'Servicio de acueducto')}</td>
+                    <td>{Number(invoicePreview.meses_cubiertos) > 1
+                      ? `${invoicePreview.periodo_inicio || invoicePreview.periodo} a ${invoicePreview.periodo_fin}`
+                      : invoicePreview.periodo || '—'}</td>
                     <td>{formatMoney(invoicePreview.valor_total)}</td>
                   </tr></tbody>
                 </table>

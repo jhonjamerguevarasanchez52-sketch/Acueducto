@@ -51,6 +51,50 @@ El backend lo calcula y guarda separado del valor de la factura; ejecuta la migr
 tu panel Wompi que tu plan y medio de pago usan esa tarifa y ajusta las variables
 si tu contrato es distinto.
 
+## Pago anticipado de mensualidades
+
+En la factura pendiente el usuario puede pagar 1, 6 o 12 periodos. El cargo de
+Wompi se suma al checkout y se almacena separado del valor neto del servicio.
+Con la tarifa base configurada, los valores estimados son:
+
+| Periodos | Servicio neto | Cargo Wompi estimado | Total checkout |
+| --- | ---: | ---: | ---: |
+| 1 mes | $12.000 | $1.251 | $13.251 |
+| 6 meses | $72.000 | $3.205 | $75.205 |
+| 12 meses | $144.000 | $5.550 | $149.550 |
+
+Antes de publicar el backend, ejecuta `db/migrations/20261026_pago_prepago_servicio.sql`.
+La migración registra cada periodo cubierto para impedir que el cron vuelva a
+facturarlo, guarda el detalle del plan en la factura y registra la fecha del pago
+y la siguiente fecha de generación al confirmarse el pago. El próximo periodo se
+factura el primer día del mes siguiente a su vencimiento según el cron mensual.
+Ejemplo: semestre desde octubre 2026 → cubre oct 2026 a mar 2027; la factura de
+abril 2027 se genera el 1 de mayo de 2027.
+
+Reglas del plan:
+
+- Solo se puede cambiar el plan si la factura no tiene un pago confirmado,
+  físico o en curso en Wompi. Un intento rechazado (`DECLINED`, `VOIDED`,
+  `ERROR`) o reemplazado no bloquea el cambio.
+- Si el usuario elige semestre/año y no lo paga antes de que el cron facture el
+  mes siguiente, la factura vuelve a ser mensual ($12.000), se le notifica y se
+  genera la factura del nuevo mes con normalidad.
+- Una factura anulada libera sus meses: ese mes se puede volver a emitir (a
+  mano o con "Generar facturación" eligiendo el mes). El cron no revisa meses
+  pasados por sí solo. Solo puede haber una factura de servicio activa por
+  usuario y mes.
+- La app desactiva los planes que incluyen un mes que ya tiene su propia factura.
+- El comprobante por correo lista cada mensualidad pagada, el valor neto del
+  servicio, la comisión Wompi, el total cobrado, la transacción y la próxima
+  factura.
+
+La migración es re-ejecutable; si ya la corriste antes, vuelve a ejecutarla.
+
+El cálculo corresponde a la tarifa base del Plan Avanzado y puede cambiar según
+el contrato y el medio de pago. Verifica los valores en tu cuenta Wompi antes de
+cobrar. La tabla de tarifas oficial está en
+https://wompi.com/es/co/planes-tarifas/.
+
 En el panel de Wompi, apunta la URL de eventos al endpoint HTTPS público
 `/api/wompi/webhook`, selecciona `transaction.updated` y usa llaves de Sandbox
 para probar. Para producción, cambia conjuntamente ambiente y las tres llaves

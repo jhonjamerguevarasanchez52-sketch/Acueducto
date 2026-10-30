@@ -48,7 +48,9 @@ class _PagosScreenState extends State<PagosScreen> with WidgetsBindingObserver {
 
   Future<void> _refrescar() async {
     final futuro = _cargar();
-    setState(() => _futuro = futuro);
+    setState(() {
+      _futuro = futuro;
+    });
     await futuro.catchError((_) => <Pago>[]);
   }
 
