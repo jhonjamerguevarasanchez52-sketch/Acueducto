@@ -38,9 +38,8 @@ class ApiService {
   /// Token de acceso de Supabase. Lo setea el [AuthProvider] al iniciar sesión.
   String? authToken;
 
-  /// Se invoca cuando una respuesta llega con 401 (token expirado/ inválido)
-  /// para que quien mantiene la sesión (el [AuthProvider]) pueda reaccionar.
-  void Function()? onUnauthorized;
+  /// Renews an expired access token and lets this client retry once.
+  Future<bool> Function()? onUnauthorized;
 
   static const Duration _timeout = Duration(seconds: 20);
 
@@ -81,6 +80,31 @@ class ApiService {
       .put(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
       .timeout(_timeout));
 
+  /// Renews tokens through the public auth endpoint without re-entering
+  /// [_send], which prevents a rejected refresh from creating a 401 loop.
+  Future<dynamic> renewSession(String refreshToken) async {
+    final response = await _client
+        .post(
+          _uri('/auth/renovar-sesion'),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({'refreshToken': refreshToken}),
+        )
+        .timeout(_timeout);
+    dynamic data;
+    if (response.body.isNotEmpty) {
+      try {
+        data = jsonDecode(response.body);
+      } catch (_) {
+        data = response.body;
+      }
+    }
+    if (response.statusCode >= 200 && response.statusCode < 300) return data;
+    final message = data is Map && data['error'] is String
+        ? data['error'] as String
+        : 'No se pudo renovar la sesión.';
+    throw ApiException(message, statusCode: response.statusCode, data: data);
+  }
+
   Future<dynamic> _send(Future<http.Response> Function() request) async {
     http.Response res;
     try {
@@ -106,6 +130,34 @@ class ApiService {
       }
     }
 
+    if (res.statusCode == 401 && authToken != null && onUnauthorized != null) {
+      var renewed = false;
+      try {
+        renewed = await onUnauthorized!.call();
+      } catch (e) {
+        if (kDebugMode) debugPrint('[ApiService] no se pudo renovar la sesión: $e');
+      }
+      if (renewed) {
+        try {
+          res = await request();
+        } on TimeoutException {
+          throw ApiException('El servidor no respondió a tiempo. Verifica tu conexión.');
+        } catch (e) {
+          if (e is ApiException) rethrow;
+          if (kDebugMode) debugPrint('[ApiService] fallo al repetir petición: $e');
+          throw ApiException('No se pudo conectar con el servidor.');
+        }
+        data = null;
+        if (res.body.isNotEmpty) {
+          try {
+            data = jsonDecode(res.body);
+          } catch (_) {
+            data = res.body;
+          }
+        }
+      }
+    }
+
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return data;
     }
@@ -113,10 +165,6 @@ class ApiService {
     final msg = data is Map && data['error'] is String
         ? data['error'] as String
         : 'Error ${res.statusCode}';
-
-    if (res.statusCode == 401) {
-      onUnauthorized?.call();
-    }
 
     throw ApiException(msg, statusCode: res.statusCode, data: data);
   }

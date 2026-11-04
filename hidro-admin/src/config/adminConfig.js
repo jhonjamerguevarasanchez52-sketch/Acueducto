@@ -24,7 +24,7 @@ export const operationDefinitions = {
     title: 'Emitir factura', section: 'facturas', endpoint: endpoints.facturas, method: 'POST',
     fields: [
       { name: 'perfil_id', label: 'Suscriptor', type: 'user', required: true },
-      { name: 'periodo', label: 'Periodo', required: true },
+      { name: 'periodo', label: 'Periodo', type: 'month', required: true },
       { name: 'valor_total', label: 'Valor total', type: 'number', required: true },
       { name: 'fecha_vencimiento', label: 'Fecha de vencimiento', type: 'date' },
       { name: 'tipo', label: 'Tipo', type: 'select', options: ['servicio', 'extraordinaria'], defaultValue: 'servicio' },

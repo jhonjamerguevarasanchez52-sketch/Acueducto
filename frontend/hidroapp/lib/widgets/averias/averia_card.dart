@@ -15,10 +15,15 @@ class AveriaCard extends StatelessWidget {
     super.key,
     required this.averia,
     this.mostrarDetallesOperativos = false,
+    this.onCambiarEstado,
   });
 
   final Averia averia;
   final bool mostrarDetallesOperativos;
+
+  /// Solo se pasa para el fontanero: muestra los botones para tomar,
+  /// resolver o cancelar la avería mientras no esté cerrada.
+  final void Function(String estado)? onCambiarEstado;
 
   ({String texto, Color color}) _estado(AppColors colores) {
     switch (averia.estado) {
@@ -134,6 +139,36 @@ class AveriaCard extends StatelessWidget {
                       fontSize: 13,
                       color: colores.secondaryText,
                     ),
+                  ),
+                ],
+              ),
+            ],
+            if (onCambiarEstado != null && !averia.cerrada) ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => onCambiarEstado!(
+                        averia.estado == 'en_proceso' ? 'resuelta' : 'en_proceso',
+                      ),
+                      icon: Icon(
+                        averia.estado == 'en_proceso'
+                            ? Icons.check_circle_outline
+                            : Icons.handyman_outlined,
+                        size: 18,
+                      ),
+                      label: Text(
+                        averia.estado == 'en_proceso'
+                            ? 'Marcar resuelta'
+                            : 'Tomar avería',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () => onCambiarEstado!('cancelada'),
+                    child: const Text('Cancelar'),
                   ),
                 ],
               ),

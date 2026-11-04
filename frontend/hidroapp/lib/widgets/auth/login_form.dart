@@ -28,6 +28,20 @@ class _LoginFormState extends State<LoginForm> {
   final _passwordCtrl = TextEditingController();
   bool _cargando = false;
   bool _verPassword = false;
+  bool _habilitarBiometria = false;
+
+  Future<void> _ingresarBiometria() async {
+    setState(() => _cargando = true);
+    try {
+      await context.read<AuthProvider>().loginWithBiometrics();
+    } on ApiException catch (e) {
+      if (mounted) AppSnackbar.error(context, e.message);
+    } catch (_) {
+      if (mounted) AppSnackbar.error(context, 'No se pudo validar la biometría. Intenta con tu contraseña.');
+    } finally {
+      if (mounted) setState(() => _cargando = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -38,13 +52,17 @@ class _LoginFormState extends State<LoginForm> {
 
   Future<void> _entrar() async {
     if (!_formKey.currentState!.validate()) return;
+    final auth = context.read<AuthProvider>();
     FocusScope.of(context).unfocus();
     setState(() => _cargando = true);
     try {
-      await context.read<AuthProvider>().login(
+      await auth.login(
             _correoCtrl.text,
             _passwordCtrl.text,
           );
+      if (_habilitarBiometria) {
+        await auth.setBiometricEnabled(true);
+      }
       // AuthGate observa el AuthProvider y esta misma ruta se reconstruye
       // como HomeScreen al quedar autenticado: no hay nada que "pop-ear".
     } on ApiException catch (e) {
@@ -81,6 +99,7 @@ class _LoginFormState extends State<LoginForm> {
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final auth = context.watch<AuthProvider>();
 
     return AuthCard(
       child: Form(
@@ -177,6 +196,40 @@ class _LoginFormState extends State<LoginForm> {
                     )
                   : const Text('Ingresar al sistema'),
             ),
+            if (auth.biometricEnabled) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _cargando ? null : _ingresarBiometria,
+                icon: const Icon(Icons.fingerprint),
+                label: const Text('Ingresar con huella o rostro'),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _cargando
+                      ? null
+                      : () => auth.setBiometricEnabled(false),
+                  child: const Text('Desactivar acceso biométrico'),
+                ),
+              ),
+            ] else ...[
+              FutureBuilder<bool>(
+                future: auth.deviceSupportsBiometrics(),
+                builder: (context, snapshot) {
+                  if (snapshot.data != true) return const SizedBox.shrink();
+                  return CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: _habilitarBiometria,
+                    onChanged: _cargando
+                        ? null
+                        : (value) => setState(() => _habilitarBiometria = value ?? false),
+                    title: const Text('Habilitar ingreso con huella o rostro'),
+                    dense: true,
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),

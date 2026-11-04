@@ -4,6 +4,7 @@ const {
   reportarAveria,
   misAverias,
   listarAverias,
+  actualizarAveria,
   eliminarAveria,
 } = require('../controller/averiaController');
 const { verificarToken } = require('../middleware/authMiddleware');
@@ -15,6 +16,8 @@ router.get('/mis-averias', verificarToken, misAverias);
 
 // Administración y fontanería consultan la lista global; solo administración elimina reportes.
 router.get('/', verificarToken, verificarRol('administrador', 'fontanero'), listarAverias);
+// Solo el fontanero cambia el estado de una avería (ni el usuario ni el administrador).
+router.put('/:id', verificarToken, verificarRol('fontanero'), actualizarAveria);
 router.delete('/:id', verificarToken, verificarRol('administrador'), eliminarAveria);
 
 module.exports = router;

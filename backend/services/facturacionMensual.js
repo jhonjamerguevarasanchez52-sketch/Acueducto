@@ -72,7 +72,8 @@ async function generarFacturasMensuales({
     .from('invoices')
     .select('*')
     .eq('periodo', periodo)
-    .eq('tipo', 'servicio');
+    .eq('tipo', 'servicio')
+    .neq('estado', 'anulada');
   if (errorExistentes) {
     throw new Error(`No se pudieron consultar las facturas del periodo ${periodo}: ${errorExistentes.message}`);
   }
@@ -84,6 +85,7 @@ async function generarFacturasMensuales({
     usuariosActivos: (perfiles || []).length,
     facturasCreadas: 0,
     facturasExistentes: 0,
+    periodosPrepagados: 0,
     correosEnviados: 0,
     correosFallidos: 0,
     errores: [],
@@ -96,38 +98,16 @@ async function generarFacturasMensuales({
       resumen.facturasExistentes += 1;
       if (!factura.generada_automaticamente || factura.correo_factura_enviado_at) continue;
     } else {
-      let resultadoFactura = await db
-        .from('invoices')
-        .insert({
-          perfil_id: perfil.id,
-          periodo,
-          tipo: 'servicio',
-          valor_total: VALOR_MENSUAL,
-          estado: 'pendiente',
-          fecha_emision: fechaEmision.toISOString(),
-          fecha_vencimiento: vencimiento,
-          generada_automaticamente: true,
-        })
-        .select()
-        .single();
-
-      if (columnaOpcionalNoDisponible(resultadoFactura.error, 'generada_automaticamente')) {
-        resultadoFactura = await db
-          .from('invoices')
-          .insert({
-            perfil_id: perfil.id,
-            periodo,
-            tipo: 'servicio',
-            valor_total: VALOR_MENSUAL,
-            estado: 'pendiente',
-            fecha_emision: fechaEmision.toISOString(),
-            fecha_vencimiento: vencimiento,
-          })
-          .select()
-          .single();
-      }
-
-      const { data, error: errorFactura } = resultadoFactura;
+      const { data: resultado, error: errorFactura } = await db.rpc(
+        'crear_factura_mensual_si_no_cubierta',
+        {
+          p_perfil_id: perfil.id,
+          p_periodo: periodo,
+          p_valor_total: VALOR_MENSUAL,
+          p_fecha_emision: fechaEmision.toISOString(),
+          p_fecha_vencimiento: vencimiento,
+        },
+      );
 
       if (errorFactura) {
         if (esDuplicado(errorFactura)) {
@@ -138,7 +118,12 @@ async function generarFacturasMensuales({
         continue;
       }
 
-      factura = data;
+      factura = Array.isArray(resultado) ? resultado[0] : resultado;
+      if (!factura) {
+        // El periodo ya está cubierto por un plan semestral/anual del usuario.
+        resumen.periodosPrepagados += 1;
+        continue;
+      }
       resumen.facturasCreadas += 1;
     }
 

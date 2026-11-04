@@ -48,7 +48,7 @@ class ProximaFactura extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2.4),
             ),
             SizedBox(width: 14),
-            Text('Cargando tu factura…'),
+            Flexible(child: Text('Cargando tu factura…')),
           ],
         ),
       );
@@ -74,10 +74,17 @@ class ProximaFactura extends StatelessWidget {
     }
 
     final facturas = snap.data ?? const <Factura>[];
-    final pendientes = facturas
-        .where((f) => f.estaPendiente && f.fechaVencimiento != null)
-        .toList()
-      ..sort((a, b) => a.fechaVencimiento!.compareTo(b.fechaVencimiento!));
+    // Las facturas sin fecha límite también se deben: van después de las
+    // que sí tienen vencimiento, para no mostrar "Estás al día" por error.
+    final pendientes = facturas.where((f) => f.estaPendiente).toList()
+      ..sort((a, b) {
+        final va = a.fechaVencimiento;
+        final vb = b.fechaVencimiento;
+        if (va == null || vb == null) {
+          return va == null ? (vb == null ? 0 : 1) : -1;
+        }
+        return va.compareTo(vb);
+      });
 
     if (pendientes.isEmpty) {
       final sinFacturas = facturas.isEmpty;
@@ -114,12 +121,16 @@ class ProximaFactura extends StatelessWidget {
     }
 
     final factura = pendientes.first;
-    final dias = _diasHasta(factura.fechaVencimiento!);
+    final vencimiento = factura.fechaVencimiento;
+    final dias = vencimiento == null ? null : _diasHasta(vencimiento);
     final avance = _avance(factura);
 
     final Color color;
     final String aviso;
-    if (dias < 0) {
+    if (dias == null) {
+      color = factura.estado == 'vencida' ? colores.danger : colores.info;
+      aviso = factura.estado == 'vencida' ? 'Factura vencida' : 'Sin fecha límite';
+    } else if (dias < 0) {
       color = colores.danger;
       aviso = dias == -1 ? 'Venció hace 1 día' : 'Venció hace ${-dias} días';
     } else if (dias == 0) {
@@ -163,7 +174,9 @@ class ProximaFactura extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Vence: ${Formato.fecha(factura.fechaVencimiento)}',
+                      vencimiento == null
+                          ? 'Emitida: ${Formato.fecha(factura.fechaEmision)}'
+                          : 'Vence: ${Formato.fecha(vencimiento)}',
                       style: TextStyle(
                         fontSize: 12.5,
                         color: colores.secondaryText,

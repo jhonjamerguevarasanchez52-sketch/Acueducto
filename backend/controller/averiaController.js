@@ -181,9 +181,8 @@ async function actualizarAveria(req, res) {
 
     const actualizacion = { estado, fontanero_id: fontaneroId };
     if (nota !== undefined) actualizacion.nota_fontanero = nota.trim() || null;
-    if (estado === 'resuelta') {
-      actualizacion.fecha_resolucion = new Date().toISOString();
-    }
+    // Si se reabre una avería resuelta, deja de tener fecha de resolución.
+    actualizacion.fecha_resolucion = estado === 'resuelta' ? new Date().toISOString() : null;
 
     const { data, error } = await breakdownModel.update(id, actualizacion);
 
@@ -192,10 +191,11 @@ async function actualizarAveria(req, res) {
         error: 'Termina la averia que esta en proceso antes de empezar otra.',
       });
     }
-    if (error) return errorConsulta(res, error);
-    if (!data) {
+    // PGRST116: el id no corresponde a ninguna avería.
+    if (error?.code === 'PGRST116' || (!error && !data)) {
       return res.status(404).json({ error: 'Avería no encontrada' });
     }
+    if (error) return errorConsulta(res, error);
 
     const resumenAveria = (data.descripcion || '').trim();
     const notaFontanero = (data.nota_fontanero || '').trim();

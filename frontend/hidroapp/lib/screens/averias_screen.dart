@@ -42,10 +42,12 @@ class _AveriasScreenState extends State<AveriasScreen> {
     _futuro = _cargar();
   }
 
-  @override 
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final rol = Provider.of<AuthProvider>(context).profile?.rol.trim().toLowerCase();
+    final rol = Provider.of<AuthProvider>(
+      context,
+    ).profile?.rol.trim().toLowerCase();
     final esFontanero = rol == 'fontanero';
     final esAdministrador = rol == 'administrador';
     final puedeVerTodasLasAverias = esFontanero || esAdministrador;
@@ -70,8 +72,58 @@ class _AveriasScreenState extends State<AveriasScreen> {
 
   Future<void> _refrescar() async {
     final futuro = _cargar();
-    setState(() => _futuro = futuro);
+    setState(() {
+      _futuro = futuro;
+    });
     await futuro.catchError((_) => <Averia>[]);
+  }
+
+  /// El fontanero cambia el estado de una avería, con una nota opcional que
+  /// le llega al usuario en la notificación.
+  Future<void> _cambiarEstado(Averia averia, String estado) async {
+    final textos = switch (estado) {
+      'en_proceso' => (
+        titulo: 'Tomar avería',
+        ayuda: 'Mensaje para el usuario (opcional)',
+        boton: 'Tomar',
+        listo: 'Avería en proceso. Se avisó al usuario.',
+      ),
+      'resuelta' => (
+        titulo: 'Marcar como resuelta',
+        ayuda: '¿Qué se hizo? (opcional)',
+        boton: 'Resuelta',
+        listo: 'Avería resuelta. Se avisó al usuario.',
+      ),
+      _ => (
+        titulo: 'Cancelar avería',
+        ayuda: 'Motivo de la cancelación (opcional)',
+        boton: 'Cancelar avería',
+        listo: 'Avería cancelada. Se avisó al usuario.',
+      ),
+    };
+    final nota = await showDialog<String>(
+      context: context,
+      builder: (_) => _NotaEstadoDialog(
+        titulo: textos.titulo,
+        ayuda: textos.ayuda,
+        boton: textos.boton,
+        notaInicial: averia.notaFontanero ?? '',
+      ),
+    );
+    if (nota == null || !mounted) return;
+
+    try {
+      await context.read<AuthProvider>().api.put(
+        '/averias/${averia.id}',
+        body: {'estado': estado, 'nota': nota},
+      );
+      if (!mounted) return;
+      AppSnackbar.success(context, textos.listo);
+      await _refrescar();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      AppSnackbar.error(context, e.message);
+    }
   }
 
   Future<void> _abrirReporte() async {
@@ -216,7 +268,11 @@ class _AveriasScreenState extends State<AveriasScreen> {
                   retraso: AppTheme.motionEscalon * (i - 1),
                   child: AveriaCard(
                     averia: averia,
-                    mostrarDetallesOperativos: _esAdministrador,
+                    // El fontanero necesita la dirección y el contacto para atenderla.
+                    mostrarDetallesOperativos: _esAdministrador || _esFontanero,
+                    onCambiarEstado: _esFontanero
+                        ? (estado) => _cambiarEstado(averia, estado)
+                        : null,
                   ),
                 );
               },
@@ -227,7 +283,6 @@ class _AveriasScreenState extends State<AveriasScreen> {
     );
   }
 }
-
 
 class _AveriaReportadaDialog extends StatefulWidget {
   const _AveriaReportadaDialog();
@@ -289,6 +344,61 @@ class _AveriaReportadaDialogState extends State<_AveriaReportadaDialog>
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Diálogo para confirmar el cambio de estado con una nota opcional.
+/// Devuelve la nota (puede ser vacía) o `null` si el fontanero se arrepiente.
+class _NotaEstadoDialog extends StatefulWidget {
+  const _NotaEstadoDialog({
+    required this.titulo,
+    required this.ayuda,
+    required this.boton,
+    required this.notaInicial,
+  });
+
+  final String titulo;
+  final String ayuda;
+  final String boton;
+  final String notaInicial;
+
+  @override
+  State<_NotaEstadoDialog> createState() => _NotaEstadoDialogState();
+}
+
+class _NotaEstadoDialogState extends State<_NotaEstadoDialog> {
+  late final TextEditingController _nota = TextEditingController(
+    text: widget.notaInicial,
+  );
+
+  @override
+  void dispose() {
+    _nota.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.titulo),
+      content: TextField(
+        controller: _nota,
+        maxLength: 1000,
+        minLines: 2,
+        maxLines: 5,
+        decoration: InputDecoration(labelText: widget.ayuda),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Volver'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_nota.text.trim()),
+          child: Text(widget.boton),
+        ),
+      ],
     );
   }
 }

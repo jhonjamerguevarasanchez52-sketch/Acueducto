@@ -16,6 +16,18 @@ function getOwn(id, profileId, { columns = '*', db = supabaseAdmin } = {}) {
   return db.from(TABLE).select(columns).eq('id', id).eq('perfil_id', profileId).single();
 }
 
+// Meses del perfil ya cubiertos por otra factura de servicio/prepago, dentro
+// de un rango AAAA-MM (comparación de texto válida por el formato fijo).
+function listCoveredPeriods(profileId, { desde, hasta, exceptoFacturaId }) {
+  return supabaseAdmin
+    .from('invoice_service_periods')
+    .select('periodo, invoice_id')
+    .eq('perfil_id', profileId)
+    .gte('periodo', desde)
+    .lte('periodo', hasta)
+    .neq('invoice_id', exceptoFacturaId);
+}
+
 // Últimas facturas de un perfil (contexto del chatbot).
 function latestByProfile(profileId, limit = 3) {
   return supabaseAdmin
@@ -54,4 +66,4 @@ function create({ perfil_id, periodo, valor_total, fecha_vencimiento, observacio
     .single();
 }
 
-module.exports = { listByProfile, getOwn, latestByProfile, list, create, ...crudBase(TABLE) };
+module.exports = { listByProfile, getOwn, listCoveredPeriods, latestByProfile, list, create, ...crudBase(TABLE) };

@@ -1,0 +1,692 @@
+{
+ "usuario": {
+  "/profile/mi-perfil": {
+   "id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+   "nombre": "Nombre",
+   "apellido": "Apellido",
+   "correo": "p2-b8aca9@gmail.com",
+   "rol": "usuario",
+   "activo": true,
+   "is_verified": true,
+   "debe_cambiar_password": false,
+   "telefono": "3001234567",
+   "numero_lote": "L-1",
+   "direccion": "Calle 1",
+   "ocupacion": null,
+   "zona": "Centro",
+   "created_at": "2026-10-28T03:31:48.378+00:00",
+   "updated_at": null
+  },
+  "/facturas": [
+   {
+    "id": "388ad3cf-a808-4a54-8258-42af5d69faca",
+    "numero_factura": 7,
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "periodo": "2027-02",
+    "tipo": "servicio",
+    "valor_total": 12000,
+    "estado": "pendiente",
+    "fecha_emision": "2026-10-28T03:31:48.749+00:00",
+    "fecha_vencimiento": null,
+    "periodo_inicio": "2027-02",
+    "periodo_fin": "2027-02",
+    "meses_cubiertos": 1,
+    "detalle_prepago": null,
+    "fecha_ultimo_pago": null,
+    "fecha_proxima_facturacion": null,
+    "observacion": null,
+    "generada_automaticamente": false,
+    "correo_factura_enviado_at": null,
+    "pagos": [
+     {
+      "id": "b199f2fe-b008-4947-8a3c-2e2c8e9c960d",
+      "factura_id": "388ad3cf-a808-4a54-8258-42af5d69faca",
+      "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+      "monto": 12000,
+      "cargo_wompi": 0,
+      "monto_total": 12000,
+      "metodo": "fisico",
+      "referencia": "72da05fe-d491-4bf2-b73f-f78484cd24e6/388ad3cf-a808-4a54-8258-42af5d69faca/6711fc87-292d-47f6-a3b0-e1603ced0031.jpg",
+      "confirmado": false,
+      "fecha_pago": "2026-10-28T03:31:48.771+00:00",
+      "fecha_confirmacion": null,
+      "metodo_confirmacion": null,
+      "estado_wompi": null,
+      "transaccion_id": null,
+      "medio_pago_wompi": null,
+      "correo_comprobante_enviado_at": null,
+      "registrado_por": null
+     }
+    ]
+   },
+   {
+    "id": "a318a5e9-91ec-4969-a4ba-d9276f2485d8",
+    "numero_factura": 6,
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "periodo": "2026 - Cuota extraordinaria para la bocatoma con un texto bastante largo para probar",
+    "tipo": "extraordinaria",
+    "valor_total": 200000,
+    "estado": "pendiente",
+    "fecha_emision": "2026-10-28T03:31:48.733+00:00",
+    "fecha_vencimiento": null,
+    "periodo_inicio": null,
+    "periodo_fin": null,
+    "meses_cubiertos": null,
+    "detalle_prepago": null,
+    "fecha_ultimo_pago": null,
+    "fecha_proxima_facturacion": null,
+    "observacion": null,
+    "generada_automaticamente": false,
+    "correo_factura_enviado_at": null,
+    "pagos": []
+   },
+   {
+    "id": "3a152cb8-a057-4389-8313-0ca39f856cdd",
+    "numero_factura": 5,
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "periodo": "2027-01",
+    "tipo": "servicio",
+    "valor_total": 15000,
+    "estado": "pendiente",
+    "fecha_emision": "2026-10-28T03:31:48.709+00:00",
+    "fecha_vencimiento": null,
+    "periodo_inicio": "2027-01",
+    "periodo_fin": "2027-01",
+    "meses_cubiertos": 1,
+    "detalle_prepago": null,
+    "fecha_ultimo_pago": null,
+    "fecha_proxima_facturacion": null,
+    "observacion": null,
+    "generada_automaticamente": false,
+    "correo_factura_enviado_at": null,
+    "pagos": []
+   },
+   {
+    "id": "b62ca7ac-6118-46f8-b15a-300760d76600",
+    "numero_factura": 4,
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "periodo": "2026-12",
+    "tipo": "servicio",
+    "valor_total": 12000,
+    "estado": "anulada",
+    "fecha_emision": "2026-10-28T03:31:48.685+00:00",
+    "fecha_vencimiento": null,
+    "periodo_inicio": "2026-12",
+    "periodo_fin": "2026-12",
+    "meses_cubiertos": 1,
+    "detalle_prepago": null,
+    "fecha_ultimo_pago": null,
+    "fecha_proxima_facturacion": null,
+    "observacion": null,
+    "generada_automaticamente": false,
+    "correo_factura_enviado_at": null,
+    "pagos": []
+   },
+   {
+    "id": "c1221f27-5494-40cd-a266-b8bce5b89a5c",
+    "numero_factura": 3,
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "periodo": "2026-11",
+    "tipo": "servicio",
+    "valor_total": 12000,
+    "estado": "vencida",
+    "fecha_emision": "2026-10-28T03:31:48.64+00:00",
+    "fecha_vencimiento": null,
+    "periodo_inicio": "2026-11",
+    "periodo_fin": "2026-11",
+    "meses_cubiertos": 1,
+    "detalle_prepago": null,
+    "fecha_ultimo_pago": null,
+    "fecha_proxima_facturacion": null,
+    "observacion": null,
+    "generada_automaticamente": false,
+    "correo_factura_enviado_at": null,
+    "pagos": []
+   },
+   {
+    "id": "ab49a3d2-8a2c-4526-b02f-c7d252ebea43",
+    "numero_factura": 2,
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "periodo": "2026-10",
+    "tipo": "servicio",
+    "valor_total": 12000,
+    "estado": "pendiente",
+    "fecha_emision": "2026-10-28T03:31:48.606+00:00",
+    "fecha_vencimiento": null,
+    "periodo_inicio": "2026-10",
+    "periodo_fin": "2026-10",
+    "meses_cubiertos": 1,
+    "detalle_prepago": null,
+    "fecha_ultimo_pago": null,
+    "fecha_proxima_facturacion": null,
+    "observacion": null,
+    "generada_automaticamente": false,
+    "correo_factura_enviado_at": null,
+    "pagos": [
+     {
+      "id": "03b9c31f-db2e-4fbb-b639-c404546aad4c",
+      "factura_id": "ab49a3d2-8a2c-4526-b02f-c7d252ebea43",
+      "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+      "monto": 12000,
+      "cargo_wompi": 1251,
+      "monto_total": 13251,
+      "metodo": "wompi",
+      "referencia": null,
+      "confirmado": false,
+      "fecha_pago": "2026-10-28T03:31:48.626+00:00",
+      "fecha_confirmacion": null,
+      "metodo_confirmacion": null,
+      "estado_wompi": "DECLINED",
+      "transaccion_id": null,
+      "medio_pago_wompi": null,
+      "correo_comprobante_enviado_at": null,
+      "registrado_por": null
+     }
+    ]
+   },
+   {
+    "id": "03438cdc-3d9d-4a1e-85d7-f8a146f30f0d",
+    "numero_factura": 1,
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "periodo": "2026-04",
+    "tipo": "prepago",
+    "valor_total": 72000,
+    "estado": "pagada",
+    "fecha_emision": "2026-10-28T03:31:48.443+00:00",
+    "fecha_vencimiento": null,
+    "periodo_inicio": "2026-04",
+    "periodo_fin": "2026-09",
+    "meses_cubiertos": 6,
+    "detalle_prepago": "Servicio prepago de 6 meses. Periodos incluidos: 2026-04, 2026-05, 2026-06, 2026-07, 2026-08, 2026-09. Próxima mensualidad: 2026-10.",
+    "fecha_ultimo_pago": "2026-10-28T03:31:48.563+00:00",
+    "fecha_proxima_facturacion": "2026-11-01",
+    "observacion": null,
+    "generada_automaticamente": false,
+    "correo_factura_enviado_at": null,
+    "pagos": [
+     {
+      "id": "a444392c-a995-4dbe-b30a-dcfaef0c9a11",
+      "factura_id": "03438cdc-3d9d-4a1e-85d7-f8a146f30f0d",
+      "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+      "monto": 72000,
+      "cargo_wompi": 3205,
+      "monto_total": 75205,
+      "metodo": "wompi",
+      "referencia": null,
+      "confirmado": true,
+      "fecha_pago": "2026-10-28T03:31:48.543+00:00",
+      "fecha_confirmacion": "2026-10-28T03:31:48.562+00:00",
+      "metodo_confirmacion": "wompi",
+      "estado_wompi": "APPROVED",
+      "transaccion_id": "trx-demo-1",
+      "medio_pago_wompi": "PSE",
+      "correo_comprobante_enviado_at": "2026-10-28T03:31:48.58+00:00",
+      "registrado_por": null
+     }
+    ]
+   }
+  ],
+  "/pagos": [
+   {
+    "id": "b199f2fe-b008-4947-8a3c-2e2c8e9c960d",
+    "factura_id": "388ad3cf-a808-4a54-8258-42af5d69faca",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "monto": 12000,
+    "cargo_wompi": 0,
+    "monto_total": 12000,
+    "metodo": "fisico",
+    "referencia": "72da05fe-d491-4bf2-b73f-f78484cd24e6/388ad3cf-a808-4a54-8258-42af5d69faca/6711fc87-292d-47f6-a3b0-e1603ced0031.jpg",
+    "confirmado": false,
+    "fecha_pago": "2026-10-28T03:31:48.771+00:00",
+    "fecha_confirmacion": null,
+    "metodo_confirmacion": null,
+    "estado_wompi": null,
+    "transaccion_id": null,
+    "medio_pago_wompi": null,
+    "correo_comprobante_enviado_at": null,
+    "registrado_por": null,
+    "recibo_url": "https://storage.test/payment-receipts/72da05fe-d491-4bf2-b73f-f78484cd24e6/388ad3cf-a808-4a54-8258-42af5d69faca/6711fc87-292d-47f6-a3b0-e1603ced0031.jpg?token=x"
+   },
+   {
+    "id": "03b9c31f-db2e-4fbb-b639-c404546aad4c",
+    "factura_id": "ab49a3d2-8a2c-4526-b02f-c7d252ebea43",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "monto": 12000,
+    "cargo_wompi": 1251,
+    "monto_total": 13251,
+    "metodo": "wompi",
+    "referencia": null,
+    "confirmado": false,
+    "fecha_pago": "2026-10-28T03:31:48.626+00:00",
+    "fecha_confirmacion": null,
+    "metodo_confirmacion": null,
+    "estado_wompi": "DECLINED",
+    "transaccion_id": null,
+    "medio_pago_wompi": null,
+    "correo_comprobante_enviado_at": null,
+    "registrado_por": null
+   },
+   {
+    "id": "a444392c-a995-4dbe-b30a-dcfaef0c9a11",
+    "factura_id": "03438cdc-3d9d-4a1e-85d7-f8a146f30f0d",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "monto": 72000,
+    "cargo_wompi": 3205,
+    "monto_total": 75205,
+    "metodo": "wompi",
+    "referencia": null,
+    "confirmado": true,
+    "fecha_pago": "2026-10-28T03:31:48.543+00:00",
+    "fecha_confirmacion": "2026-10-28T03:31:48.562+00:00",
+    "metodo_confirmacion": "wompi",
+    "estado_wompi": "APPROVED",
+    "transaccion_id": "trx-demo-1",
+    "medio_pago_wompi": "PSE",
+    "correo_comprobante_enviado_at": "2026-10-28T03:31:48.58+00:00",
+    "registrado_por": null
+   }
+  ],
+  "/notificaciones": [
+   {
+    "id": "8781e3b8-fbba-416b-b627-813448e89816",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "mensaje": "Tu servicio de agua fue suspendido. Motivo: Mora de dos mensualidades.",
+    "tipo": "corte",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.821+00:00"
+   },
+   {
+    "id": "4721ddac-8b42-4bba-8990-a3dc3a79b590",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "mensaje": "Mantenimiento del tanque el sábado de 8 a.m. a 2 p.m.; habrá baja presión en toda la vereda.",
+    "tipo": "general",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.783+00:00"
+   },
+   {
+    "id": "a20b6034-41b7-4ecb-8ecb-c90e32384ac6",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "mensaje": "Se generó tu factura del periodo 2027-02 por $12000.",
+    "tipo": "factura",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.751+00:00"
+   },
+   {
+    "id": "10b75baf-5973-4a1a-bf71-21c6a3032a8c",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "mensaje": "Se generó tu factura del periodo 2026 - Cuota extraordinaria para la bocatoma con un texto bastante largo para probar por $200000.",
+    "tipo": "factura",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.734+00:00"
+   },
+   {
+    "id": "a0b5801d-372b-4522-9ff0-f7097f9a8627",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "mensaje": "Se generó tu factura del periodo 2027-01 por $15000.",
+    "tipo": "factura",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.712+00:00"
+   },
+   {
+    "id": "0450a43c-dfe1-4580-80ee-f63f82be8459",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "mensaje": "Se generó tu factura del periodo 2026-12 por $12000.",
+    "tipo": "factura",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.687+00:00"
+   },
+   {
+    "id": "f195be75-071c-4532-b0b5-58e7eb61394c",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "mensaje": "Se generó tu factura del periodo 2026-11 por $12000.",
+    "tipo": "factura",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.644+00:00"
+   },
+   {
+    "id": "33165e9d-dfd4-45ba-a057-b54ae0a3254a",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "mensaje": "Se generó tu factura del periodo 2026-10 por $12000.",
+    "tipo": "factura",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.609+00:00"
+   },
+   {
+    "id": "467e2803-5180-4c18-a480-7bbcca7e5569",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "mensaje": "El pago de la factura 1 fue confirmado correctamente.",
+    "tipo": "pago",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.563+00:00"
+   },
+   {
+    "id": "1ba35914-fa94-40a2-ba8a-699c2e6b7d15",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "mensaje": "Se generó tu factura del periodo 2026-04 por $12000.",
+    "tipo": "factura",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.457+00:00"
+   }
+  ],
+  "/notificaciones/no-leidas": {
+   "noLeidas": 10
+  },
+  "/averias/mis-averias": {
+   "data": [
+    {
+     "id": "96ff47da-92c2-448a-9c51-06c002839955",
+     "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+     "fontanero_id": null,
+     "descripcion": "Fuga grande en el tubo principal frente a la escuela de la vereda",
+     "zona": "Centro",
+     "direccion": "Calle 1",
+     "estado": "reportada",
+     "nota_fontanero": null,
+     "fecha_reporte": "2026-10-28T03:31:48.798+00:00",
+     "fecha_resolucion": null
+    }
+   ]
+  },
+  "/cortes/estado": {
+   "servicioCortado": true,
+   "corte": {
+    "id": "44a64cb3-d120-48e3-a5f9-a5992010d941",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "factura_id": "c1221f27-5494-40cd-a266-b8bce5b89a5c",
+    "cortado_por": "ae88cc48-2388-4852-822e-70550cead581",
+    "reconectado_por": null,
+    "origen": "manual",
+    "motivo": "Mora de dos mensualidades",
+    "estado": "activo",
+    "fecha_corte": "2026-10-28T03:31:48.819+00:00",
+    "fecha_reconexion": null
+   }
+  },
+  "/cortes/mis-cortes": [
+   {
+    "id": "44a64cb3-d120-48e3-a5f9-a5992010d941",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "factura_id": "c1221f27-5494-40cd-a266-b8bce5b89a5c",
+    "cortado_por": "ae88cc48-2388-4852-822e-70550cead581",
+    "reconectado_por": null,
+    "origen": "manual",
+    "motivo": "Mora de dos mensualidades",
+    "estado": "activo",
+    "fecha_corte": "2026-10-28T03:31:48.819+00:00",
+    "fecha_reconexion": null
+   }
+  ],
+  "/wompi/config": {
+   "publicKey": "pub_test_x",
+   "ambiente": "test",
+   "currency": "COP",
+   "disponible": true
+  },
+  "/facturas/:id/opciones-pago": {
+   "facturaId": "c1221f27-5494-40cd-a266-b8bce5b89a5c",
+   "puedeCambiarPlan": true,
+   "motivoSinPlanes": null,
+   "opciones": [
+    {
+     "periodoInicio": "2026-11",
+     "periodoFin": "2026-11",
+     "meses": 1,
+     "periodos": [
+      "2026-11"
+     ],
+     "proximoPeriodo": "2026-12",
+     "fechaProximaFacturacion": "2027-01-01",
+     "valorMensual": 12000,
+     "valorServicio": 12000,
+     "cargoWompi": 1251,
+     "totalCobrar": 13251,
+     "disponible": true,
+     "motivoNoDisponible": null
+    },
+    {
+     "periodoInicio": "2026-11",
+     "periodoFin": "2027-04",
+     "meses": 6,
+     "periodos": [
+      "2026-11",
+      "2026-12",
+      "2027-01",
+      "2027-02",
+      "2027-03",
+      "2027-04"
+     ],
+     "proximoPeriodo": "2027-05",
+     "fechaProximaFacturacion": "2027-06-01",
+     "valorMensual": 12000,
+     "valorServicio": 72000,
+     "cargoWompi": 3205,
+     "totalCobrar": 75205,
+     "disponible": false,
+     "motivoNoDisponible": "El periodo 2027-01 ya tiene su propia factura."
+    },
+    {
+     "periodoInicio": "2026-11",
+     "periodoFin": "2027-10",
+     "meses": 12,
+     "periodos": [
+      "2026-11",
+      "2026-12",
+      "2027-01",
+      "2027-02",
+      "2027-03",
+      "2027-04",
+      "2027-05",
+      "2027-06",
+      "2027-07",
+      "2027-08",
+      "2027-09",
+      "2027-10"
+     ],
+     "proximoPeriodo": "2027-11",
+     "fechaProximaFacturacion": "2027-12-01",
+     "valorMensual": 12000,
+     "valorServicio": 144000,
+     "cargoWompi": 5550,
+     "totalCobrar": 149550,
+     "disponible": false,
+     "motivoNoDisponible": "El periodo 2027-01 ya tiene su propia factura."
+    }
+   ]
+  },
+  "/pagos/cotizacion-wompi/:id": {
+   "valorServicio": 12000,
+   "cargoWompi": 1251,
+   "totalCobrar": 13251
+  }
+ },
+ "administrador": {
+  "/profile/mi-perfil": {
+   "id": "ae88cc48-2388-4852-822e-70550cead581",
+   "nombre": "Nombre",
+   "apellido": "Apellido",
+   "correo": "p1-6d1eaa@gmail.com",
+   "rol": "administrador",
+   "activo": true,
+   "is_verified": true,
+   "debe_cambiar_password": false,
+   "telefono": "3001234567",
+   "numero_lote": "L-1",
+   "direccion": "Calle 1",
+   "ocupacion": null,
+   "zona": "Centro",
+   "created_at": "2026-10-28T03:31:48.372+00:00",
+   "updated_at": null
+  },
+  "/facturas": [],
+  "/pagos": [],
+  "/notificaciones": [
+   {
+    "id": "a73e22ec-34c0-49eb-8941-2196b2248085",
+    "perfil_id": "ae88cc48-2388-4852-822e-70550cead581",
+    "mensaje": "Mantenimiento del tanque el sábado de 8 a.m. a 2 p.m.; habrá baja presión en toda la vereda.",
+    "tipo": "general",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.783+00:00"
+   }
+  ],
+  "/notificaciones/no-leidas": {
+   "noLeidas": 1
+  },
+  "/averias": {
+   "data": [
+    {
+     "id": "96ff47da-92c2-448a-9c51-06c002839955",
+     "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+     "fontanero_id": null,
+     "descripcion": "Fuga grande en el tubo principal frente a la escuela de la vereda",
+     "zona": "Centro",
+     "direccion": "Calle 1",
+     "estado": "reportada",
+     "nota_fontanero": null,
+     "fecha_reporte": "2026-10-28T03:31:48.798+00:00",
+     "fecha_resolucion": null,
+     "reportante": {
+      "id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+      "nombre": "Nombre",
+      "apellido": "Apellido",
+      "correo": "p2-b8aca9@gmail.com",
+      "telefono": "3001234567",
+      "zona": "Centro",
+      "direccion": "Calle 1"
+     }
+    }
+   ]
+  },
+  "/averias/mis-averias": {
+   "data": []
+  },
+  "/cortes/estado": {
+   "servicioCortado": false,
+   "corte": null
+  },
+  "/pagos/todos?confirmado=false": [
+   {
+    "id": "b199f2fe-b008-4947-8a3c-2e2c8e9c960d",
+    "factura_id": "388ad3cf-a808-4a54-8258-42af5d69faca",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "monto": 12000,
+    "cargo_wompi": 0,
+    "monto_total": 12000,
+    "metodo": "fisico",
+    "referencia": "72da05fe-d491-4bf2-b73f-f78484cd24e6/388ad3cf-a808-4a54-8258-42af5d69faca/6711fc87-292d-47f6-a3b0-e1603ced0031.jpg",
+    "confirmado": false,
+    "fecha_pago": "2026-10-28T03:31:48.771+00:00",
+    "fecha_confirmacion": null,
+    "metodo_confirmacion": null,
+    "estado_wompi": null,
+    "transaccion_id": null,
+    "medio_pago_wompi": null,
+    "correo_comprobante_enviado_at": null,
+    "registrado_por": null,
+    "recibo_url": "https://storage.test/payment-receipts/72da05fe-d491-4bf2-b73f-f78484cd24e6/388ad3cf-a808-4a54-8258-42af5d69faca/6711fc87-292d-47f6-a3b0-e1603ced0031.jpg?token=x"
+   },
+   {
+    "id": "03b9c31f-db2e-4fbb-b639-c404546aad4c",
+    "factura_id": "ab49a3d2-8a2c-4526-b02f-c7d252ebea43",
+    "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+    "monto": 12000,
+    "cargo_wompi": 1251,
+    "monto_total": 13251,
+    "metodo": "wompi",
+    "referencia": null,
+    "confirmado": false,
+    "fecha_pago": "2026-10-28T03:31:48.626+00:00",
+    "fecha_confirmacion": null,
+    "metodo_confirmacion": null,
+    "estado_wompi": "DECLINED",
+    "transaccion_id": null,
+    "medio_pago_wompi": null,
+    "correo_comprobante_enviado_at": null,
+    "registrado_por": null
+   }
+  ],
+  "/wompi/config": {
+   "publicKey": "pub_test_x",
+   "ambiente": "test",
+   "currency": "COP",
+   "disponible": true
+  }
+ },
+ "fontanero": {
+  "/profile/mi-perfil": {
+   "id": "c8fd452a-fc81-48d1-99b8-c7bcb0a653e5",
+   "nombre": "Nombre",
+   "apellido": "Apellido",
+   "correo": "p3-5cca10@gmail.com",
+   "rol": "fontanero",
+   "activo": true,
+   "is_verified": true,
+   "debe_cambiar_password": false,
+   "telefono": "3001234567",
+   "numero_lote": "L-1",
+   "direccion": "Calle 1",
+   "ocupacion": null,
+   "zona": "Centro",
+   "created_at": "2026-10-28T03:31:48.381+00:00",
+   "updated_at": null
+  },
+  "/facturas": [],
+  "/pagos": [],
+  "/notificaciones": [
+   {
+    "id": "acf6281f-7579-40b9-95cc-766eeb5c2ef4",
+    "perfil_id": "c8fd452a-fc81-48d1-99b8-c7bcb0a653e5",
+    "mensaje": "Nueva avería de Nombre Apellido, en Calle 1 · Centro. Fuga grande en el tubo principal frente a la escuela de la vereda",
+    "tipo": "averia",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.807+00:00"
+   },
+   {
+    "id": "a821ae29-503b-410f-b5b4-bee446b9c9e1",
+    "perfil_id": "c8fd452a-fc81-48d1-99b8-c7bcb0a653e5",
+    "mensaje": "Mantenimiento del tanque el sábado de 8 a.m. a 2 p.m.; habrá baja presión en toda la vereda.",
+    "tipo": "general",
+    "estado": "no_leido",
+    "fecha": "2026-10-28T03:31:48.783+00:00"
+   }
+  ],
+  "/notificaciones/no-leidas": {
+   "noLeidas": 2
+  },
+  "/averias": {
+   "data": [
+    {
+     "id": "96ff47da-92c2-448a-9c51-06c002839955",
+     "perfil_id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+     "fontanero_id": null,
+     "descripcion": "Fuga grande en el tubo principal frente a la escuela de la vereda",
+     "zona": "Centro",
+     "direccion": "Calle 1",
+     "estado": "reportada",
+     "nota_fontanero": null,
+     "fecha_reporte": "2026-10-28T03:31:48.798+00:00",
+     "fecha_resolucion": null,
+     "reportante": {
+      "id": "72da05fe-d491-4bf2-b73f-f78484cd24e6",
+      "nombre": "Nombre",
+      "apellido": "Apellido",
+      "correo": "p2-b8aca9@gmail.com",
+      "telefono": "3001234567",
+      "zona": "Centro",
+      "direccion": "Calle 1"
+     }
+    }
+   ]
+  },
+  "/cortes/estado": {
+   "servicioCortado": false,
+   "corte": null
+  },
+  "/wompi/config": {
+   "publicKey": "pub_test_x",
+   "ambiente": "test",
+   "currency": "COP",
+   "disponible": true
+  }
+ }
+}

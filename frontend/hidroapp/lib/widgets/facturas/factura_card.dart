@@ -6,6 +6,7 @@ import '../../utils/formato.dart';
 import '../core/fila_detalle.dart';
 import '../core/hidro_logo.dart';
 import '../core/mensaje_estado.dart';
+import 'plan_pago_sheet.dart' show nombrePlanPago;
 
 /// Tarjeta de una factura: periodo, valor, fechas y observación. Si está
 /// pendiente muestra los botones "Pagar" y "Mis pagos".
@@ -88,8 +89,10 @@ class FacturaCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'FACTURA DE SERVICIO',
+                Text(
+                  factura.mesesCubiertos > 1
+                      ? 'FACTURA DE SERVICIO · PLAN ${nombrePlanPago(factura.mesesCubiertos).toUpperCase()}'
+                      : 'FACTURA DE SERVICIO',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 11,
@@ -98,7 +101,9 @@ class FacturaCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  Formato.periodo(factura.periodo),
+                  factura.mesesCubiertos > 1
+                      ? '${Formato.periodo(factura.periodoInicio ?? factura.periodo)} – ${Formato.periodo(factura.periodoFin)}'
+                      : Formato.periodo(factura.periodo),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -126,7 +131,9 @@ class FacturaCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'TOTAL A PAGAR',
+                      factura.estado == 'pagada'
+                          ? 'VALOR DEL SERVICIO PAGADO'
+                          : 'TOTAL A PAGAR',
                       style: TextStyle(
                         color: colores.secondaryText,
                         fontSize: 11,
@@ -149,6 +156,14 @@ class FacturaCard extends StatelessWidget {
                       icono: Icons.event_available_outlined,
                       texto: 'Emitida: ${Formato.fecha(factura.fechaEmision)}',
                     ),
+                    if (factura.mesesCubiertos > 1)
+                      FilaDetalle(
+                        icono: Icons.calendar_month_outlined,
+                        texto:
+                            '${factura.mesesCubiertos} mensualidades de '
+                            '${Formato.pesos(factura.valorTotal / factura.mesesCubiertos)}: '
+                            '${factura.periodosCubiertos.map(Formato.periodo).join(', ')}',
+                      ),
                     if (factura.fechaVencimiento != null)
                       FilaDetalle(
                         icono: Icons.schedule_outlined,
@@ -160,6 +175,54 @@ class FacturaCard extends StatelessWidget {
                         icono: Icons.sticky_note_2_outlined,
                         texto: factura.observacion!,
                       ),
+                    if (factura.fechaUltimoPago != null)
+                      FilaDetalle(
+                        icono: Icons.verified_outlined,
+                        texto:
+                            'Pagada: ${Formato.fechaHora(factura.fechaUltimoPago)}',
+                      ),
+                    if (factura.fechaProximaFacturacion != null)
+                      FilaDetalle(
+                        icono: Icons.event_repeat_outlined,
+                        texto:
+                            'Próxima facturación: ${Formato.fecha(factura.fechaProximaFacturacion)}',
+                      ),
+                    for (final pago in factura.pagosConfirmados) ...[
+                      const SizedBox(height: 6),
+                      FilaDetalle(
+                        icono: Icons.receipt_long_outlined,
+                        texto:
+                            'Pago confirmado: ${Formato.fechaHora(pago.fechaConfirmacion ?? pago.fechaPago)}',
+                      ),
+                      FilaDetalle(
+                        icono: Icons.water_drop_outlined,
+                        texto:
+                            'Servicio del acueducto: ${Formato.pesos(pago.monto)}',
+                      ),
+                      if (pago.cargoWompi > 0)
+                        FilaDetalle(
+                          icono: Icons.account_balance_wallet_outlined,
+                          texto:
+                              'Comisión Wompi: ${Formato.pesos(pago.cargoWompi)}',
+                        ),
+                      if (pago.montoTotal != null)
+                        FilaDetalle(
+                          icono: Icons.payments_outlined,
+                          texto:
+                              'Total cobrado: ${Formato.pesos(pago.montoTotal)}',
+                        ),
+                      if (pago.transaccionId != null)
+                        FilaDetalle(
+                          icono: Icons.tag,
+                          texto: 'Transacción: ${pago.transaccionId}',
+                        ),
+                      if (pago.medioPagoWompi != null)
+                        FilaDetalle(
+                          icono: Icons.credit_card_outlined,
+                          texto:
+                              'Medio de pago: ${Formato.etiqueta(pago.medioPagoWompi)}',
+                        ),
+                    ],
                     if (factura.estaPendiente) ...[
                       const SizedBox(height: 14),
                       Row(

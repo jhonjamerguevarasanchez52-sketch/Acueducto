@@ -78,6 +78,28 @@ function App() {
   const [reportFrom, setReportFrom] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`)
   const [reportTo, setReportTo] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`)
 
+  const applyReportPreset = (preset) => {
+    const current = new Date()
+    const year = current.getFullYear()
+    const month = current.getMonth()
+    const dateValue = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    let start
+    let end
+    if (preset === 'year') {
+      start = new Date(year, 0, 1)
+      end = new Date(year, 11, 31)
+    } else if (preset === 'semester') {
+      const semesterStartMonth = month < 6 ? 0 : 6
+      start = new Date(year, semesterStartMonth, 1)
+      end = new Date(year, semesterStartMonth + 6, 0)
+    } else {
+      start = new Date(year, month, 1)
+      end = new Date(year, month + 1, 0)
+    }
+    setReportFrom(dateValue(start))
+    setReportTo(dateValue(end))
+  }
+
   const filterRows = (rows) => {
     const query = searchQuery.trim().toLocaleLowerCase('es')
     if (!query) return rows
@@ -87,7 +109,15 @@ function App() {
   }
 
   useEffect(() => {
-    if (!getToken()) return
+    const handleExpiredSession = () => {
+      clearToken()
+      setProfile(null)
+      setSectionData({})
+      setSessionStatus('signed-out')
+      setAuthError('Tu sesión expiró. Inicia sesión de nuevo para continuar.')
+    }
+    window.addEventListener('hidro-session-expired', handleExpiredSession)
+    if (!getToken()) return () => window.removeEventListener('hidro-session-expired', handleExpiredSession)
 
     apiRequest(endpoints.profile)
       .then((currentProfile) => {
@@ -102,6 +132,7 @@ function App() {
         setAuthError(error.message || 'La sesión expiró. Inicia sesión de nuevo.')
         setSessionStatus('signed-out')
       })
+    return () => window.removeEventListener('hidro-session-expired', handleExpiredSession)
   }, [])
 
   useEffect(() => {
@@ -294,15 +325,40 @@ function App() {
     setIsImportingUsers(false)
   }
 
-  const handleDownloadUsersTemplate = () => {
-    const content = '\uFEFFnombre,apellido,correo,rol\r\nAna,Lopez,ana@ejemplo.com,usuario\r\n'
-    const file = new Blob([content], { type: 'text/csv;charset=utf-8' })
+  const downloadFile = (file, filename) => {
     const url = URL.createObjectURL(file)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'plantilla-usuarios.csv'
+    link.download = filename
     link.click()
-    URL.revokeObjectURL(url)
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  const handleDownloadUsersTemplate = async (format) => {
+    try {
+      if (format === 'xlsx') {
+        const ExcelJS = (await import('exceljs')).default
+        const workbook = new ExcelJS.Workbook()
+        const sheet = workbook.addWorksheet('Usuarios')
+        sheet.columns = [
+          { header: 'nombre', key: 'nombre', width: 20 },
+          { header: 'apellido', key: 'apellido', width: 20 },
+          { header: 'correo', key: 'correo', width: 32 },
+          { header: 'rol', key: 'rol', width: 18 },
+        ]
+        sheet.addRow({ nombre: 'Ana', apellido: 'Lopez', correo: 'ana@ejemplo.com', rol: 'usuario' })
+        sheet.views = [{ state: 'frozen', ySplit: 1 }]
+        sheet.autoFilter = 'A1:D1'
+        const buffer = await workbook.xlsx.writeBuffer()
+        downloadFile(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'plantilla-usuarios.xlsx')
+      } else {
+        const content = '\uFEFFnombre,apellido,correo,rol\r\nAna,Lopez,ana@ejemplo.com,usuario\r\n'
+        downloadFile(new Blob([content], { type: 'text/csv;charset=utf-8' }), 'plantilla-usuarios.csv')
+      }
+      setBulkUserError('')
+    } catch (error) {
+      setBulkUserError(error.message || 'No fue posible generar la plantilla.')
+    }
   }
 
   const openCreateUser = () => {
@@ -749,21 +805,28 @@ function App() {
       />
     )
   }
-  const exportTreasuryWorkbook = (report = 'todos') => exportTreasuryWorkbookFile({
-    report,
-    sectionData,
-    users,
-    invoices,
-    reportPayments,
-    reportInvoices,
-    reportConfirmedPayments,
-    reportRevenue,
-    reportPendingRevenue,
-    reportFrom,
-    reportTo,
-    setActionError,
-    setActionMessage,
-  })
+  const exportTreasuryWorkbook = async (report = 'todos') => {
+    try {
+      await exportTreasuryWorkbookFile({
+        report,
+        sectionData,
+        users,
+        invoices,
+        reportPayments,
+        reportInvoices,
+        reportConfirmedPayments,
+        reportRevenue,
+        reportPendingRevenue,
+        reportFrom,
+        reportTo,
+        setActionError,
+        setActionMessage,
+      })
+    } catch (error) {
+      setActionMessage('')
+      setActionError(error.message || 'No fue posible generar el informe Excel.')
+    }
+  }
   const sectionContext = {
     sectionData,
     sectionErrors,
@@ -796,6 +859,7 @@ function App() {
     setReportFrom,
     reportTo,
     setReportTo,
+    applyReportPreset,
     dashboardKpis,
     revenueTrend,
     serviceMix,
@@ -973,10 +1037,14 @@ function App() {
               Sube un archivo CSV UTF-8 o Excel (.xlsx) con las columnas <strong>nombre, apellido, correo</strong> y, opcionalmente, <strong>rol</strong>.
               Si omites el rol, se asignará “usuario�?. Máximo {MAX_BULK_USERS} usuarios y 5 MB por archivo.
             </p>
-            <button type="button" className="link-button bulk-template-button" onClick={handleDownloadUsersTemplate}>
-              <Download size={16} />
-              Descargar plantilla CSV
-            </button>
+            <div className="bulk-template-actions">
+              <button type="button" className="link-button bulk-template-button" onClick={() => handleDownloadUsersTemplate('xlsx')}>
+                <Download size={16} /> Descargar plantilla Excel (.xlsx)
+              </button>
+              <button type="button" className="link-button bulk-template-button" onClick={() => handleDownloadUsersTemplate('csv')}>
+                <Download size={16} /> Plantilla CSV
+              </button>
+            </div>
             <form className="bulk-user-form" onSubmit={handleBulkUserImport}>
               <label className="bulk-file-input">
                 Archivo CSV o Excel
@@ -1110,7 +1178,11 @@ function App() {
                     <span className="invoice-logo-frame"><img className="invoice-logo" src={hidroAppLogo} alt="" /></span>
                     <div>
                       <span className="invoice-brand">HidroApp · Acueducto Campo Amor</span>
-                      <h2>{invoicePreview.tipo === 'extraordinaria' ? 'Factura extraordinaria' : 'Factura de servicio'}</h2>
+                      <h2>{invoicePreview.tipo === 'extraordinaria'
+                        ? 'Factura extraordinaria'
+                        : Number(invoicePreview.meses_cubiertos) > 1
+                          ? `Factura de servicio · ${Number(invoicePreview.meses_cubiertos)} meses`
+                          : 'Factura de servicio'}</h2>
                     </div>
                   </div>
                   <div className="invoice-number">
@@ -1119,7 +1191,12 @@ function App() {
                   </div>
                 </header>
                 <div className="invoice-meta">
-                  <div><span>Periodo facturado</span><strong>{invoicePreview.periodo || '—'}</strong></div>
+                  <div><span>Periodo facturado</span><strong>{Number(invoicePreview.meses_cubiertos) > 1
+                    ? `${invoicePreview.periodo_inicio || invoicePreview.periodo} a ${invoicePreview.periodo_fin}`
+                    : invoicePreview.periodo || '—'}</strong></div>
+                  {invoicePreview.fecha_proxima_facturacion && (
+                    <div><span>Próxima facturación</span><strong>{formatDate(invoicePreview.fecha_proxima_facturacion)}</strong></div>
+                  )}
                   <div><span>Estado</span><strong>{invoicePreview.estado || '—'}</strong></div>
                   <div><span>Fecha de emisión</span><strong>{formatDate(invoicePreview.fecha_emision)}</strong></div>
                   <div><span>Fecha límite de pago</span><strong>{formatDate(invoicePreview.fecha_vencimiento)}</strong></div>
@@ -1135,8 +1212,10 @@ function App() {
                 <table className="invoice-lines">
                   <thead><tr><th>Concepto</th><th>Periodo</th><th>Valor</th></tr></thead>
                   <tbody><tr>
-                    <td>{invoicePreview.observacion || (invoicePreview.tipo === 'extraordinaria' ? 'Cuota extraordinaria' : 'Servicio de acueducto')}</td>
-                    <td>{invoicePreview.periodo || '—'}</td>
+                    <td>{invoicePreview.observacion || invoicePreview.detalle_prepago || (invoicePreview.tipo === 'extraordinaria' ? 'Cuota extraordinaria' : 'Servicio de acueducto')}</td>
+                    <td>{Number(invoicePreview.meses_cubiertos) > 1
+                      ? `${invoicePreview.periodo_inicio || invoicePreview.periodo} a ${invoicePreview.periodo_fin}`
+                      : invoicePreview.periodo || '—'}</td>
                     <td>{formatMoney(invoicePreview.valor_total)}</td>
                   </tr></tbody>
                 </table>

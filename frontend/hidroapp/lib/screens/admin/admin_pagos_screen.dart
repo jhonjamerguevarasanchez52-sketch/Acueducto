@@ -18,10 +18,13 @@ class _AdminPagosScreenState extends State<AdminPagosScreen> {
     _futuro = widget.api.pagosSinConfirmar();
   }
 
-  void _recargar() => setState(() => _futuro = widget.api.pagosSinConfirmar());
+  void _recargar() => setState(() {
+    _futuro = widget.api.pagosSinConfirmar();
+  });
 
-  void _aviso(String texto) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
+  void _aviso(String texto) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(texto)));
 
   Future<void> _confirmar(Map<String, dynamic> p) async {
     final ok = await showDialog<bool>(
@@ -35,8 +38,14 @@ class _AdminPagosScreenState extends State<AdminPagosScreen> {
           'Al confirmar, la factura queda pagada y se reconecta el servicio si estaba cortado.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirmar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar'),
+          ),
         ],
       ),
     );
@@ -66,7 +75,9 @@ class _AdminPagosScreenState extends State<AdminPagosScreen> {
           if (snap.hasError) return Center(child: Text('${snap.error}'));
 
           final pagos = snap.data!;
-          if (pagos.isEmpty) return const Center(child: Text('No hay pagos pendientes'));
+          if (pagos.isEmpty) {
+            return const Center(child: Text('No hay pagos pendientes'));
+          }
 
           return RefreshIndicator(
             onRefresh: () async => _recargar(),
@@ -79,6 +90,11 @@ class _AdminPagosScreenState extends State<AdminPagosScreen> {
                   title: Text('\$${p['monto']} · ${p['metodo']}'),
                   subtitle: Text('Ref: ${p['referencia'] ?? '-'}'),
                   trailing: FilledButton(
+                    // El tema da ancho infinito a los botones; en una fila
+                    // de lista eso rompe el diseño.
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                    ),
                     onPressed: () => _confirmar(p),
                     child: const Text('Confirmar'),
                   ),

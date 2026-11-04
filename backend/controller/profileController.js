@@ -1,6 +1,6 @@
 const profileModel = require('../models/profileModel');
 const {
-  CAMPOS_EDITABLES_PERFIL,
+  extraerCambiosPerfil,
   DIAS_LIMITE_EDICION_PERFIL,
   CORREOS_SIN_LIMITE_EDICION,
   CAMPOS_REQUERIDOS_PERFIL_COMPLETO,
@@ -28,12 +28,8 @@ async function verPerfil(req, res) {
 async function editarPerfil(req, res) {
   const userId = req.usuario.id;
 
-  const datosActualizar = {};
-  for (const campo of CAMPOS_EDITABLES_PERFIL) {
-    if (req.body[campo] !== undefined) {
-      datosActualizar[campo] = req.body[campo];
-    }
-  }
+  const { cambios: datosActualizar, error: errorCampos } = extraerCambiosPerfil(req.body);
+  if (errorCampos) return res.status(400).json({ error: errorCampos });
 
   if (Object.keys(datosActualizar).length === 0) {
     return res.status(400).json({ error: 'No hay campos válidos para actualizar' });

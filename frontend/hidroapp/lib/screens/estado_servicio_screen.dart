@@ -43,7 +43,9 @@ class _EstadoServicioScreenState extends State<EstadoServicioScreen> {
 
   Future<void> _refrescar() async {
     final futuro = _cargar();
-    setState(() => _futuro = futuro);
+    setState(() {
+      _futuro = futuro;
+    });
     await futuro.catchError(
       (_) => _DatosServicio(
         estado: EstadoServicio(servicioCortado: false),

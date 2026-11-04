@@ -104,12 +104,14 @@ class PagoCard extends StatelessWidget {
               children: [
                 Icon(estado.icono, size: 16, color: estado.color),
                 const SizedBox(width: 6),
-                Text(
-                  estado.texto,
-                  style: TextStyle(
-                    color: estado.color,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                Flexible(
+                  child: Text(
+                    estado.texto,
+                    style: TextStyle(
+                      color: estado.color,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -119,6 +121,16 @@ class PagoCard extends StatelessWidget {
               icono: Icons.event_outlined,
               texto: 'Registrado: ${Formato.fechaHora(pago.fechaPago)}',
             ),
+            if (pago.cargoWompi > 0)
+              FilaDetalle(
+                icono: Icons.account_balance_wallet_outlined,
+                texto: 'Cargo Wompi: ${Formato.pesos(pago.cargoWompi)}',
+              ),
+            if (pago.montoTotal != null)
+              FilaDetalle(
+                icono: Icons.payments_outlined,
+                texto: 'Total cobrado: ${Formato.pesos(pago.montoTotal)}',
+              ),
             if (pago.confirmado && pago.fechaConfirmacion != null)
               FilaDetalle(
                 icono: Icons.verified_outlined,
@@ -129,6 +141,16 @@ class PagoCard extends StatelessWidget {
               FilaDetalle(
                 icono: Icons.tag,
                 texto: 'Referencia: ${pago.referencia}',
+              ),
+            if (pago.transaccionId != null)
+              FilaDetalle(
+                icono: Icons.receipt_long_outlined,
+                texto: 'Transacción Wompi: ${pago.transaccionId}',
+              ),
+            if (pago.medioPagoWompi != null)
+              FilaDetalle(
+                icono: Icons.credit_card_outlined,
+                texto: 'Medio Wompi: ${Formato.etiqueta(pago.medioPagoWompi)}',
               ),
             if (pago.reciboUrl != null) ...[
               const SizedBox(height: 6),

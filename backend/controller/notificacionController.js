@@ -103,7 +103,9 @@ async function eliminarNotificacion(req, res) {
   const { id } = req.params;
 
   try {
-    const { data, error } = await notificationModel.removeOwn(id, userId, req.db);
+    // RLS no permite DELETE a la app: el filtro por perfil_id del modelo es
+    // lo que garantiza que solo se borre una notificación propia.
+    const { data, error } = await notificationModel.removeOwn(id, userId);
 
     if (error || !data) {
       return res.status(404).json({ error: 'Notificación no encontrada' });
