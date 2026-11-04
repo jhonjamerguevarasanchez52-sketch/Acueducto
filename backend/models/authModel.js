@@ -33,4 +33,29 @@ function changePassword(id, password) {
   return supabaseAdmin.auth.admin.updateUserById(id, { password });
 }
 
-module.exports = { signIn, refreshSession, getUserByToken, userClient, createUser, deleteUser, changePassword };
+// Crea una sesión para un correo SIN contraseña. Solo se llama después de que
+// el backend validó el código de 6 dígitos que le envió a ese correo
+// (authController.ingresarConCodigo). generateLink no envía ningún correo:
+// solo devuelve el token, que se canjea de inmediato por la sesión.
+async function createSessionForEmail(correo) {
+  const { data: enlace, error: errorEnlace } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'magiclink',
+    email: correo,
+  });
+  const tokenHash = enlace?.properties?.hashed_token;
+  if (errorEnlace || !tokenHash) {
+    return { data: null, error: errorEnlace || new Error('No se pudo generar el acceso.') };
+  }
+  return supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'magiclink' });
+}
+
+module.exports = {
+  signIn,
+  refreshSession,
+  getUserByToken,
+  userClient,
+  createUser,
+  deleteUser,
+  changePassword,
+  createSessionForEmail,
+};

@@ -40,6 +40,22 @@ function listActiveForBilling() {
   return supabaseAdmin.from(TABLE).select('id, nombre, correo').eq('activo', true);
 }
 
+// Perfiles activos de una zona (o de todo el acueducto si zona es null), para
+// avisar de un corte programado.
+function listActiveByZone(zona) {
+  let query = supabaseAdmin.from(TABLE).select('id, nombre, correo').eq('activo', true);
+  if (zona) query = query.eq('zona', zona);
+  return query;
+}
+
+// Zonas registradas (sin repetir), para los selectores del panel.
+async function listZones() {
+  const { data, error } = await supabaseAdmin.from(TABLE).select('zona').not('zona', 'is', null);
+  if (error) return { data: null, error };
+  const zonas = [...new Set((data || []).map((fila) => String(fila.zona).trim()).filter(Boolean))];
+  return { data: zonas.sort((a, b) => a.localeCompare(b, 'es')), error: null };
+}
+
 function listRegisteredUsersForNotifications() {
   return supabaseAdmin.from(TABLE).select('id, nombre, correo, rol');
 }
@@ -74,6 +90,8 @@ module.exports = {
   list,
   listActiveIds,
   listActiveForBilling,
+  listActiveByZone,
+  listZones,
   listRegisteredUsersForNotifications,
   create,
   update,

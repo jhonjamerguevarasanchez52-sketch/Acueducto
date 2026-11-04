@@ -23,4 +23,15 @@ function fechaHoraColombia(valor) {
   }).format(fecha);
 }
 
-module.exports = { ZONA_HORARIA, fechaLarga, fechaHoraColombia };
+// Fecha de calendario de Colombia (AAAA-MM-DD) para un instante dado. Evita
+// que entre las 7 p. m. y la medianoche el servidor en UTC "viva" en mañana.
+function fechaBogota(fecha = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: ZONA_HORARIA,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(fecha);
+}
+
+module.exports = { ZONA_HORARIA, fechaLarga, fechaHoraColombia, fechaBogota };

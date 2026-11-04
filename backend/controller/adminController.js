@@ -1,24 +1,23 @@
 const authModel = require('../models/authModel');
 const profileModel = require('../models/profileModel');
 const breakdownModel = require('../models/breakdownModel');
+const supabaseAdmin = require('../config/supabaseAdminClient');
 const { extraerCambiosPerfil } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
-const { generarCodigoSeguridad } = require('../utils/securityCode');
 const { enviarCorreo } = require('../config/mailer');
 const { notificar } = require('../utils/notificar');
 const { escaparHtml } = require('../utils/html');
+const { normalizarCorreo } = require('../utils/formato');
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
-function normalizarCorreo(correo) {
-  return String(correo || '').toLowerCase().trim();
-}
-
 // Crear un usuario con contraseña temporal generada automáticamente.
 // Pensado para que un administrador dé de alta a alguien sin tener que
-// inventarle una contraseña: se le envía por correo y queda obligado a
-// cambiarla apenas inicie sesión (ver authController.iniciarSesion).
+// inventarle una contraseña. La cuenta nace verificada (el correo de
+// bienvenida ya prueba que el correo es suyo) y la persona puede entrar con
+// la contraseña temporal o, más fácil, con un código enviado a su correo.
+// Teléfono, dirección, zona y lote son opcionales y se guardan en el mismo paso.
 async function crearUsuario(req, res) {
   const correo = normalizarCorreo(req.body.correo);
   const { nombre, apellido } = req.body;
@@ -28,13 +27,18 @@ async function crearUsuario(req, res) {
     return res.status(400).json({ error: 'Correo, nombre y apellido son obligatorios' });
   }
 
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+    return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+  }
+
   if (!ROLES_VALIDOS.includes(rol)) {
     return res.status(400).json({ error: 'Rol inválido. Usa: administrador, usuario o fontanero' });
   }
 
+  const { cambios: datosOpcionales, error: errorCampos } = extraerCambiosPerfil(req.body);
+  if (errorCampos) return res.status(400).json({ error: errorCampos });
+
   const passwordTemporal = generarPasswordTemporal();
-  const codigoVerificacion = generarCodigoSeguridad();
-  const codigoVerificacionExpiracion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   let userId;
 
   try {
@@ -60,16 +64,15 @@ async function crearUsuario(req, res) {
     }
 
     const { error: profileError } = await profileModel.create({
+      ...datosOpcionales,
       id: userId,
-      nombre,
-      apellido,
+      nombre: String(nombre).trim(),
+      apellido: String(apellido).trim(),
       correo,
       rol,
       activo: true,
-      is_verified: false,
+      is_verified: true,
       debe_cambiar_password: true,
-      codigo_verificacion: codigoVerificacion,
-      codigo_verificacion_expiracion: codigoVerificacionExpiracion,
     });
 
     if (profileError) {
@@ -84,33 +87,28 @@ async function crearUsuario(req, res) {
         to: correo,
         subject: 'Tu cuenta en Acueducto Campo Amor',
         html: `<p>Hola ${escaparHtml(nombre)},</p>
-          <p>Un administrador creó tu cuenta en Acueducto Campo Amor. Esta es tu contraseña temporal:</p>
-          <h2>${escaparHtml(passwordTemporal)}</h2>
-          <p><strong>Código de verificación:</strong></p>
-          <h2>${codigoVerificacion}</h2>
-          <p>Por seguridad, deberás cambiarla apenas inicies sesión por primera vez.</p>`,
+          <p>El acueducto creó tu cuenta en la aplicación de Acueducto Campo Amor. Para entrar tienes dos opciones:</p>
+          <p><strong>1. La más fácil:</strong> en la app toca <em>"Entrar con un código a mi correo"</em>, escribe este correo (${escaparHtml(correo)}) y te enviaremos un código de 6 dígitos. No necesitas recordar contraseñas.</p>
+          <p><strong>2. Con contraseña:</strong> usa esta contraseña temporal. La app te pedirá cambiarla la primera vez.</p>
+          <h2 style="letter-spacing:2px;">${escaparHtml(passwordTemporal)}</h2>`,
       });
       if (!respuestaCorreo) throw new Error('Brevo no confirmó el envío.');
       correoEnviado = true;
     } catch (mailErr) {
       console.error('Error enviando correo de cuenta creada:', mailErr.message);
-      await profileModel.saveFields(userId, {
-        codigo_verificacion: null,
-        codigo_verificacion_expiracion: null,
-      });
     }
 
-    // Además del correo, dejamos un aviso dentro de la app para cuando inicie sesión.
+    // Además del correo, dejamos un aviso de bienvenida dentro de la app.
     await notificar(
       userId,
-      'Tu cuenta fue creada con una contraseña temporal. Por seguridad, cámbiala desde tu perfil.',
-      'seguridad'
+      '¡Bienvenido a Acueducto Campo Amor! Aquí puedes ver y pagar tus facturas, reportar averías y recibir avisos del servicio.',
+      'general'
     );
 
     return res.status(201).json({
       message: correoEnviado
-        ? 'Usuario creado. Se enviaron la contraseña temporal y el código de verificación por correo.'
-        : 'Usuario creado, pero no se pudo enviar el correo. Comparte la contraseña temporal y solicita el reenvío del código desde el inicio de sesión.',
+        ? 'Usuario creado. Le enviamos por correo cómo entrar a la app.'
+        : 'Usuario creado, pero no se pudo enviar el correo. Comparte la contraseña temporal o pídele que entre con "código a mi correo".',
       userId,
       correoEnviado,
       // Se devuelve también aquí (solo visible para el administrador que crea
@@ -261,6 +259,23 @@ async function eliminarUsuario(req, res) {
   }
 
   try {
+    // Las facturas y los pagos son la contabilidad del acueducto: un usuario
+    // con historial no se borra, se desactiva (bloquea su acceso y lo saca de
+    // la facturación, pero conserva todo). La base de datos también lo impide
+    // con ON DELETE RESTRICT (migración 20261030_mejoras_integrales.sql).
+    const [facturas, pagos] = await Promise.all([
+      supabaseAdmin.from('invoices').select('id', { count: 'exact', head: true }).eq('perfil_id', userId),
+      supabaseAdmin.from('payments').select('id', { count: 'exact', head: true }).eq('perfil_id', userId),
+    ]);
+    if (facturas.error) return errorConsulta(res, facturas.error);
+    if (pagos.error) return errorConsulta(res, pagos.error);
+    if ((facturas.count || 0) + (pagos.count || 0) > 0) {
+      return res.status(409).json({
+        error: `Este usuario tiene ${facturas.count || 0} factura(s) y ${pagos.count || 0} pago(s) registrados. Para no perder la contabilidad no se puede eliminar: desactívalo en su lugar.`,
+        puedeDesactivar: true,
+      });
+    }
+
     // Quita primero la asignación activa para que la eliminación también
     // funcione en bases antiguas cuya FK aún no tiene ON DELETE SET NULL.
     const { error: errorAverias } = await breakdownModel.unassignFromPlumber(userId);
@@ -277,7 +292,8 @@ async function eliminarUsuario(req, res) {
         || /foreign key|violates.*constraint|database error deleting user/i.test(error.message || '');
       if (bloqueoPorRelacion) {
         return res.status(409).json({
-          error: 'La base de datos aún tiene una relación que bloquea el borrado. Aplica la migración 20261014_breakdown_assignee_delete.sql en Supabase y vuelve a intentarlo.',
+          error: 'Este usuario tiene registros asociados que no se pueden borrar. Desactívalo en su lugar.',
+          puedeDesactivar: true,
         });
       }
       return errorConsulta(res, error);

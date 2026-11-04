@@ -6,10 +6,10 @@ const { notificar } = require('../utils/notificar');
 const { enviarCorreo } = require('../config/mailer');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
-const {
-  VALOR_MENSUAL,
-  generarFacturasMensuales: ejecutarFacturacionMensual,
-} = require('../services/facturacionMensual');
+const { generarFacturasMensuales: ejecutarFacturacionMensual } = require('../services/facturacionMensual');
+// Se usa a través del módulo (no desestructurado) para que las pruebas puedan
+// reemplazar la consulta de la tarifa.
+const tarifaServicio = require('../services/tarifaServicio');
 const {
   MESES_DISPONIBLES,
   calcularPeriodosPlan,
@@ -20,11 +20,7 @@ const { cotizarWompi } = require('../utils/wompiTarifa');
 
 const { escaparHtml } = require('../utils/html');
 const { fechaLarga } = require('../utils/fechas');
-
-
-function formatearMoneda(valor) {
-  return Number(valor).toLocaleString('es-CO');
-}
+const { formatearPesos } = require('../utils/formato');
 
 async function enviarCorreoFactura({ correo, nombre, periodo, valorTotal, fechaVencimiento }) {
   if (!correo) return false;
@@ -34,7 +30,7 @@ async function enviarCorreoFactura({ correo, nombre, periodo, valorTotal, fechaV
       subject: `Nueva factura - periodo ${periodo} - Acueducto Campo Amor`,
       html: `<p>Hola ${escaparHtml(nombre)},</p>
              <p>Se generó tu factura del periodo <strong>${escaparHtml(periodo)}</strong> por un valor de
-             <strong>$${formatearMoneda(valorTotal)}</strong>.</p>
+             <strong>${formatearPesos(valorTotal)}</strong>.</p>
              ${fechaVencimiento ? `<p>Fecha límite de pago: ${escaparHtml(fechaLarga(fechaVencimiento))}.</p>` : ''}
              <p>Puedes consultar el detalle desde la aplicación de Acueducto Campo Amor.</p>`,
     });
@@ -81,14 +77,23 @@ function admitePlan(factura) {
     && ['servicio', 'prepago'].includes(factura.tipo);
 }
 
+// Cuota mensual de la tarifa que aplicaba al periodo inicial de la factura
+// (la misma que usa la función SQL configurar_plan_factura).
+async function tarifaDeFactura(factura) {
+  const periodoInicio = factura.periodo_inicio || factura.periodo;
+  if (!esPeriodoValido(periodoInicio)) return null;
+  const { valor } = await tarifaServicio.valorMensualDePeriodo(periodoInicio);
+  return valor;
+}
+
 // Una factura antigua (periodo fuera de AAAA-MM) o con un valor distinto a la
 // tarifa se paga tal como se emitió: recalcularla cambiaría lo que se debe.
-function motivoSinPlanes(factura) {
+function motivoSinPlanes(factura, valorMensual) {
   const meses = Number(factura.meses_cubiertos) || 1;
   if (!esPeriodoValido(factura.periodo_inicio || factura.periodo)) {
     return 'Esta factura es de un periodo antiguo; se paga tal como fue emitida.';
   }
-  if (Number(factura.valor_total) !== VALOR_MENSUAL * meses) {
+  if (Number(factura.valor_total) !== valorMensual * meses) {
     return 'Esta factura tiene un valor especial; se paga tal como fue emitida.';
   }
   return null;
@@ -118,15 +123,15 @@ function opcionFacturaActual(factura) {
 // Cada opción muestra lo que debe llegar limpio al acueducto (valorServicio)
 // y lo que se cobra en el checkout de Wompi para cubrir su comisión.
 // `periodosOcupados` son meses ya facturados en otra factura del usuario.
-function opcionesPlanPago(factura, mesesDisponibles, periodosOcupados = new Set()) {
+function opcionesPlanPago(factura, mesesDisponibles, periodosOcupados, valorMensual) {
   const periodoInicio = factura.periodo_inicio || factura.periodo;
   return mesesDisponibles.map((meses) => {
     const plan = calcularPeriodosPlan(periodoInicio, Number(meses));
-    const valorServicio = VALOR_MENSUAL * meses;
+    const valorServicio = valorMensual * meses;
     const conflicto = plan.periodos.find((periodo) => periodosOcupados.has(periodo));
     return {
       ...plan,
-      valorMensual: VALOR_MENSUAL,
+      valorMensual,
       valorServicio,
       ...cotizarWompi(valorServicio),
       disponible: !conflicto,
@@ -148,7 +153,8 @@ async function obtenerOpcionesPlanPago(req, res) {
       return res.status(409).json({ error: 'Esta factura no permite elegir un plan de pago.' });
     }
 
-    const sinPlanes = motivoSinPlanes(factura);
+    const valorMensual = await tarifaDeFactura(factura);
+    const sinPlanes = motivoSinPlanes(factura, valorMensual);
     if (sinPlanes) {
       return res.status(200).json({
         facturaId: factura.id,
@@ -183,6 +189,7 @@ async function obtenerOpcionesPlanPago(req, res) {
         factura,
         disponibles,
         new Set((ocupados || []).map((fila) => fila.periodo)),
+        valorMensual,
       ),
     });
   } catch (err) {
@@ -216,7 +223,7 @@ async function configurarPlanPago(req, res) {
         cotizacionWompi: cotizarWompi(Number(factura.valor_total)),
       });
     }
-    const sinPlanes = motivoSinPlanes(factura);
+    const sinPlanes = motivoSinPlanes(factura, await tarifaDeFactura(factura));
     if (sinPlanes) return res.status(409).json({ error: sinPlanes });
 
     const { data: pagoActivo, error: errorPagos } = await paymentModel.hasActiveByInvoice(factura.id);
@@ -301,7 +308,10 @@ async function generarFacturasMensuales(req, res) {
 
   try {
     const resumen = await ejecutarFacturacionMensual(periodo ? { periodo } : {});
-    const message = `Facturación ${resumen.periodo} finalizada: ${resumen.facturasCreadas} nuevas, ${resumen.facturasExistentes} existentes, ${resumen.correosEnviados} correos enviados y ${resumen.correosFallidos} fallidos.`;
+    const message = [
+      `Facturación ${resumen.periodo} finalizada: ${resumen.facturasCreadas} nuevas de ${formatearPesos(resumen.valorPorFactura)}, ${resumen.facturasExistentes} existentes, ${resumen.correosEnviados} correos enviados y ${resumen.correosFallidos} fallidos.`,
+      ...resumen.avisos,
+    ].join(' ');
     return res.status(200).json({ message, ...resumen });
   } catch (err) {
     return errorInesperado(res, err);
@@ -350,7 +360,7 @@ async function crearFactura(req, res) {
 
     await notificar(
       perfil_id,
-      `Se generó tu factura del periodo ${periodo} por $${valor_total}.`,
+      `Se generó tu factura del periodo ${periodo} por ${formatearPesos(valor_total)}.`,
       'factura'
     );
 
@@ -375,12 +385,21 @@ async function crearFactura(req, res) {
   }
 }
 
-// Actualizar el estado de una factura (pendiente | pagada | anulada | vencida)
+// Actualizar una factura (estado pendiente | anulada | vencida, valor, fecha,
+// observación). "Pagada" NO se puede poner a mano: una factura solo queda
+// pagada cuando se registra o confirma su pago (POST /api/pagos/admin o
+// PUT /api/pagos/:id/confirmar), para que la tesorería siempre cuadre.
 async function actualizarFactura(req, res) {
   const { id } = req.params;
   const { estado, valor_total, fecha_vencimiento, observacion } = req.body;
 
-  const estadosValidos = ['pendiente', 'pagada', 'anulada', 'vencida'];
+  if (estado === 'pagada') {
+    return res.status(400).json({
+      error: 'Para marcar una factura como pagada registra el pago (botón "Registrar pago"). Así el dinero queda en la contabilidad.',
+    });
+  }
+
+  const estadosValidos = ['pendiente', 'anulada', 'vencida'];
   if (estado && !estadosValidos.includes(estado)) {
     return res.status(400).json({ error: 'Estado inválido' });
   }
@@ -400,6 +419,18 @@ async function actualizarFactura(req, res) {
   }
 
   try {
+    const { data: actual, error: errorActual } = await invoiceModel.getState(id);
+    if (errorActual) return errorConsulta(res, errorActual);
+    if (!actual) return res.status(404).json({ error: 'Factura no encontrada' });
+
+    // Una factura pagada es un registro contable cerrado: solo admite notas.
+    const soloObservacion = Object.keys(cambios).every((campo) => campo === 'observacion');
+    if (actual.estado === 'pagada' && !soloObservacion) {
+      return res.status(409).json({
+        error: 'Esta factura ya está pagada: no se puede cambiar su estado, valor ni fecha. Solo puedes agregar una observación.',
+      });
+    }
+
     const { data, error } = await invoiceModel.update(id, cambios);
 
     // PGRST116: ninguna fila coincide con el id.
@@ -411,6 +442,8 @@ async function actualizarFactura(req, res) {
         error: 'Ya existe otra factura activa de ese mes para el usuario; anúlala antes de reactivar esta.',
       });
     }
+    // P0001: la regla de la base de datos (trigger validar_estado_factura).
+    if (error?.code === 'P0001') return res.status(409).json({ error: error.message });
     if (error) return errorConsulta(res, error);
 
     return res.status(200).json({ message: 'Factura actualizada', factura: data });

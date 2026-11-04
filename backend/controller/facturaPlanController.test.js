@@ -4,7 +4,12 @@ const assert = require('node:assert/strict');
 const invoiceModel = require('../models/invoiceModel');
 const paymentModel = require('../models/paymentModel');
 const supabaseAdmin = require('../config/supabaseAdminClient');
+const tarifaServicio = require('../services/tarifaServicio');
 const { misFacturas, obtenerOpcionesPlanPago, configurarPlanPago } = require('./facturaController');
+
+// La tarifa vigente sale de la tabla `rates`; en las pruebas no se consulta.
+let tarifaPrueba = 12000;
+tarifaServicio.valorMensualDePeriodo = async () => ({ valor: tarifaPrueba, origen: 'tarifa', tarifaId: null });
 
 function respuesta() {
   return {
@@ -90,6 +95,32 @@ test('las opciones de factura muestran neto, cargo Wompi y siguiente periodo', a
   assert.equal(res.body.opciones[1].periodoInicio, '2026-10');
   assert.equal(res.body.opciones[1].periodoFin, '2027-03');
   assert.equal(res.body.opciones[1].proximoPeriodo, '2027-04');
+});
+
+test('los planes usan la tarifa registrada por el administrador, no un valor fijo', async (t) => {
+  const originales = {
+    getOwn: invoiceModel.getOwn,
+    hasActiveByInvoice: paymentModel.hasActiveByInvoice,
+    listCoveredPeriods: invoiceModel.listCoveredPeriods,
+  };
+  t.after(() => {
+    invoiceModel.getOwn = originales.getOwn;
+    paymentModel.hasActiveByInvoice = originales.hasActiveByInvoice;
+    invoiceModel.listCoveredPeriods = originales.listCoveredPeriods;
+    tarifaPrueba = 12000;
+  });
+  tarifaPrueba = 15000;
+  invoiceModel.getOwn = async () => ({ data: { ...facturaBase(), valor_total: 15000 }, error: null });
+  paymentModel.hasActiveByInvoice = async () => ({ data: false, error: null });
+  invoiceModel.listCoveredPeriods = async () => ({ data: [], error: null });
+
+  const res = respuesta();
+  await obtenerOpcionesPlanPago({ params: { id: 'factura-1' }, usuario: { id: 'perfil-1' }, db: {} }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.puedeCambiarPlan, true);
+  assert.deepEqual(res.body.opciones.map((o) => o.valorServicio), [15000, 90000, 180000]);
+  assert.ok(res.body.opciones.every((o) => o.valorMensual === 15000));
 });
 
 test('configura el semestre con el RPC transaccional y devuelve el detalle del plan', async (t) => {

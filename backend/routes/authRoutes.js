@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-
 const {
   iniciarSesion,
+  solicitarCodigoAcceso,
+  ingresarConCodigo,
   renovarSesion,
-  verificarCorreoAdministrador,
   verificarCuenta,
   reenviarCodigoVerificacion,
   cambiarPasswordPropio,
@@ -17,17 +17,15 @@ const { verificarToken } = require('../middleware/authMiddleware');
 // Todas las rutas de autenticación pasan por el límite estricto de intentos.
 router.use(limiteAuth);
 
-// No hay auto-registro: las cuentas las crea el administrador con
-// `scripts/crearUsuario.js`. Por eso no se expone ninguna ruta de registro.
+// No hay auto-registro: las cuentas las crea el administrador desde el panel.
 router.post('/login', iniciarSesion);
 router.post('/renovar-sesion', renovarSesion);
-router.post('/verificar-administrador', verificarCorreoAdministrador);
 
-// TODO: login con Google pendiente de reimplementar con Supabase
-// (signInWithIdToken). El controlador anterior (controller/google.js)
-// dependía de Mongoose y jsonwebtoken, que ya no forman parte del proyecto.
+// Ingreso sin contraseña: código de 6 dígitos enviado al correo.
+router.post('/codigo-acceso', solicitarCodigoAcceso);
+router.post('/ingresar-con-codigo', ingresarConCodigo);
 
-// Verificación de cuenta
+// Verificación de cuenta (solo para cuentas antiguas sin verificar).
 router.post('/verificar', verificarCuenta);
 router.post('/reenviar-codigo', reenviarCodigoVerificacion);
 
@@ -40,4 +38,3 @@ router.post('/solicitar-recuperacion', solicitarRecuperacion);
 router.post('/resetear-password', resetearPassword);
 
 module.exports = router;
-

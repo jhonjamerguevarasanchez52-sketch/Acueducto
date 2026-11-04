@@ -5,11 +5,7 @@ const remitenteCorreo = process.env.EMAIL_USER;
 const remitenteNombre = process.env.EMAIL_SENDER_NAME || 'Acueducto Campo Amor';
 const nombreAcueducto = 'Acueducto Campo Amor';
 
-function escaparHtml(valor) {
-  return String(valor).replace(/[&<>"']/g, (caracter) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[caracter]);
-}
+const { escaparHtml } = require('../utils/html');
 
 // Plantilla compatible con clientes de correo: estilos en línea y tablas para
 // que el mismo diseño se conserve en Gmail, Outlook y dispositivos móviles.

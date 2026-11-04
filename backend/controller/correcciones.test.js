@@ -54,7 +54,9 @@ test('perfil: solo acepta texto, recorta y no deja vaciar nombre ni apellido', (
 test('actualizar factura distingue no encontrada, conflicto y valor inválido', async (t) => {
   silenciar(t);
   const original = invoiceModel.update;
-  t.after(() => { invoiceModel.update = original; });
+  const originalEstado = invoiceModel.getState;
+  t.after(() => { invoiceModel.update = original; invoiceModel.getState = originalEstado; });
+  invoiceModel.getState = async () => ({ data: { id: 'f1', estado: 'pendiente' }, error: null });
   const req = (body) => ({ params: { id: 'f1' }, body });
 
   let res = respuesta();
@@ -76,6 +78,42 @@ test('actualizar factura distingue no encontrada, conflicto y valor inválido', 
   res = respuesta();
   await actualizarFactura(req({ estado: 'anulada' }), res);
   assert.equal(res.statusCode, 400);
+});
+
+test('una factura no se marca pagada a mano ni se reabre si ya está pagada', async (t) => {
+  silenciar(t);
+  const original = invoiceModel.update;
+  const originalEstado = invoiceModel.getState;
+  t.after(() => { invoiceModel.update = original; invoiceModel.getState = originalEstado; });
+  const req = (body) => ({ params: { id: 'f1' }, body });
+  let actualizaciones = 0;
+  invoiceModel.update = async (id, cambios) => {
+    actualizaciones += 1;
+    return { data: { id, ...cambios }, error: null };
+  };
+
+  // Marcar pagada sin pago: se rechaza sin tocar la base de datos.
+  invoiceModel.getState = async () => ({ data: { id: 'f1', estado: 'pendiente' }, error: null });
+  let res = respuesta();
+  await actualizarFactura(req({ estado: 'pagada' }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error, /registra el pago/i);
+
+  // Una factura pagada no se anula ni cambia de valor...
+  invoiceModel.getState = async () => ({ data: { id: 'f1', estado: 'pagada' }, error: null });
+  res = respuesta();
+  await actualizarFactura(req({ estado: 'anulada' }), res);
+  assert.equal(res.statusCode, 409);
+  res = respuesta();
+  await actualizarFactura(req({ valor_total: 5000 }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(actualizaciones, 0);
+
+  // ...pero sí admite una observación.
+  res = respuesta();
+  await actualizarFactura(req({ observacion: 'Pagó en la oficina' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(actualizaciones, 1);
 });
 
 test('el recibo de pago físico se guarda con el cliente del servidor', async (t) => {

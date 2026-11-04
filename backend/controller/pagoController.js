@@ -329,6 +329,9 @@ async function listarPagosWompi(req, res) {
       .from('payments')
       .select('*')
       .or('transaccion_id.not.is.null,estado_wompi.not.is.null')
+      // Sin orden explícito la paginación puede repetir u omitir pagos.
+      .order('fecha_pago', { ascending: false })
+      .order('id', { ascending: true })
       .range(offset, offset + limit - 1);
 
     if (estado_wompi) consulta = consulta.eq('estado_wompi', estado_wompi);

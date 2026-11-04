@@ -1,10 +1,14 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const profileModel = require('../models/profileModel');
 const mailer = require('../config/mailer');
-const { fechaLarga } = require('../utils/fechas');
+const { fechaLarga, ZONA_HORARIA } = require('../utils/fechas');
+const { escaparHtml } = require('../utils/html');
+const { formatearPesos } = require('../utils/formato');
+const { VALOR_MENSUAL_POR_DEFECTO, valorMensualDePeriodo } = require('./tarifaServicio');
 
-const VALOR_MENSUAL = 12000;
-const ZONA_HORARIA = 'America/Bogota';
+// Se conserva el nombre por compatibilidad: es solo el respaldo cuando no hay
+// una tarifa residencial vigente registrada en la tabla `rates`.
+const VALOR_MENSUAL = VALOR_MENSUAL_POR_DEFECTO;
 
 function obtenerFechaBogota(fecha) {
   const partes = new Intl.DateTimeFormat('en-CA', {
@@ -36,16 +40,6 @@ function fechaVencimiento(periodo) {
   return proximoMes.toISOString().slice(0, 10);
 }
 
-function escaparHtml(valor = '') {
-  return String(valor).replace(/[&<>"']/g, (caracter) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[caracter]);
-}
-
 function esDuplicado(error) {
   return error && error.code === '23505';
 }
@@ -61,8 +55,14 @@ async function generarFacturasMensuales({
   obtenerPerfilesActivos = () => profileModel.listActiveForBilling(),
   db = supabaseAdmin,
   enviarCorreo = (opciones) => mailer.enviarCorreo(opciones),
+  obtenerValorMensual = () => valorMensualDePeriodo(periodo, { db }),
 } = {}) {
   validarPeriodo(periodo);
+
+  // La cuota sale de la tarifa vigente que el administrador registra en el
+  // panel; así la factura, la app y GOTA muestran siempre el mismo valor.
+  const tarifa = await obtenerValorMensual();
+  const valorMensual = tarifa.valor;
 
   const { data: perfiles, error: errorPerfiles } = await obtenerPerfilesActivos();
   if (errorPerfiles) {
@@ -82,7 +82,8 @@ async function generarFacturasMensuales({
   const facturasExistentes = new Map((existentes || []).map((factura) => [factura.perfil_id, factura]));
   const resumen = {
     periodo,
-    valorPorFactura: VALOR_MENSUAL,
+    valorPorFactura: valorMensual,
+    origenTarifa: tarifa.origen,
     usuariosActivos: (perfiles || []).length,
     facturasCreadas: 0,
     facturasExistentes: 0,
@@ -90,7 +91,13 @@ async function generarFacturasMensuales({
     correosEnviados: 0,
     correosFallidos: 0,
     errores: [],
+    avisos: [],
   };
+  if (tarifa.origen === 'defecto') {
+    resumen.avisos.push(
+      `No hay una tarifa residencial vigente para ${periodo}: se facturó el valor de respaldo de ${formatearPesos(valorMensual)}. Registra la tarifa en el panel.`
+    );
+  }
   const vencimiento = fechaVencimiento(periodo);
 
   for (const perfil of perfiles || []) {
@@ -104,7 +111,7 @@ async function generarFacturasMensuales({
         {
           p_perfil_id: perfil.id,
           p_periodo: periodo,
-          p_valor_total: VALOR_MENSUAL,
+          p_valor_total: valorMensual,
           p_fecha_emision: fechaEmision.toISOString(),
           p_fecha_vencimiento: vencimiento,
         },
@@ -137,12 +144,12 @@ async function generarFacturasMensuales({
     try {
       const respuesta = await enviarCorreo({
         to: perfil.correo,
-        subject: `Nueva factura - periodo ${periodo} - Acueducto Campoamor`,
+        subject: `Nueva factura - periodo ${periodo} - Acueducto Campo Amor`,
         html: `<p>Hola ${escaparHtml(perfil.nombre || '')},</p>
                <p>Se generó tu factura del periodo <strong>${periodo}</strong> por un valor de
-               <strong>$${VALOR_MENSUAL.toLocaleString('es-CO')}</strong>.</p>
-               <p>Fecha límite de pago: ${fechaLarga(vencimiento)}.</p>
-               <p>Puedes consultar el detalle desde la aplicación de Acueducto Campoamor.</p>`,
+               <strong>${formatearPesos(factura.valor_total ?? valorMensual)}</strong>.</p>
+               <p>Fecha límite de pago: ${fechaLarga(factura.fecha_vencimiento || vencimiento)}.</p>
+               <p>Puedes consultar el detalle y pagar desde la aplicación de Acueducto Campo Amor.</p>`,
       });
       if (!respuesta) throw new Error('El servicio de correo no confirmó el envío.');
       if (factura && factura.generada_automaticamente) {

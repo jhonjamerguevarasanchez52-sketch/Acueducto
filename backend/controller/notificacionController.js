@@ -1,30 +1,7 @@
 const notificationModel = require('../models/notificationModel');
 const profileModel = require('../models/profileModel');
-const { enviarCorreo } = require('../config/mailer');
-const { escaparHtml } = require('../utils/html');
-const { correoAviso } = require('../utils/emailtemplates');
+const { enviarAvisosCorreo } = require('../services/avisosCorreo');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
-
-async function enviarAvisosCorreo(perfiles, mensaje) {
-  const resultados = await Promise.all(perfiles.map(async (perfil) => {
-    if (!perfil.correo) return false;
-    try {
-      const correo = correoAviso(perfil.nombre || '', mensaje);
-      const respuesta = await enviarCorreo({
-        to: perfil.correo,
-        subject: correo.asunto,
-        html: correo.html,
-      });
-      if (!respuesta) throw new Error('El servicio de correo no confirmó el envío.');
-      return true;
-    } catch (errorCorreo) {
-      console.error(`[notificacion] No se pudo enviar correo a ${perfil.correo}:`, errorCorreo.message);
-      return false;
-    }
-  }));
-  const enviados = resultados.filter(Boolean).length;
-  return { enviados, fallidos: resultados.length - enviados };
-}
 
 // ---------- USUARIO FINAL ----------
 
