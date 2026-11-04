@@ -91,6 +91,13 @@ class _EstadoServicioScreenState extends State<EstadoServicioScreen> {
                   corteActivo: datos.estado.corte,
                 ),
                 const SizedBox(height: 20),
+                // Cortes anunciados por el acueducto para la zona del usuario.
+                for (final programado in datos.estado.cortesProgramados) ...[
+                  CorteProgramadoCard(corte: programado),
+                  const SizedBox(height: 12),
+                ],
+                if (datos.estado.cortesProgramados.isNotEmpty)
+                  const SizedBox(height: 8),
                 if (datos.historial.isNotEmpty) ...[
                   const Padding(
                     padding: EdgeInsets.only(left: 4, bottom: 8),

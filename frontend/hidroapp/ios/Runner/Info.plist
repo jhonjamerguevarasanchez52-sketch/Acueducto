@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Usamos el micrófono para que le envíes audios a GOTA y reportes averías hablando.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Usamos Face ID para permitirte ingresar a HIDROAPP de forma segura.</string>
 	<key>UIApplicationSceneManifest</key>

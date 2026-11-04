@@ -9,7 +9,7 @@ import '../widgets/core/core.dart';
 import 'editar_perfil_screen.dart';
 
 /// Pestaña "Perfil": muestra los datos de la cuenta del usuario, permite
-/// editarlos (una vez cada 30 días) y cerrar sesión.
+/// editarlos y cerrar sesión.
 class PerfilScreen extends StatelessWidget {
   const PerfilScreen({super.key});
 
@@ -188,8 +188,8 @@ class PerfilScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               perfil?.perfilCompleto == true
-                  ? 'Solo puedes editar tus datos una vez cada 30 días.'
-                  : 'Completa los datos faltantes; el plazo de 30 días comenzará cuando estén registrados.',
+                  ? 'Para cambiar tu dirección, zona o lote, comunícate con el administrador.'
+                  : 'Completa tu dirección, zona y lote para que el fontanero pueda ubicarte.',
               style: TextStyle(color: colores.secondaryText, fontSize: 12),
             ),
           ),

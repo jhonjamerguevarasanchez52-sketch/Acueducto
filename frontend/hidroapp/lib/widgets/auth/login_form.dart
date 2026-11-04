@@ -2,6 +2,7 @@
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../screens/ingresar_con_codigo_screen.dart';
 import '../../screens/olvide_password_screen.dart';
 import '../../screens/verificar_cuenta_screen.dart';
 import '../../services/api_service.dart';
@@ -97,14 +98,24 @@ class _LoginFormState extends State<LoginForm> {
     }
   }
 
-  void _recuperarPassword() {
+  // Solo se prellena el correo si lo que escribieron parece un correo.
+  String get _correoEscrito {
     final correo = _correoCtrl.text.trim();
+    return _correoValido.hasMatch(correo) ? correo : '';
+  }
+
+  void _recuperarPassword() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OlvidePasswordScreen(
-          // Solo se prellena si lo que escribieron parece un correo.
-          correoInicial: _correoValido.hasMatch(correo) ? correo : '',
-        ),
+        builder: (_) => OlvidePasswordScreen(correoInicial: _correoEscrito),
+      ),
+    );
+  }
+
+  void _entrarConCodigo() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => IngresarConCodigoScreen(correoInicial: _correoEscrito),
       ),
     );
   }
@@ -130,7 +141,7 @@ class _LoginFormState extends State<LoginForm> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Ingresa con tu correo y contraseña',
+              'Ingresa con tu correo y contraseña, o pide un código a tu correo',
               style: TextStyle(fontSize: 13.5, color: authMutedDe(context)),
             ),
             const SizedBox(height: 22),
@@ -208,6 +219,14 @@ class _LoginFormState extends State<LoginForm> {
                           strokeWidth: 2, color: Colors.white),
                     )
                   : const Text('Ingresar al sistema'),
+            ),
+            const SizedBox(height: 10),
+            // La forma más fácil de entrar: un código al correo, sin contraseña.
+            OutlinedButton.icon(
+              key: const ValueKey('boton-entrar-con-codigo'),
+              onPressed: _cargando ? null : _entrarConCodigo,
+              icon: const Icon(Icons.mark_email_unread_outlined),
+              label: const Text('Entrar con un código a mi correo'),
             ),
             if (auth.biometricEnabled) ...[
               const SizedBox(height: 12),

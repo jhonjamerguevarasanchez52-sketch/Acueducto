@@ -49,7 +49,8 @@ class ApiService {
 
   static const _rutaRenovarSesion = '/auth/renovar-sesion';
 
-  static const Duration _timeout = Duration(seconds: 20);
+  /// Render (plan gratuito) tarda 30–60 s en despertar el servidor dormido.
+  static const Duration _timeout = Duration(seconds: 45);
 
   Uri _uri(String path) => Uri.parse('${ApiConfig.baseUrl}$path');
 
@@ -58,9 +59,13 @@ class ApiService {
         if (authToken != null) 'Authorization': 'Bearer $authToken',
       };
 
-  Future<dynamic> get(String path) => _send(path, () => _client
-      .get(_uri(path), headers: _headers)
-      .timeout(_timeout));
+  /// Los GET no cambian nada en el servidor, así que se reintentan una vez
+  /// ante un timeout o fallo de red (típico mientras Render despierta).
+  Future<dynamic> get(String path) => _send(
+        path,
+        () => _client.get(_uri(path), headers: _headers).timeout(_timeout),
+        reintentarFalloDeRed: true,
+      );
 
   Future<dynamic> post(String path, {Object? body}) => _send(path, () => _client
       .post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
@@ -70,6 +75,7 @@ class ApiService {
     String path, {
     required List<int> bytes,
     required String contentType,
+    Map<String, String> headers = const {},
   }) =>
       _send(
         path,
@@ -77,6 +83,7 @@ class ApiService {
             .post(
               _uri(path),
               headers: {
+                ...headers,
                 'Content-Type': contentType,
                 if (authToken != null) 'Authorization': 'Bearer $authToken',
               },
@@ -91,10 +98,17 @@ class ApiService {
 
   Future<dynamic> _send(
     String path,
-    Future<http.Response> Function() request,
-  ) async {
+    Future<http.Response> Function() request, {
+    bool reintentarFalloDeRed = false,
+  }) async {
     final tokenUsado = authToken;
-    var res = await _ejecutar(request);
+    http.Response res;
+    try {
+      res = await _ejecutar(request);
+    } on ApiException {
+      if (!reintentarFalloDeRed) rethrow;
+      res = await _ejecutar(request);
+    }
 
     // El access token de Supabase vence (≈1 h). Antes de dar la sesión por
     // perdida pedimos uno nuevo con el refresh token y repetimos la petición

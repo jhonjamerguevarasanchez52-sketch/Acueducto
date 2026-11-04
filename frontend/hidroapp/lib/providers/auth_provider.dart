@@ -79,15 +79,6 @@ class AuthProvider extends ChangeNotifier {
   /// app normal.
   bool get debeCambiarPassword => _profile?.debeCambiarPassword ?? false;
 
-  /// Comprueba que el correo esté asociado a un administrador. Lo usa el
-  /// panel administrativo; los suscriptores inician sesión directamente.
-  Future<void> verificarCorreoAdministrador(String correo) async {
-    await _api.post(
-      '/auth/verificar-administrador',
-      body: {'correo': correo.trim().toLowerCase()},
-    );
-  }
-
   /// Se llama al arrancar la app: intenta restaurar la sesión guardada.
   Future<void> bootstrap() async {
     _biometricEnabled = await _storage.read(_biometricEnabledKey) == 'true';
@@ -133,7 +124,29 @@ class AuthProvider extends ChangeNotifier {
       'correo': correo.trim(),
       'password': password,
     });
+    await _abrirSesion(data);
+  }
 
+  /// Pide al backend que envíe un código de acceso de 6 dígitos al correo.
+  /// La respuesta es la misma exista o no la cuenta.
+  Future<void> solicitarCodigoAcceso(String correo) async {
+    await _api.post('/auth/codigo-acceso', body: {
+      'correo': correo.trim().toLowerCase(),
+    });
+  }
+
+  /// Entra sin contraseña con el código que llegó al correo.
+  Future<void> loginConCodigo(String correo, String codigo) async {
+    final data = await _api.post('/auth/ingresar-con-codigo', body: {
+      'correo': correo.trim().toLowerCase(),
+      'codigo': codigo.trim(),
+    });
+    await _abrirSesion(data);
+  }
+
+  /// Guarda la sesión que devolvió el backend (login con contraseña o con
+  /// código) y carga el perfil.
+  Future<void> _abrirSesion(dynamic data) async {
     String? token;
     try {
       if (data is Map && data['session'] is Map) {

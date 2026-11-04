@@ -4,9 +4,11 @@ import '../../models/averia.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
 import '../core/mensaje_estado.dart';
+import 'averia_audio_tile.dart';
 
 /// Tarjeta de una avería reportada: fecha, estado, descripción y, si el
-/// fontanero la dejó, su nota y la fecha de resolución.
+/// fontanero la dejó, su nota y la fecha de resolución. Si el usuario la
+/// reportó por audio, el fontanero y la administración pueden escucharlo.
 ///
 /// La administración puede ver los datos del reportante; los usuarios ven
 /// únicamente el estado y la descripción de sus propios reportes.
@@ -16,10 +18,14 @@ class AveriaCard extends StatelessWidget {
     required this.averia,
     this.mostrarDetallesOperativos = false,
     this.onCambiarEstado,
+    this.onObtenerUrlAudio,
   });
 
   final Averia averia;
   final bool mostrarDetallesOperativos;
+
+  /// Sin esto no se muestran los audios (los usuarios no los ven).
+  final ObtenerUrlAudio? onObtenerUrlAudio;
 
   /// Solo se pasa para el fontanero: muestra los botones para tomar,
   /// resolver o cancelar la avería mientras no esté cerrada.
@@ -68,6 +74,13 @@ class AveriaCard extends StatelessWidget {
               averia.descripcion,
               style: const TextStyle(fontSize: 15, height: 1.35),
             ),
+            if (onObtenerUrlAudio != null)
+              for (final audio in averia.audios)
+                AveriaAudioTile(
+                  key: ValueKey(audio.id),
+                  audio: audio,
+                  onObtenerUrl: onObtenerUrlAudio!,
+                ),
             if (mostrarDetallesOperativos) ...[
               const SizedBox(height: 12),
               _DatoAveria(

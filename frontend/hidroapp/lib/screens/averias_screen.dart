@@ -126,6 +126,22 @@ class _AveriasScreenState extends State<AveriasScreen> {
     }
   }
 
+  /// Enlace temporal para escuchar el audio que el usuario le envió a GOTA.
+  /// Si el archivo ya se borró (410) avisa y devuelve null.
+  Future<String?> _obtenerUrlAudio(Averia averia, AveriaAudio audio) async {
+    try {
+      final data = await context
+          .read<AuthProvider>()
+          .api
+          .get('/averias/${averia.id}/audios/${audio.id}');
+      final url = data is Map ? data['url'] : null;
+      return url is String ? url : null;
+    } on ApiException catch (e) {
+      if (mounted) AppSnackbar.error(context, e.message);
+      return null;
+    }
+  }
+
   Future<void> _abrirReporte() async {
     final creada = await showModalBottomSheet<bool>(
       context: context,
@@ -272,6 +288,9 @@ class _AveriasScreenState extends State<AveriasScreen> {
                     mostrarDetallesOperativos: _esAdministrador || _esFontanero,
                     onCambiarEstado: _esFontanero
                         ? (estado) => _cambiarEstado(averia, estado)
+                        : null,
+                    onObtenerUrlAudio: _puedeVerTodasLasAverias
+                        ? (audio) => _obtenerUrlAudio(averia, audio)
                         : null,
                   ),
                 );
