@@ -3,8 +3,11 @@ const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { notificarNuevaAveria } = require('../services/notificarAveria');
+const audiosAveriaService = require('../services/audiosAveriaService');
 
 const ESTADOS_VALIDOS = ['reportada', 'en_proceso', 'resuelta', 'cancelada'];
+// "Fuga · Baja presión" ya basta para que el fontanero sepa qué pasa.
+const MIN_DESCRIPCION = 10;
 
 // ---------- USUARIO FINAL ----------
 
@@ -16,8 +19,8 @@ async function reportarAveria(req, res) {
     const direccionUsuario = req.usuario.direccion;
     const { descripcion, ubicacionConfirmada, ubicacion } = req.body;
 
-    if (typeof descripcion !== 'string' || descripcion.trim().length < 20) {
-      return res.status(400).json({ error: 'Describe el problema con más detalle (mínimo 20 caracteres).' });
+    if (typeof descripcion !== 'string' || descripcion.trim().length < MIN_DESCRIPCION) {
+      return res.status(400).json({ error: `Describe el problema con más detalle (mínimo ${MIN_DESCRIPCION} caracteres).` });
     }
 
     let zonaReporte = zonaUsuario;
@@ -90,9 +93,20 @@ async function listarAverias(req, res) {
       : { data: [], error: null };
     if (perfilesError) return errorConsulta(res, perfilesError);
     const porId = new Map((perfiles || []).map((perfil) => [perfil.id, perfil]));
+
+    // Sin audios la lista sigue sirviendo: un fallo aquí no debe dejar al
+    // fontanero sin ver las averías.
+    let audiosPorAveria = new Map();
+    try {
+      audiosPorAveria = await audiosAveriaService.audiosDeAverias((data || []).map((averia) => averia.id));
+    } catch (errorAudios) {
+      console.error('[averias] no se pudieron cargar los audios:', errorAudios.message);
+    }
+
     const conReportante = (data || []).map((averia) => ({
       ...averia,
       reportante: porId.get(averia.perfil_id) || null,
+      audios: audiosPorAveria.get(averia.id) || [],
     }));
 
     res.status(200).json({ data: conReportante });
@@ -149,6 +163,14 @@ async function actualizarAveria(req, res) {
     }
     if (error) return errorConsulta(res, error);
 
+    if (estado === 'resuelta' || estado === 'cancelada') {
+      try {
+        await audiosAveriaService.acortarPorCierre(id);
+      } catch (errorAudios) {
+        console.error('[averias] no se pudo adelantar el borrado de audios:', errorAudios.message);
+      }
+    }
+
     const resumenAveria = (data.descripcion || '').trim();
     const notaFontanero = (data.nota_fontanero || '').trim();
     const mensajes = {
@@ -180,6 +202,35 @@ async function actualizarAveria(req, res) {
   }
 }
 
+// GET /:id/audios/:audioId - enlace temporal (5 min) para escuchar el audio
+// que el usuario le envió a GOTA. Solo la escucha del fontanero cuenta para
+// borrarlo a las 72 horas; la del administrador no.
+async function escucharAudio(req, res) {
+  try {
+    const { id, audioId } = req.params;
+    const resultado = await audiosAveriaService.crearUrlEscucha({
+      audioId,
+      averiaId: id,
+      marcarEscuchado: req.usuario.rol === 'fontanero',
+    });
+
+    if (resultado.estado === 'no_encontrado') {
+      return res.status(404).json({ error: 'Audio no encontrado' });
+    }
+    if (resultado.estado === 'borrado') {
+      return res.status(410).json({
+        error: 'Este audio ya se borró. La transcripción sigue guardada en la avería.',
+        audio: resultado.audio,
+      });
+    }
+    return res.status(200).json({ url: resultado.url, audio: resultado.audio });
+  } catch (err) {
+    // 22P02: el id no es un uuid válido.
+    if (err?.code === '22P02') return res.status(404).json({ error: 'Audio no encontrado' });
+    return errorInesperado(res, err);
+  }
+}
+
 // DELETE /:id - el fontanero o el administrador borran un reporte
 // erróneo o duplicado.
 async function eliminarAveria(req, res) {
@@ -198,4 +249,4 @@ async function eliminarAveria(req, res) {
   }
 }
 
-module.exports = { reportarAveria, misAverias, listarAverias, actualizarAveria, eliminarAveria };
+module.exports = { reportarAveria, misAverias, listarAverias, actualizarAveria, escucharAudio, eliminarAveria };

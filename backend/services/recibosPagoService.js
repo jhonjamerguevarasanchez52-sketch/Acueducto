@@ -1,44 +1,14 @@
 const { randomUUID } = require('crypto');
 const supabaseAdmin = require('../config/supabaseAdminClient');
+const { crearBucketPrivado } = require('../utils/bucketPrivado');
 
 const BUCKET = 'payment-receipts';
 const MAX_BYTES = 5 * 1024 * 1024;
 const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-let bucketReady;
-
-async function asegurarBucketPrivado() {
-  if (!bucketReady) {
-    bucketReady = (async () => {
-      const storage = supabaseAdmin.storage;
-      const opciones = {
-        public: false,
-        fileSizeLimit: MAX_BYTES,
-        allowedMimeTypes: MIME_TYPES,
-      };
-      const { data: existente, error: errorConsulta } = await storage.getBucket(BUCKET);
-
-      if (existente) {
-        const { error } = await storage.updateBucket(BUCKET, opciones);
-        if (error) throw error;
-        return;
-      }
-
-      if (errorConsulta && errorConsulta.statusCode !== '404') throw errorConsulta;
-      const { error } = await storage.createBucket(BUCKET, opciones);
-      if (error) {
-        if (!/already exists|duplicate/i.test(error.message || '')) throw error;
-        const { data: carrera, error: errorCarrera } = await storage.getBucket(BUCKET);
-        if (!carrera || errorCarrera) throw errorCarrera || error;
-        const { error: errorActualizacion } = await storage.updateBucket(BUCKET, opciones);
-        if (errorActualizacion) throw errorActualizacion;
-      }
-    })().catch((error) => {
-      bucketReady = null;
-      throw error;
-    });
-  }
-  return bucketReady;
-}
+const asegurarBucketPrivado = crearBucketPrivado(BUCKET, {
+  fileSizeLimit: MAX_BYTES,
+  allowedMimeTypes: MIME_TYPES,
+});
 
 async function subirRecibo({ perfilId, facturaId, bytes, contentType }) {
   await asegurarBucketPrivado();

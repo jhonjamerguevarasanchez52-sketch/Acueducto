@@ -1,51 +1,117 @@
-const Groq = require('groq-sdk');
 const rateModel = require('../models/rateModel');
 const profileModel = require('../models/profileModel');
 const invoiceModel = require('../models/invoiceModel');
 const breakdownModel = require('../models/breakdownModel');
 const { errorInesperado } = require('../utils/httpErrores');
-const { notificarNuevaAveria } = require('../services/notificarAveria');
+// Se llama por el módulo (no desestructurado) para que las pruebas puedan
+// reemplazarlo y no avisen al fontanero real.
+const notificarAveria = require('../services/notificarAveria');
+const audiosAveriaService = require('../services/audiosAveriaService');
+const { obtenerGroq } = require('../config/groqClient');
 
-// El cliente se crea perezosamente (no al cargar el módulo): así, si falta
-// GROQ_API_KEY, solo falla esta ruta en vez de tumbar todo el servidor al
-// arrancar (el SDK de Groq lanza en su constructor si no hay API key).
-let groq = null;
-const MAX_MENSAJE = 500;
+// Un audio de 60 s transcrito ocupa unos 900 caracteres.
+const MAX_MENSAJE = 1000;
 const MAX_TURNOS_HISTORIAL = 8;
 
 function normalizar(texto) {
   return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
-function quiereRegistrar(mensaje, historial) {
+const MIN_DESCRIPCION = 10;
+
+// El usuario pide explícitamente registrar o avisar ("reporta la fuga",
+// "avisa al fontanero"). Ni así se registra directo: se le muestra la
+// descripción con un botón de confirmación.
+function pideRegistrar(mensaje) {
   const actual = normalizar(mensaje);
-  const pideRegistro = /\b(report(a|ar|ame)|registr(a|ar|alo)|mand(a|ar)|envi(a|ar)|avis(a|ar)|notific(a|ar))\b/.test(actual) &&
+  return /\b(report(a|ar|ame)|registr(a|ar|alo)|mand(a|ar)|envi(a|ar)|avis(a|ar)|notific(a|ar))\b/.test(actual) &&
     /\b(averia|fuga|dano|fontanero|plomero|reporte)\b/.test(actual);
-  const afirmacion = /^(si|dale|listo|confirmo|hazlo|de una)([,! ]|$)/.test(actual.trim());
-  const asistentePidioConfirmar = [...historial].reverse().some((turno) =>
-    turno.role === 'assistant' && /\b(registr|report|avis|fontanero)\w*\b/.test(normalizar(turno.content))
-  );
-  return pideRegistro || (afirmacion && asistentePidioConfirmar);
 }
 
 function armarDescripcionAveria(mensaje, historial) {
   const textosUsuario = [...historial.filter((turno) => turno.role === 'user').map((turno) => turno.content), mensaje];
   const detalles = textosUsuario
     .map((texto) => texto.trim())
-    .filter((texto) => texto.length >= 8 && !/^\s*(si|dale|listo|confirmo|hazlo|ok|okay)[.! ]*$/i.test(texto))
-    .filter((texto) => !/^(por favor )?(reporta|registra|manda|envia|avisa)( la)? averia\b/i.test(texto));
+    .filter((texto) => texto.length >= 8 && !/^\s*(si|sí|dale|listo|confirmo|hazlo|ok|okay)[.! ]*$/i.test(texto))
+    .filter((texto) => !/^(por favor,? )?(reporta|registra|manda|env[ií]a|avisa)( la| al)? (aver[ií]a|fontanero)( por favor)?[.!, ]*$/i.test(texto));
   return [...new Set(detalles)].join('. ').slice(0, 1000);
 }
 
-function obtenerCliente() {
-  if (!process.env.GROQ_API_KEY) return null;
-  if (!groq) groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-  return groq;
+// La app muestra "Sí, avisar al fontanero" y, al tocarlo, reenvía esta
+// descripción con `confirmarAveria: true`.
+function accionConfirmar(descripcion) {
+  return { tipo: 'confirmar_averia', descripcion };
+}
+
+// Ids de audios enviados en esta conversación; se vinculan a la avería si se registra.
+function idsDeAudio(valor) {
+  if (!Array.isArray(valor)) return [];
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return [...new Set(valor.filter((id) => typeof id === 'string' && uuid.test(id)))].slice(0, 10);
+}
+
+// GOTA ofreció registrar la avería y avisar al fontanero.
+function ofreceRegistrar(texto) {
+  return /\b(registr|report|avis)\w*\b.*\bfontanero\b/.test(normalizar(texto));
+}
+
+// Solo se llega aquí desde el botón de confirmación de la app: perfilId sale
+// del token y la descripción es la que el usuario vio y confirmó.
+async function registrarAveriaConfirmada(req, res, perfilId, descripcionRecibida) {
+  if (!perfilId) {
+    return res.status(401).json({ respuesta: 'Inicia sesión para registrar la avería y avisar al fontanero.' });
+  }
+  const descripcion = typeof descripcionRecibida === 'string' ? descripcionRecibida.trim().slice(0, 1000) : '';
+  if (descripcion.length < MIN_DESCRIPCION) {
+    return res.status(400).json({ respuesta: 'Cuéntame en una frase qué pasó (por ejemplo, dónde está la fuga o qué servicio falta) y la registro para avisar al fontanero.' });
+  }
+
+  const { data: perfil, error: errorPerfil } = await profileModel.getById(perfilId, {
+    columns: 'nombre, apellido, zona, direccion, activo',
+  });
+  if (errorPerfil) throw errorPerfil;
+  if (!perfil?.activo) {
+    return res.status(403).json({ respuesta: 'Tu perfil no está activo. Contacta al administrador del acueducto.' });
+  }
+  if (!perfil.zona && !perfil.direccion) {
+    return res.status(200).json({ respuesta: 'Tu perfil no tiene una ubicación registrada. Pídele al administrador que actualice tu dirección para poder enviar la avería.' });
+  }
+
+  // Un doble toque en el botón no debe crear dos averías.
+  const { data: recientes } = await breakdownModel.latestByProfile(perfilId, 1);
+  const anterior = recientes?.[0];
+  if (anterior && anterior.estado === 'reportada' &&
+      normalizar(anterior.descripcion) === normalizar(descripcion) &&
+      Date.now() - new Date(anterior.fecha_reporte).getTime() < 600000) {
+    return res.status(200).json({ respuesta: 'Esta avería ya quedó registrada y el fontanero está siendo notificado.', averia: { estado: anterior.estado } });
+  }
+
+  // La app no tiene permiso de insertar averías, así que la escritura va por
+  // el cliente de servicio (como en averiaController).
+  const { data: averia, error } = await breakdownModel.create({
+    perfil_id: perfilId,
+    descripcion,
+    zona: perfil.zona,
+    direccion: perfil.direccion,
+  });
+  if (error) throw error;
+  // La avería ya quedó guardada: si vincular el audio falla, el reporte
+  // sigue siendo válido (la transcripción ya va en la descripción).
+  try {
+    await audiosAveriaService.vincularAudios({ perfilId, audioIds: idsDeAudio(req.body.audioIds), averiaId: averia.id });
+  } catch (errorAudio) {
+    console.error('[chat] no se pudo vincular el audio a la avería:', errorAudio.message);
+  }
+  void notificarAveria.notificarNuevaAveria(averia);
+  return res.status(201).json({ respuesta: 'Avería registrada. Ya estoy avisando al fontanero.', averia: { id: averia.id, estado: averia.estado } });
 }
 
 async function chatearConAsistente(req, res) {
   try {
     const { mensaje, historial } = req.body;
+    if (req.body.confirmarAveria === true) {
+      return await registrarAveriaConfirmada(req, res, req.usuario?.id, req.body.descripcion);
+    }
     if (typeof mensaje !== 'string' || !mensaje.trim()) {
       return res.status(400).json({ error: 'Debes enviar un mensaje válido.' });
     }
@@ -55,7 +121,7 @@ async function chatearConAsistente(req, res) {
       return res.status(400).json({ error: `El mensaje no puede superar ${MAX_MENSAJE} caracteres.` });
     }
 
-    const cliente = obtenerCliente();
+    const cliente = obtenerGroq();
 
     // Conservamos solo unos pocos turnos recientes y texto plano. Esto permite
     // entender referencias como "esa fuga" sin enviar conversaciones enormes.
@@ -74,48 +140,20 @@ async function chatearConAsistente(req, res) {
 
     const perfilId = req.usuario?.id;
 
-    // Registrar y avisar es un camino directo: el chatbot no debe volver a
-    // preguntar lo ya dicho ni esperar una llamada a Groq para guardar.
-    if (quiereRegistrar(mensajeActual, mensajesPrevios)) {
+    // Pedir el registro explícitamente no necesita a Groq: se arma la
+    // descripción con lo que el usuario ya dijo y se le pide confirmarla.
+    if (pideRegistrar(mensajeActual)) {
       if (!perfilId) {
         return res.status(401).json({ respuesta: 'Inicia sesión para registrar la avería y avisar al fontanero.' });
       }
-
-      const { data: perfil, error: errorPerfil } = await profileModel.getById(perfilId, {
-        columns: 'nombre, apellido, zona, direccion, activo',
-      });
-      if (errorPerfil) throw errorPerfil;
-      if (!perfil?.activo) {
-        return res.status(403).json({ respuesta: 'Tu perfil no está activo. Contacta al administrador del acueducto.' });
-      }
-
       const descripcion = armarDescripcionAveria(mensajeActual, mensajesPrevios);
-      if (descripcion.length < 20) {
+      if (descripcion.length < MIN_DESCRIPCION) {
         return res.status(200).json({ respuesta: 'Cuéntame en una frase qué pasó (por ejemplo, dónde está la fuga o qué servicio falta) y la registro para avisar al fontanero.' });
       }
-      if (!perfil.zona && !perfil.direccion) {
-        return res.status(200).json({ respuesta: 'Tu perfil no tiene una ubicación registrada. Pídele al administrador que actualice tu dirección para poder enviar la avería.' });
-      }
-
-      const { data: recientes } = await breakdownModel.latestByProfile(perfilId, 1);
-      const anterior = recientes?.[0];
-      if (anterior && anterior.estado === 'reportada' &&
-          normalizar(anterior.descripcion) === normalizar(descripcion) &&
-          Date.now() - new Date(anterior.fecha_reporte).getTime() < 600000) {
-        return res.status(200).json({ respuesta: 'Esta avería ya quedó registrada y el fontanero está siendo notificado.', averia: { estado: anterior.estado } });
-      }
-
-      // perfilId sale del token; la app no tiene permiso de insertar averías,
-      // así que la escritura va por el cliente de servicio (como en averiaController).
-      const { data: averia, error } = await breakdownModel.create({
-        perfil_id: perfilId,
-        descripcion,
-        zona: perfil.zona,
-        direccion: perfil.direccion,
+      return res.status(200).json({
+        respuesta: `Voy a avisar al fontanero con esta descripción:\n"${descripcion}"\n¿La envío?`,
+        accion: accionConfirmar(descripcion),
       });
-      if (error) throw error;
-      void notificarNuevaAveria(averia);
-      return res.status(201).json({ respuesta: 'Avería registrada. Ya estoy avisando al fontanero.', averia: { id: averia.id, estado: averia.estado } });
     }
 
     if (!cliente) {
@@ -185,7 +223,8 @@ AVERÍAS:
 - Distingue entre reportar un problema nuevo y consultar el estado de una avería existente. Para consultas de estado, usa las averías recientes del usuario y cita su estado, fecha o nota del fontanero cuando estén disponibles.
 - Interpreta expresiones coloquiales, mensajes cortos y errores de escritura. "No me llega el agua", "botó agua" o "se rompió el tubo" pueden describir una avería.
 - Si reporta una fuga, daño, baja presión o falta de agua, conserva lo que ya dijo y pregunta solo una vez por el dato esencial que falte. Aprovecha la dirección del perfil para la ubicación; no vuelvas a preguntar dirección si ya está registrada.
-- Si los datos esenciales están claros, pregunta una sola vez: "¿Quieres que la registre y avise al fontanero?". Si responde afirmativamente, indícale que escriba "registra la avería" para ejecutar el envío. Nunca afirmes que quedó guardada sin confirmación de la API.
+- Si los datos esenciales están claros, pregunta una sola vez: "¿Quieres que la registre y avise al fontanero?". La app le muestra al usuario un botón "Sí, avisar al fontanero" para confirmarlo; no le pidas que escriba nada para registrarla.
+- Algunos mensajes vienen de audios transcritos automáticamente: tolera palabras mal transcritas y deduce la intención. Nunca afirmes que quedó guardada sin confirmación de la API.
 - No confundas un reporte nuevo con el historial de averías.
 
 OTROS TEMAS:
@@ -214,10 +253,86 @@ ${contextoUsuario}`;
 
     const textoRespuesta = respuesta.choices?.[0]?.message?.content || 'No pude generar una respuesta.';
 
-    return res.status(200).json({ respuesta: textoRespuesta });
+    const descripcion = perfilId && ofreceRegistrar(textoRespuesta)
+      ? armarDescripcionAveria(mensajeActual, mensajesPrevios)
+      : '';
+    return res.status(200).json({
+      respuesta: textoRespuesta,
+      ...(descripcion.length >= MIN_DESCRIPCION && { accion: accionConfirmar(descripcion) }),
+    });
   } catch (err) {
     return errorInesperado(res, err);
   }
 }
 
-module.exports = { chatearConAsistente };
+// POST /audio - el usuario le envía un audio a GOTA. Se transcribe con
+// Whisper y se guarda unas horas por si termina siendo una avería. La app
+// muestra el texto para que el usuario lo revise y lo envía como mensaje.
+async function transcribirAudio(req, res) {
+  try {
+    const perfilId = req.usuario.id;
+    const bytes = req.body;
+    const contentType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    const { LIMITES, MIME_TYPES } = audiosAveriaService;
+    const errorDuracion = `El audio puede durar máximo ${LIMITES.maxSegundos} segundos.`;
+
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0) {
+      return res.status(400).json({ error: 'No recibí ningún audio. Intenta grabarlo de nuevo.' });
+    }
+    if (!MIME_TYPES.includes(contentType)) {
+      return res.status(415).json({ error: 'Formato de audio no compatible.' });
+    }
+    if (bytes.length > LIMITES.maxBytes) {
+      return res.status(413).json({ error: errorDuracion });
+    }
+
+    // La duración declarada solo sirve para reservar el cupo; la real la da Whisper.
+    const declarada = Number.parseInt(req.headers['x-audio-duracion'], 10);
+    const segundos = Number.isFinite(declarada)
+      ? Math.min(Math.max(declarada, 1), LIMITES.maxSegundos)
+      : LIMITES.maxSegundos;
+
+    const cupo = await audiosAveriaService.consumirCupo(perfilId, segundos);
+    if (cupo === 'limite_usuario') {
+      return res.status(429).json({
+        error: `Por hoy ya usaste tus ${LIMITES.audiosPorDia} audios 🎤. Escríbeme y te ayudo igual.`,
+      });
+    }
+    if (cupo !== 'ok') {
+      return res.status(429).json({ error: 'Los audios están ocupados por hoy. Escríbeme y te ayudo igual.' });
+    }
+
+    const resultado = await audiosAveriaService.transcribir(bytes, contentType);
+    if (!resultado) {
+      return res.status(503).json({ error: 'El asistente virtual no está disponible por ahora.' });
+    }
+    if (resultado.duracion !== null && resultado.duracion > LIMITES.maxSegundos + 5) {
+      return res.status(413).json({ error: errorDuracion });
+    }
+    const transcripcion = resultado.texto.trim().slice(0, MAX_MENSAJE);
+    if (transcripcion.length < 2) {
+      return res.status(422).json({ error: 'No logré entender el audio. Intenta hablar más cerca del teléfono.' });
+    }
+
+    // Si guardar el archivo falla, el usuario igual recibe su texto: lo que
+    // se pierde es solo el audio para el fontanero.
+    let audioId = null;
+    try {
+      audioId = await audiosAveriaService.guardarAudioPendiente({
+        perfilId,
+        bytes,
+        contentType,
+        duracion: resultado.duracion ?? segundos,
+        transcripcion,
+      });
+    } catch (errorGuardar) {
+      console.error('[chat] no se pudo guardar el audio:', errorGuardar.message);
+    }
+
+    return res.status(200).json({ transcripcion, audioId });
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+module.exports = { chatearConAsistente, transcribirAudio };

@@ -11,6 +11,8 @@
     "dev": "nodemon server.js",
     "probar-correo": "node scripts/probarCorreo.js",
     "facturar-mensual": "node scripts/facturarMensual.js",
+    "limpiar-audios": "node scripts/limpiarAudios.js",
+    "tareas-diarias": "node scripts/tareasDiarias.js",
     "test": "node --test"
   },
   "keywords": [],

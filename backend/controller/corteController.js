@@ -1,4 +1,5 @@
 const outageModel = require('../models/outageModel');
+const scheduledOutageModel = require('../models/scheduledOutageModel');
 const profileModel = require('../models/profileModel');
 const { notificar } = require('../utils/notificar');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
@@ -27,15 +28,24 @@ async function estadoServicio(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await outageModel.findActiveByProfile(userId, { db: req.db });
+    const [{ data, error }, programados] = await Promise.all([
+      outageModel.findActiveByProfile(userId, { db: req.db }),
+      scheduledOutageModel.listUpcomingForZone(req.usuario.zona, new Date().toISOString()),
+    ]);
 
     if (error) {
       return errorConsulta(res, error);
+    }
+    // Los cortes programados son informativos: si la consulta falla (por
+    // ejemplo, migración sin aplicar), el estado individual igual se muestra.
+    if (programados.error) {
+      console.error('[cortes] no se pudieron leer los cortes programados:', programados.error.message);
     }
 
     return res.status(200).json({
       servicioCortado: !!data,
       corte: data || null,
+      cortesProgramados: programados.data || [],
     });
   } catch (err) {
     return errorInesperado(res, err);
