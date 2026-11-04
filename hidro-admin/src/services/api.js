@@ -117,6 +117,7 @@ export const endpoints = {
   facturasTodas: '/facturas/todas',
   generarFacturasMensuales: '/facturas/generar-mensuales',
   facturaExtraordinaria: '/facturas/factura-extraordinaria',
+  pagosBase: '/pagos',
   pagos: '/pagos/todos',
   cortes: '/cortes',
   notificaciones: '/notificaciones',
