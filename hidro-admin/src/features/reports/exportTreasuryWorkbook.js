@@ -118,7 +118,7 @@ export default async function exportTreasuryWorkbook({
       },
     }
     const workbook = new ExcelJS.Workbook()
-    workbook.creator = 'HIDRO-APP · Acueducto Campoamor'
+    workbook.creator = 'HIDRO-APP · Acueducto Campo Amor'
     workbook.subject = 'Informes de tesorería'
     workbook.title = `Informe ${report}`
     workbook.created = new Date()
@@ -163,7 +163,7 @@ export default async function exportTreasuryWorkbook({
       worksheet.getCell('A1').font = { name: 'Aptos Display', size: 18, bold: true, color: { argb: 'FFFFFFFF' } }
       worksheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left', indent: 3 }
       worksheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF123B5D' } }
-      worksheet.getCell('A2').value = `ACUEDUCTO CAMPOAMOR  |  Periodo: ${reportFrom || 'Sin límite'} al ${reportTo || 'Sin límite'}  |  Generado: ${new Date().toLocaleString('es-CO')}`
+      worksheet.getCell('A2').value = `ACUEDUCTO CAMPO AMOR  |  Periodo: ${reportFrom || 'Sin límite'} al ${reportTo || 'Sin límite'}  |  Generado: ${new Date().toLocaleString('es-CO')}`
       worksheet.getCell('A2').font = { name: 'Aptos', size: 10, color: { argb: 'FF426579' }, italic: true }
       worksheet.getCell('A2').alignment = { vertical: 'middle', horizontal: 'left', indent: 3 }
       worksheet.getRow(1).height = 43
@@ -206,7 +206,7 @@ export default async function exportTreasuryWorkbook({
       })
       worksheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: Math.max(4, worksheet.rowCount), column: columns.length } }
       worksheet.getColumn(1).alignment = { vertical: 'middle' }
-      worksheet.headerFooter.oddFooter = '&L&HAcueducto Campoamor&CInforme de tesorería&R&P de &N'
+      worksheet.headerFooter.oddFooter = '&L&HAcueducto Campo Amor&CInforme de tesorería&R&P de &N'
     })
     const suffix = `${reportFrom || 'inicio'}-${reportTo || 'hoy'}`
     const buffer = await workbook.xlsx.writeBuffer()

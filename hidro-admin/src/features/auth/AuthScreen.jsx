@@ -21,14 +21,13 @@ export default function AuthScreen({
   isLoggingIn,
   onLogin,
   onRecoverySubmit,
-  onCheckAdminEmail,
 }) {
   return (
       <main className="auth-shell">
-        <section className="auth-showcase" aria-label="Acueducto Campoamor">
+        <section className="auth-showcase" aria-label="Acueducto Campo Amor">
           <div className="auth-showcase-top">
             <img src={hidroAppLogo} alt="" className="auth-brand-logo" />
-            <span>ACUEDUCTO CAMPOAMOR</span>
+            <span>ACUEDUCTO CAMPO AMOR</span>
           </div>
           <div className="auth-showcase-copy">
             <span className="auth-kicker"><span /> SERVICIO Y COMUNIDAD</span>
@@ -61,7 +60,6 @@ export default function AuthScreen({
             autoComplete="username"
             value={email}
             onChange={(event) => { setEmail(event.target.value); setAuthError('') }}
-            onBlur={authMode === 'login' ? onCheckAdminEmail : undefined}
             required
           />
           {authMode === 'login' && (
