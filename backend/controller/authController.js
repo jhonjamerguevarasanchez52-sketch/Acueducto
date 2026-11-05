@@ -7,7 +7,7 @@ const {
   registrarExito,
 } = require('../utils/controlIntentos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
-const { generarCodigoSeguridad } = require('../utils/securityCode');
+const { generarCodigoSeguridad, protegerCodigo, codigoCoincide } = require('../utils/securityCode');
 const { normalizarCorreo } = require('../utils/formato');
 const { escaparHtml } = require('../utils/html');
 
@@ -21,10 +21,12 @@ function expiracionCodigo() {
   return new Date(Date.now() + MINUTOS_VALIDEZ_CODIGO * 60 * 1000).toISOString();
 }
 
-function codigoValido(guardado, recibido, expiracion) {
-  return Boolean(guardado)
-    && guardado === String(recibido || '').trim()
-    && new Date(expiracion) >= new Date();
+// El código se guarda protegido (HMAC, ver utils/securityCode.js) y se
+// compara en tiempo constante.
+function codigoValido(perfilId, guardado, recibido, expiracion) {
+  return Boolean(expiracion)
+    && new Date(expiracion) >= new Date()
+    && codigoCoincide(perfilId, guardado, recibido);
 }
 
 function respuestaBloqueo(res, bloqueo, mensaje = 'Demasiados intentos fallidos') {
@@ -185,7 +187,7 @@ async function solicitarCodigoAcceso(req, res) {
 
     const codigo = generarCodigo();
     const { error: errorGuardar } = await profileModel.saveFields(perfil.id, {
-      codigo_acceso: codigo,
+      codigo_acceso: protegerCodigo(perfil.id, codigo),
       codigo_acceso_expiracion: expiracionCodigo(),
     });
     if (errorGuardar) return errorConsulta(res, errorGuardar);
@@ -226,7 +228,7 @@ async function ingresarConCodigo(req, res) {
       correo,
       'id, codigo_acceso, codigo_acceso_expiracion'
     );
-    if (error || !perfil || !codigoValido(perfil.codigo_acceso, codigo, perfil.codigo_acceso_expiracion)) {
+    if (error || !perfil || !codigoValido(perfil.id, perfil.codigo_acceso, codigo, perfil.codigo_acceso_expiracion)) {
       await registrarFallo('codigo-acceso', correo);
       return res.status(400).json({ error: MENSAJE_CODIGO_INVALIDO });
     }
@@ -333,7 +335,7 @@ async function verificarCuenta(req, res) {
       return res.status(400).json({ error: 'La cuenta ya está verificada' });
     }
 
-    if (!codigoValido(perfil.codigo_verificacion, codigo, perfil.codigo_verificacion_expiracion)) {
+    if (!codigoValido(perfil.id, perfil.codigo_verificacion, codigo, perfil.codigo_verificacion_expiracion)) {
       await registrarFallo('verificar', correo);
       return res.status(400).json({ error: MENSAJE_CODIGO_INVALIDO });
     }
@@ -385,7 +387,7 @@ async function reenviarCodigoVerificacion(req, res) {
     const codigoVerificacion = generarCodigo();
 
     const { error: updateError } = await profileModel.saveFields(perfil.id, {
-      codigo_verificacion: codigoVerificacion,
+      codigo_verificacion: protegerCodigo(perfil.id, codigoVerificacion),
       codigo_verificacion_expiracion: expiracionCodigo(),
     });
 
@@ -494,7 +496,7 @@ async function solicitarRecuperacion(req, res) {
     const codigoRecuperacion = generarCodigo();
 
     const { error: updateError } = await profileModel.saveFields(perfil.id, {
-      codigo_recuperacion: codigoRecuperacion,
+      codigo_recuperacion: protegerCodigo(perfil.id, codigoRecuperacion),
       codigo_expiracion: expiracionCodigo(),
     });
 
@@ -551,7 +553,7 @@ async function resetearPassword(req, res) {
     // Mismo mensaje y mismo conteo de intentos exista o no el correo: así no
     // se puede usar esta ruta para averiguar qué correos están registrados.
     if (buscarError || !perfil
-      || !codigoValido(perfil.codigo_recuperacion, codigo, perfil.codigo_expiracion)) {
+      || !codigoValido(perfil.id, perfil.codigo_recuperacion, codigo, perfil.codigo_expiracion)) {
       await registrarFallo('reset', correo);
       return res.status(400).json({ error: MENSAJE_CODIGO_INVALIDO });
     }

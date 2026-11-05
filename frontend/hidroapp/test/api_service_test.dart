@@ -80,4 +80,63 @@ void main() {
       ),
     );
   });
+
+  test(
+    'un GET que agota el tiempo NO se reintenta (no duplica la espera)',
+    () async {
+      var llamadas = 0;
+      final client = MockClient((_) async {
+        llamadas += 1;
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        return http.Response('{}', 200);
+      });
+      final api = ApiService(
+        client: client,
+        tiempoMaximo: const Duration(milliseconds: 20),
+      );
+      addTearDown(api.dispose);
+
+      await expectLater(
+        api.get('/facturas'),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            contains('no respondió a tiempo'),
+          ),
+        ),
+      );
+      expect(llamadas, 1);
+    },
+  );
+
+  test('un GET con fallo de conexión se reintenta una vez', () async {
+    var llamadas = 0;
+    final client = MockClient((_) async {
+      llamadas += 1;
+      if (llamadas == 1) throw http.ClientException('conexión rechazada');
+      return http.Response(jsonEncode({'ok': true}), 200);
+    });
+    final api = ApiService(client: client);
+    addTearDown(api.dispose);
+
+    expect(await api.get('/facturas'), {'ok': true});
+    expect(llamadas, 2);
+  });
+
+  test('delete envía el método DELETE con el token', () async {
+    http.BaseRequest? capturada;
+    final client = MockClient((request) async {
+      capturada = request;
+      return http.Response('{}', 200);
+    });
+    final api = ApiService(client: client)..authToken = 't';
+    addTearDown(api.dispose);
+
+    await api.delete('/notificaciones/abc');
+
+    expect(capturada?.method, 'DELETE');
+    expect(capturada?.url.path, endsWith('/notificaciones/abc'));
+    expect(capturada?.headers['Authorization'], 'Bearer t');
+  });
 }

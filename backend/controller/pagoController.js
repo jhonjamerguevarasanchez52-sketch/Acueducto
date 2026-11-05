@@ -10,7 +10,7 @@ const recibosPagoService = require('../services/recibosPagoService');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 const WOMPI_CURRENCY = process.env.WOMPI_CURRENCY || 'COP';
-const ESTADOS_WOMPI_REINTENTABLES = new Set(['DECLINED', 'VOIDED', 'ERROR']);
+const ESTADOS_WOMPI_RECHAZADOS = new Set(['DECLINED', 'VOIDED', 'ERROR']);
 
 // Métodos que un administrador puede usar al cargar un pago a nombre de alguien
 const METODOS_ADMIN = ['efectivo', 'transferencia', 'otro'];
@@ -19,16 +19,22 @@ const METODOS_ADMIN = ['efectivo', 'transferencia', 'otro'];
 // Son errores esperados del negocio (no fallos del servidor).
 const RECHAZO_TRIGGER = /ya fue pagada|anulada|no coincide|no corresponde|no existe/i;
 
+// Agrega a cada pago físico el enlace temporal de su recibo. Los enlaces se
+// piden en lote (una llamada a Storage por cada 100 recibos), no uno por uno.
 async function agregarUrlsRecibos(pagos = []) {
-  return Promise.all(pagos.map(async (pago) => {
-    if (pago.metodo !== 'fisico' || !pago.referencia) return pago;
-    try {
-      return { ...pago, recibo_url: await recibosPagoService.crearUrlRecibo(pago.referencia) };
-    } catch (err) {
-      console.error('[pagos] no se pudo generar enlace temporal del recibo:', err.message);
-      return { ...pago, recibo_url: null };
-    }
-  }));
+  const conRecibo = (pago) => pago.metodo === 'fisico' && pago.referencia;
+  const rutas = pagos.filter(conRecibo).map((pago) => pago.referencia);
+  if (rutas.length === 0) return pagos;
+
+  let enlaces = new Map();
+  try {
+    enlaces = await recibosPagoService.crearUrlsRecibos(rutas);
+  } catch (err) {
+    console.error('[pagos] no se pudieron generar los enlaces temporales de los recibos:', err.message);
+  }
+  return pagos.map((pago) => (
+    conRecibo(pago) ? { ...pago, recibo_url: enlaces.get(pago.referencia) ?? null } : pago
+  ));
 }
 
 // ---------- USUARIO FINAL ----------
@@ -74,15 +80,14 @@ async function registrarPago(req, res) {
     return res.status(400).json({ error: 'Faltan campos obligatorios: factura_id, metodo' });
   }
 
+  // Por esta ruta solo entra Wompi; el pago físico usa /:facturaId/recibo.
   if (metodo !== 'wompi') {
     return res.status(400).json({ error: 'Para pagar físicamente debes adjuntar el recibo.' });
   }
 
-  if (metodo === 'wompi') {
-    const problemaConfiguracion = obtenerProblemaConfiguracion();
-    if (problemaConfiguracion) {
-      return res.status(503).json({ error: problemaConfiguracion });
-    }
+  const problemaConfiguracion = obtenerProblemaConfiguracion();
+  if (problemaConfiguracion) {
+    return res.status(503).json({ error: problemaConfiguracion });
   }
 
   try {
@@ -119,27 +124,28 @@ async function registrarPago(req, res) {
       return errorConsulta(res, errorPendiente);
     }
 
+    // Un intento rechazado (DECLINED, VOIDED, ERROR) nunca bloquea uno nuevo.
+    // findPendingByInvoice ya los excluye; esta revisión es una segunda
+    // barrera por si esa consulta cambia.
     let pago = null;
-    if (pagoPendiente) {
-      const puedeReanudarCheckout = metodo === 'wompi' &&
-        pagoPendiente.metodo === 'wompi' &&
+    const pendienteRechazado = pagoPendiente?.metodo === 'wompi' &&
+      ESTADOS_WOMPI_RECHAZADOS.has(pagoPendiente.estado_wompi);
+    if (pagoPendiente && !pendienteRechazado) {
+      const puedeReanudarCheckout = pagoPendiente.metodo === 'wompi' &&
         [null, undefined, 'PENDING'].includes(pagoPendiente.estado_wompi);
-      const wompiRechazado = pagoPendiente.metodo === 'wompi' &&
-        ESTADOS_WOMPI_REINTENTABLES.has(pagoPendiente.estado_wompi);
 
-      if (puedeReanudarCheckout) {
-        if (Number(pagoPendiente.monto) !== monto ||
-            Number(pagoPendiente.cargo_wompi || 0) !== cotizacion.cargoWompi) {
-          return res.status(409).json({
-            error: 'El valor de la factura cambió. Actualiza la factura antes de iniciar otro pago.',
-          });
-        }
-        pago = pagoPendiente;
-      } else if (!wompiRechazado) {
+      if (!puedeReanudarCheckout) {
         return res.status(409).json({
           error: 'Ya existe un pago pendiente de confirmación para esta factura',
         });
       }
+      if (Number(pagoPendiente.monto) !== monto ||
+          Number(pagoPendiente.cargo_wompi || 0) !== cotizacion.cargoWompi) {
+        return res.status(409).json({
+          error: 'El valor de la factura cambió. Actualiza la factura antes de iniciar otro pago.',
+        });
+      }
+      pago = pagoPendiente;
     }
 
     if (!pago) {
@@ -166,8 +172,7 @@ async function registrarPago(req, res) {
           if (errorConcurrente) return errorConsulta(res, errorConcurrente);
           if (!pagoConcurrente) return errorConsulta(res, error);
 
-          const esMismoCheckout = metodo === 'wompi' &&
-            pagoConcurrente.metodo === 'wompi' &&
+          const esMismoCheckout = pagoConcurrente.metodo === 'wompi' &&
             [null, undefined, 'PENDING'].includes(pagoConcurrente.estado_wompi) &&
             Number(pagoConcurrente.monto) === monto &&
             Number(pagoConcurrente.cargo_wompi || 0) === cotizacion.cargoWompi;
@@ -191,28 +196,26 @@ async function registrarPago(req, res) {
       pago,
     };
 
-    // Wompi signs the persisted payment ID and invoice amount server-side.
-    if (metodo === 'wompi') {
-      try {
-        const amountInCents = Math.round(cotizacion.totalCobrar * 100);
-        respuesta.wompi = {
-          publicKey: process.env.WOMPI_PUBLIC_KEY,
+    // El backend firma el id del pago y el total; el cliente nunca ve la llave.
+    try {
+      const amountInCents = Math.round(cotizacion.totalCobrar * 100);
+      respuesta.wompi = {
+        publicKey: process.env.WOMPI_PUBLIC_KEY,
+        reference: pago.id,
+        amountInCents,
+        valorServicio: cotizacion.valorServicio,
+        cargoWompi: cotizacion.cargoWompi,
+        totalCobrar: cotizacion.totalCobrar,
+        currency: WOMPI_CURRENCY,
+        signature: calcularFirmaIntegridad({
           reference: pago.id,
           amountInCents,
-          valorServicio: cotizacion.valorServicio,
-          cargoWompi: cotizacion.cargoWompi,
-          totalCobrar: cotizacion.totalCobrar,
           currency: WOMPI_CURRENCY,
-          signature: calcularFirmaIntegridad({
-            reference: pago.id,
-            amountInCents,
-            currency: WOMPI_CURRENCY,
-          }),
-        };
-      } catch (firmaErr) {
-        console.error('[pagos] no se pudo calcular la firma de integridad de Wompi:', firmaErr.message);
-        return res.status(503).json({ error: 'No se pudo preparar el pago con Wompi.' });
-      }
+        }),
+      };
+    } catch (firmaErr) {
+      console.error('[pagos] no se pudo calcular la firma de integridad de Wompi:', firmaErr.message);
+      return res.status(503).json({ error: 'No se pudo preparar el pago con Wompi.' });
     }
 
     return res.status(201).json(respuesta);
@@ -411,6 +414,18 @@ async function registrarPagoAdmin(req, res) {
     }
     if (factura.estado === 'anulada') {
       return res.status(409).json({ error: 'Esta factura está anulada' });
+    }
+
+    // Solo puede haber un pago sin confirmar por factura (índice único). Sin
+    // esta revisión el administrador recibiría un "registro duplicado" sin
+    // saber qué hacer.
+    const { data: pendiente, error: errorPendiente } = await paymentModel.findPendingByInvoice(factura_id);
+    if (errorPendiente) return errorConsulta(res, errorPendiente);
+    if (pendiente) {
+      const detalle = pendiente.metodo === 'wompi'
+        ? 'un pago en línea (Wompi) que el usuario inició y aún no termina. Si el usuario confirma que no pagó en línea, elimina ese pago pendiente en "Pagos" y vuelve a registrar este.'
+        : 'un recibo físico pendiente de revisión. Confírmalo o elimínalo en "Pagos".';
+      return res.status(409).json({ error: `Esta factura ya tiene ${detalle}`, pagoPendienteId: pendiente.id });
     }
 
     // El trigger trg_forzar_pago_no_confirmado obliga a que todo pago nazca

@@ -19,8 +19,14 @@ import AuthScreen from './features/auth/AuthScreen.jsx'
 import exportTreasuryWorkbookFile from './features/reports/exportTreasuryWorkbook.js'
 import { imprimirFactura } from './features/invoices/printInvoice.js'
 import SectionViews from './features/sections/SectionViews.jsx'
-import { quickActions, resourceEndpointBySection, MAX_BULK_USERS, MAX_USER_FILE_SIZE_BYTES, operationDefinitions, roleColors } from './config/adminConfig.js'
-import { apiRequest, clearToken, endpoints, getToken, login } from './services/api.js'
+import { quickActions, resourceEndpointBySection, paginatedEndpoints, MAX_BULK_USERS, MAX_USER_FILE_SIZE_BYTES, operationDefinitions, roleColors } from './config/adminConfig.js'
+import { apiRequest, apiRequestAll, clearToken, endpoints, getToken, login } from './services/api.js'
+
+const fetchResource = (endpointName) => (
+  paginatedEndpoints.has(endpointName)
+    ? apiRequestAll(endpoints[endpointName])
+    : apiRequest(endpoints[endpointName])
+)
 import { formatMoney, formatDate, formatInvoiceNumber } from './utils/formatters.js'
 import { parseUsersCsv, parseUsersExcel } from './utils/usersCsv.js'
 import hidroAppLogo from './assets/hidroapp-logo.png'
@@ -112,7 +118,7 @@ function App() {
     let cancelled = false
     Promise.all(Object.entries(resourceEndpointBySection).map(async ([section, endpointName]) => {
       try {
-        const data = await apiRequest(endpoints[endpointName])
+        const data = await fetchResource(endpointName)
         return { section, data: Array.isArray(data) ? data : [], error: '' }
       } catch (error) {
         return { section, data: [], error: error.message || 'No fue posible cargar los datos' }
@@ -139,7 +145,7 @@ function App() {
     setLoadingSections((current) => ({ ...current, [section]: true }))
     setSectionErrors((current) => ({ ...current, [section]: '' }))
     try {
-      const data = await apiRequest(endpoints[endpointName])
+      const data = await fetchResource(endpointName)
       setSectionData((current) => ({ ...current, [section]: Array.isArray(data) ? data : [] }))
     } catch (error) {
       setSectionErrors((current) => ({ ...current, [section]: error.message || 'No fue posible cargar los datos' }))

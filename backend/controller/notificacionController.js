@@ -96,12 +96,22 @@ async function eliminarNotificacion(req, res) {
 
 // ---------- ADMINISTRADOR ----------
 
+// La app agrupa y colorea los avisos por tipo; uno desconocido se vería roto.
+const TIPOS_AVISO = ['general', 'servicio', 'factura', 'corte', 'averia'];
+const MAX_MENSAJE_AVISO = 1000;
+
 // Enviar una notificación a un usuario, o a todos (perfil_id: "todos")
 async function enviarNotificacion(req, res) {
   const { perfil_id = 'todos', mensaje, tipo = 'general', enviar_correo = false } = req.body;
 
   if (typeof mensaje !== 'string' || !mensaje.trim()) {
     return res.status(400).json({ error: 'El mensaje es obligatorio' });
+  }
+  if (mensaje.trim().length > MAX_MENSAJE_AVISO) {
+    return res.status(400).json({ error: `El mensaje admite máximo ${MAX_MENSAJE_AVISO} caracteres.` });
+  }
+  if (!TIPOS_AVISO.includes(tipo)) {
+    return res.status(400).json({ error: `Tipo de aviso inválido. Usa: ${TIPOS_AVISO.join(', ')}` });
   }
   if (req.usuario.rol === 'fontanero' && perfil_id !== 'todos') {
     return res.status(403).json({ error: 'El fontanero solo puede enviar avisos generales' });

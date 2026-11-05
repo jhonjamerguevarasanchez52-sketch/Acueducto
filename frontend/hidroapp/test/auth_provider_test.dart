@@ -5,6 +5,7 @@ import 'package:acueducto_app/services/api_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:local_auth/local_auth.dart';
 
 class MemoryAuthSessionStorage implements AuthSessionStorage {
   final values = <String, String>{};
@@ -177,7 +178,7 @@ void main() {
     },
   );
 
-  test('desactivar biometría elimina el refresh token guardado', () async {
+  test('desactivar biometría conserva el refresh token para renovar la sesión', () async {
     final storage = MemoryAuthSessionStorage()
       ..values['biometric_enabled'] = 'true'
       ..values['biometric_refresh_token'] = 'refresh-seguro';
@@ -194,6 +195,83 @@ void main() {
 
     expect(provider.biometricEnabled, isFalse);
     expect(storage.values.containsKey('biometric_enabled'), isFalse);
-    expect(storage.values.containsKey('biometric_refresh_token'), isFalse);
+    // Sin él, la sesión se cerraría cada hora al vencer el token.
+    expect(storage.values['biometric_refresh_token'], 'refresh-seguro');
   });
+
+  group('activar la biometría desde Ajustes', () {
+    AuthProvider proveedor(MemoryAuthSessionStorage storage, _HuellaFalsa huella) {
+      final provider = AuthProvider(
+        api: ApiService(client: MockClient((_) async => http.Response('{}', 200))),
+        storage: storage,
+        localAuth: huella,
+      );
+      addTearDown(provider.dispose);
+      return provider;
+    }
+
+    test('pide la huella y, si la confirma, queda activa', () async {
+      final storage = MemoryAuthSessionStorage()..values['biometric_refresh_token'] = 'r';
+      final huella = _HuellaFalsa(confirma: true);
+      final provider = proveedor(storage, huella);
+
+      expect(await provider.setBiometricEnabled(true), isTrue);
+      expect(huella.pedidas, 1);
+      expect(provider.biometricEnabled, isTrue);
+      expect(storage.values['biometric_enabled'], 'true');
+    });
+
+    test('si cancela la huella, sigue desactivada', () async {
+      final storage = MemoryAuthSessionStorage()..values['biometric_refresh_token'] = 'r';
+      final provider = proveedor(storage, _HuellaFalsa(confirma: false));
+
+      expect(await provider.setBiometricEnabled(true), isFalse);
+      expect(provider.biometricEnabled, isFalse);
+      expect(storage.values.containsKey('biometric_enabled'), isFalse);
+    });
+
+    test('sin huella ni rostro en el teléfono explica por qué no se puede', () async {
+      final storage = MemoryAuthSessionStorage()..values['biometric_refresh_token'] = 'r';
+      final provider = proveedor(storage, _HuellaFalsa(confirma: true, soportada: false));
+
+      expect(
+        () => provider.setBiometricEnabled(true),
+        throwsA(isA<ApiException>()),
+      );
+    });
+
+    test('una cuenta nueva no tiene biometría hasta activarla', () async {
+      final storage = MemoryAuthSessionStorage();
+      final provider = proveedor(storage, _HuellaFalsa(confirma: true));
+      await provider.bootstrap();
+      expect(provider.biometricEnabled, isFalse);
+      expect(provider.tomarBiometriaAlIniciar(), isFalse);
+    });
+  });
+}
+
+/// Simula el sensor de huella o rostro del teléfono.
+class _HuellaFalsa extends LocalAuthentication {
+  _HuellaFalsa({required this.confirma, this.soportada = true});
+
+  final bool confirma;
+  final bool soportada;
+  int pedidas = 0;
+
+  @override
+  Future<bool> isDeviceSupported() async => soportada;
+
+  @override
+  Future<List<BiometricType>> getAvailableBiometrics() async =>
+      soportada ? [BiometricType.fingerprint] : [];
+
+  @override
+  Future<bool> authenticate({
+    required String localizedReason,
+    Iterable<Object?> authMessages = const [],
+    AuthenticationOptions options = const AuthenticationOptions(),
+  }) async {
+    pedidas++;
+    return confirma;
+  }
 }

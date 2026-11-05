@@ -32,9 +32,13 @@ class FlutterAuthSessionStorage implements AuthSessionStorage {
 
 /// Maneja la sesión del usuario: token de Supabase, perfil y llamadas de auth.
 class AuthProvider extends ChangeNotifier {
-  AuthProvider({ApiService? api, AuthSessionStorage? storage})
-    : _api = api ?? ApiService(),
-      _storage = storage ?? FlutterAuthSessionStorage() {
+  AuthProvider({
+    ApiService? api,
+    AuthSessionStorage? storage,
+    LocalAuthentication? localAuth,
+  }) : _api = api ?? ApiService(),
+       _storage = storage ?? FlutterAuthSessionStorage(),
+       _localAuth = localAuth ?? LocalAuthentication() {
     _api.onUnauthorized = _manejarSesionExpirada;
     _api.onRenovarSesion = _renovarSesion;
   }
@@ -56,7 +60,7 @@ class AuthProvider extends ChangeNotifier {
   ApiService get api => _api;
   bool get biometricEnabled => _biometricEnabled;
   bool _biometricEnabled = false;
-  final LocalAuthentication _localAuth = LocalAuthentication();
+  final LocalAuthentication _localAuth;
 
   /// Renovación del access token en curso, compartida por todas las
   /// peticiones que reciban 401 a la vez (el refresh token es de un solo uso).
@@ -181,25 +185,35 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> setBiometricEnabled(bool enabled) async {
+  /// Activa o desactiva el ingreso con huella o rostro desde Ajustes.
+  /// Al activarlo se pide la biometría una vez para confirmar que el dueño
+  /// del dispositivo es quien lo hace. Devuelve `false` si la cancela.
+  Future<bool> setBiometricEnabled(bool enabled) async {
     if (enabled) {
       final supported = await deviceSupportsBiometrics();
       if (!supported) {
-        throw ApiException('Este dispositivo no tiene biometría configurada.');
+        throw ApiException('Este dispositivo no tiene huella ni rostro configurados.');
       }
       final refreshToken = await _storage.read(_refreshTokenKey);
       if (refreshToken == null || refreshToken.isEmpty) {
         throw ApiException(
-          'Inicia sesión nuevamente para habilitar el acceso biométrico.',
+          'Cierra sesión y vuelve a ingresar con tu contraseña para activarlo.',
         );
       }
+      final confirmado = await _localAuth.authenticate(
+        localizedReason: 'Confirma para activar el ingreso con huella o rostro',
+        options: const AuthenticationOptions(biometricOnly: true),
+      );
+      if (!confirmado) return false;
       await _storage.write(_biometricEnabledKey, 'true');
     } else {
+      // El refresh token se conserva: la app lo usa para renovar la sesión
+      // en silencio aunque no haya biometría.
       await _storage.delete(_biometricEnabledKey);
-      await _storage.delete(_refreshTokenKey);
     }
     _biometricEnabled = enabled;
     notifyListeners();
+    return true;
   }
 
   Future<void> loginWithBiometrics() async {

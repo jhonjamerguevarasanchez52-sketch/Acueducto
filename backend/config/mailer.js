@@ -76,4 +76,12 @@ async function enviarCorreo({ to, subject, html }) {
   });
 }
 
-module.exports = { enviarCorreo, construirCorreoHtml };
+// Brevo responde 429 (demasiadas peticiones) o 402 (sin créditos) cuando se
+// agota el cupo del plan; el plan gratuito permite 300 correos al día.
+function esCupoAgotado(error) {
+  const estado = Number(error?.statusCode ?? error?.status ?? error?.response?.status);
+  if (estado === 429 || estado === 402) return true;
+  return /daily limit|quota|credits|not enough|rate limit/i.test(String(error?.message || ''));
+}
+
+module.exports = { enviarCorreo, construirCorreoHtml, esCupoAgotado };

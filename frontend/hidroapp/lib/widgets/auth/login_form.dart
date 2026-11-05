@@ -2,7 +2,6 @@
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
-import '../../screens/ingresar_con_codigo_screen.dart';
 import '../../screens/olvide_password_screen.dart';
 import '../../screens/verificar_cuenta_screen.dart';
 import '../../services/api_service.dart';
@@ -29,13 +28,12 @@ class _LoginFormState extends State<LoginForm> {
   final _passwordCtrl = TextEditingController();
   bool _cargando = false;
   bool _verPassword = false;
-  bool _habilitarBiometria = false;
 
   @override
   void initState() {
     super.initState();
-    // Al abrir la app con la huella activada, la pedimos de una vez en lugar
-    // de esperar a que toquen el botón.
+    // Si el usuario activó la huella o el rostro en Ajustes, se pide al abrir
+    // la app; si la cancela, entra con correo y contraseña.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (context.read<AuthProvider>().tomarBiometriaAlIniciar()) {
@@ -74,9 +72,7 @@ class _LoginFormState extends State<LoginForm> {
             _correoCtrl.text,
             _passwordCtrl.text,
           );
-      if (_habilitarBiometria) {
-        await auth.setBiometricEnabled(true);
-      }
+      // La huella o el rostro se activan después, desde Ajustes en Perfil.
       // AuthGate observa el AuthProvider y esta misma ruta se reconstruye
       // como HomeScreen al quedar autenticado: no hay nada que "pop-ear".
     } on ApiException catch (e) {
@@ -112,18 +108,9 @@ class _LoginFormState extends State<LoginForm> {
     );
   }
 
-  void _entrarConCodigo() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => IngresarConCodigoScreen(correoInicial: _correoEscrito),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final auth = context.watch<AuthProvider>();
 
     return AuthCard(
       child: Form(
@@ -141,7 +128,7 @@ class _LoginFormState extends State<LoginForm> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Ingresa con tu correo y contraseña, o pide un código a tu correo',
+              'Ingresa con tu correo y contraseña',
               style: TextStyle(fontSize: 13.5, color: authMutedDe(context)),
             ),
             const SizedBox(height: 22),
@@ -220,48 +207,6 @@ class _LoginFormState extends State<LoginForm> {
                     )
                   : const Text('Ingresar al sistema'),
             ),
-            const SizedBox(height: 10),
-            // La forma más fácil de entrar: un código al correo, sin contraseña.
-            OutlinedButton.icon(
-              key: const ValueKey('boton-entrar-con-codigo'),
-              onPressed: _cargando ? null : _entrarConCodigo,
-              icon: const Icon(Icons.mark_email_unread_outlined),
-              label: const Text('Entrar con un código a mi correo'),
-            ),
-            if (auth.biometricEnabled) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _cargando ? null : _ingresarBiometria,
-                icon: const Icon(Icons.fingerprint),
-                label: const Text('Ingresar con huella o rostro'),
-              ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: _cargando
-                      ? null
-                      : () => auth.setBiometricEnabled(false),
-                  child: const Text('Desactivar acceso biométrico'),
-                ),
-              ),
-            ] else ...[
-              FutureBuilder<bool>(
-                future: auth.deviceSupportsBiometrics(),
-                builder: (context, snapshot) {
-                  if (snapshot.data != true) return const SizedBox.shrink();
-                  return CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    value: _habilitarBiometria,
-                    onChanged: _cargando
-                        ? null
-                        : (value) => setState(() => _habilitarBiometria = value ?? false),
-                    title: const Text('Habilitar ingreso con huella o rostro'),
-                    dense: true,
-                  );
-                },
-              ),
-            ],
           ],
         ),
       ),

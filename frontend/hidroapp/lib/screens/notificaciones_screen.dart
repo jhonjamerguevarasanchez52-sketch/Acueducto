@@ -144,6 +144,29 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     }
   }
 
+  /// Borra una notificación propia al deslizar la tarjeta. La tarjeta espera
+  /// la respuesta del servidor: si se borró, sale de la lista; si falló,
+  /// regresa a su sitio y se muestra el error. (Reinsertar una tarjeta ya
+  /// deslizada rompe el Dismissible, por eso se decide antes de quitarla.)
+  Future<bool> _confirmarEliminar(Notificacion n) async {
+    try {
+      await context.read<AuthProvider>().api.delete('/notificaciones/${n.id}');
+      return true;
+    } on ApiException catch (e) {
+      if (mounted) AppSnackbar.error(context, e.message);
+      return false;
+    }
+  }
+
+  void _quitarDeLaLista(Notificacion n) {
+    setState(() {
+      _notificaciones = [
+        for (final x in _notificaciones)
+          if (x.id != n.id) x,
+      ];
+    });
+  }
+
   /// Según el tipo de aviso, abre la pantalla donde el usuario puede ver el
   /// detalle o actuar sobre lo que causó la notificación (pagar la factura,
   /// ver el estado de la avería, etc.).
@@ -259,16 +282,55 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
               padding: const EdgeInsets.all(16),
               itemCount: _notificaciones.length,
               separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, i) => EntradaAnimada(
-                retraso: AppTheme.motionEscalon * i,
-                child: _NotificacionCard(
-                  notificacion: _notificaciones[i],
-                  onTap: () => _abrirCausante(_notificaciones[i]),
-                ),
-              ),
+              itemBuilder: (context, i) {
+                final n = _notificaciones[i];
+                return EntradaAnimada(
+                  key: ValueKey('notificacion-${n.id}'),
+                  retraso: AppTheme.motionEscalon * i,
+                  child: Dismissible(
+                    key: ValueKey('borrar-${n.id}'),
+                    direction: DismissDirection.endToStart,
+                    background: const _FondoEliminar(),
+                    confirmDismiss: (_) => _confirmarEliminar(n),
+                    onDismissed: (_) => _quitarDeLaLista(n),
+                    child: _NotificacionCard(
+                      notificacion: n,
+                      onTap: () => _abrirCausante(n),
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// Fondo rojo con el ícono de papelera que aparece al deslizar una tarjeta.
+class _FondoEliminar extends StatelessWidget {
+  const _FondoEliminar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.error,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Eliminar',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          SizedBox(width: 8),
+          Icon(Icons.delete_outline, color: Colors.white),
+        ],
       ),
     );
   }

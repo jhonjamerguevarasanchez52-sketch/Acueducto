@@ -99,6 +99,7 @@ async function generarFacturasMensuales({
     );
   }
   const vencimiento = fechaVencimiento(periodo);
+  let cupoCorreoAgotado = false;
 
   for (const perfil of perfiles || []) {
     let factura = facturasExistentes.get(perfil.id);
@@ -141,6 +142,14 @@ async function generarFacturasMensuales({
       continue;
     }
 
+    // Con el cupo de Brevo agotado se siguen creando las facturas, pero no se
+    // insiste con los correos: quedan sin marca de envío y la ejecución del
+    // día siguiente (días 1 a 5 del mes) los reintenta.
+    if (cupoCorreoAgotado) {
+      resumen.correosFallidos += 1;
+      continue;
+    }
+
     try {
       const respuesta = await enviarCorreo({
         to: perfil.correo,
@@ -164,7 +173,14 @@ async function generarFacturasMensuales({
       resumen.correosEnviados += 1;
     } catch (errorCorreo) {
       resumen.correosFallidos += 1;
-      resumen.errores.push(`No se pudo enviar el correo a ${perfil.correo}: ${errorCorreo.message}`);
+      if (mailer.esCupoAgotado(errorCorreo)) {
+        cupoCorreoAgotado = true;
+        resumen.avisos.push(
+          'Brevo rechazó los correos por cupo agotado. Las facturas se crearon; los correos pendientes se reintentan en la próxima ejecución.'
+        );
+      } else {
+        resumen.errores.push(`No se pudo enviar el correo a ${perfil.correo}: ${errorCorreo.message}`);
+      }
     }
   }
 

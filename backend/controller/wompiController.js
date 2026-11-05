@@ -80,7 +80,9 @@ async function webhook(req, res) {
     if (pagoError) {
       // Wompi can deliver an old event after its payment record was removed.
       // A missing reference is terminal; retrying it cannot make the row appear.
-      if (pagoError.code === 'PGRST116') {
+      // 22P02: la referencia ni siquiera es un uuid (otro comercio u otra app
+      // con las mismas llaves). Reintentar tampoco la arregla.
+      if (pagoError.code === 'PGRST116' || pagoError.code === '22P02') {
         console.warn('[wompi] pago no encontrado para referencia', referencia);
         return res.status(200).json({ received: true, ignored: true });
       }

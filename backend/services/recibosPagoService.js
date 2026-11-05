@@ -21,14 +21,28 @@ async function subirRecibo({ perfilId, facturaId, bytes, contentType }) {
   return { path: data?.path || path, error };
 }
 
-async function crearUrlRecibo(path) {
-  if (!path) return null;
+// Enlaces temporales para muchos recibos a la vez: una llamada a Storage por
+// cada bloque de 100 en vez de una por recibo. Devuelve un Map ruta → enlace;
+// una ruta que falla queda con null.
+const LOTE_ENLACES = 100;
+
+async function crearUrlsRecibos(paths = []) {
+  const unicos = [...new Set(paths.filter(Boolean))];
+  const enlaces = new Map();
+  if (unicos.length === 0) return enlaces;
+
   await asegurarBucketPrivado();
-  const { data, error } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .createSignedUrl(path, 10 * 60);
-  if (error) throw error;
-  return data.signedUrl;
+  for (let i = 0; i < unicos.length; i += LOTE_ENLACES) {
+    const lote = unicos.slice(i, i + LOTE_ENLACES);
+    const { data, error } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .createSignedUrls(lote, 10 * 60);
+    if (error) throw error;
+    for (const item of data || []) {
+      enlaces.set(item.path, item.error ? null : item.signedUrl || null);
+    }
+  }
+  return enlaces;
 }
 
 async function eliminarRecibo(path) {
@@ -37,4 +51,11 @@ async function eliminarRecibo(path) {
   if (error) console.error('[pagos] no se pudo limpiar un recibo sin pago asociado:', error.message);
 }
 
-module.exports = { BUCKET, MAX_BYTES, MIME_TYPES, subirRecibo, crearUrlRecibo, eliminarRecibo };
+module.exports = {
+  BUCKET,
+  MAX_BYTES,
+  MIME_TYPES,
+  subirRecibo,
+  crearUrlsRecibos,
+  eliminarRecibo,
+};

@@ -67,8 +67,13 @@ async function actualizarTarifa(req, res) {
   const { id } = req.params;
   const { cuota_fija, vigente_desde, vigente_hasta, tipo } = req.body;
 
+  // Misma regla que al crearla: una edición no puede dejar una cuota inválida.
+  if (cuota_fija !== undefined && (!Number.isFinite(Number(cuota_fija)) || Number(cuota_fija) < 0)) {
+    return res.status(400).json({ error: 'cuota_fija no puede ser negativa' });
+  }
+
   const cambios = {};
-  if (cuota_fija !== undefined) cambios.cuota_fija = cuota_fija;
+  if (cuota_fija !== undefined) cambios.cuota_fija = Number(cuota_fija);
   if (vigente_desde !== undefined) cambios.vigente_desde = vigente_desde;
   if (vigente_hasta !== undefined) cambios.vigente_hasta = vigente_hasta;
   if (tipo !== undefined) cambios.tipo = tipo;
@@ -80,9 +85,12 @@ async function actualizarTarifa(req, res) {
   try {
     const { data, error } = await rateModel.update(id, cambios);
 
-    if (error || !data) {
+    // PGRST116: ningún registro con ese id. Otros errores (fechas inválidas,
+    // vigencias que se cruzan) no son "no encontrada".
+    if (error?.code === 'PGRST116' || (!error && !data)) {
       return res.status(404).json({ error: 'Tarifa no encontrada' });
     }
+    if (error) return errorConsulta(res, error);
 
     return res.status(200).json({ message: 'Tarifa actualizada', tarifa: data });
   } catch (err) {
@@ -97,9 +105,10 @@ async function eliminarTarifa(req, res) {
   try {
     const { data, error } = await rateModel.remove(id);
 
-    if (error || !data) {
+    if (error?.code === 'PGRST116' || (!error && !data)) {
       return res.status(404).json({ error: 'Tarifa no encontrada' });
     }
+    if (error) return errorConsulta(res, error);
 
     return res.status(200).json({ message: 'Tarifa eliminada', tarifa: data });
   } catch (err) {

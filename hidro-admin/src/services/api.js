@@ -122,6 +122,26 @@ export async function apiRequest(path, options = {}) {
   return data
 }
 
+// Supabase entrega como máximo 1000 filas por consulta. Los listados que
+// crecen sin tope (usuarios, facturas, pagos, cortes) se piden por páginas y
+// se unen aquí, para que el panel y los reportes nunca trabajen con datos
+// recortados en silencio.
+export const TAMANO_PAGINA = 500
+const MAX_PAGINAS = 200
+
+export async function apiRequestAll(path, options = {}) {
+  const filas = []
+  const separador = path.includes('?') ? '&' : '?'
+  for (let pagina = 0; pagina < MAX_PAGINAS; pagina += 1) {
+    const offset = pagina * TAMANO_PAGINA
+    const datos = await apiRequest(`${path}${separador}limit=${TAMANO_PAGINA}&offset=${offset}`, options)
+    if (!Array.isArray(datos)) return datos
+    filas.push(...datos)
+    if (datos.length < TAMANO_PAGINA) return filas
+  }
+  return filas
+}
+
 export const endpoints = {
   login: '/auth/login',
   changePassword: '/auth/cambiar-password',
@@ -134,6 +154,9 @@ export const endpoints = {
   generarFacturasMensuales: '/facturas/generar-mensuales',
   facturaExtraordinaria: '/facturas/factura-extraordinaria',
   pagos: '/pagos/todos',
+  // Acciones sobre un pago concreto: /pagos/:id/confirmar y DELETE /pagos/:id.
+  // No cuelgan de /pagos/todos (esa ruta solo lista).
+  pago: '/pagos',
   registrarPagoAdmin: '/pagos/admin',
   cortes: '/cortes',
   cortesProgramados: '/cortes/programados',

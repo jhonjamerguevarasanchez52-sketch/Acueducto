@@ -11,15 +11,20 @@ const {
   solicitarRecuperacion,
   resetearPassword,
 } = require('../controller/authController');
-const { limiteAuth } = require('../middleware/rateLimit');
+const { limiteAuth, limiteAuthIp } = require('../middleware/rateLimit');
 const { verificarToken } = require('../middleware/authMiddleware');
 
-// Todas las rutas de autenticación pasan por el límite estricto de intentos.
-router.use(limiteAuth);
+// Renovar la sesión no adivina nada (el refresh token es largo y aleatorio) y
+// la app y el panel lo hacen cada hora: queda fuera del límite estricto para
+// no bloquear a todos los que comparten la IP. Sigue bajo el límite general.
+router.post('/renovar-sesion', renovarSesion);
+
+// El resto de rutas de autenticación pasan por el límite estricto de intentos
+// (por IP + correo) y por un techo por IP.
+router.use(limiteAuthIp, limiteAuth);
 
 // No hay auto-registro: las cuentas las crea el administrador desde el panel.
 router.post('/login', iniciarSesion);
-router.post('/renovar-sesion', renovarSesion);
 
 // Ingreso sin contraseña: código de 6 dígitos enviado al correo.
 router.post('/codigo-acceso', solicitarCodigoAcceso);

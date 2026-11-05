@@ -1,6 +1,7 @@
 const supabaseAdmin = require('../config/supabaseAdminClient'); // Cliente admin (ignora RLS); es el que se usa por defecto
 const { COLUMNAS_PERFIL_PUBLICO } = require('../utils/perfilCampos'); // Columnas del perfil seguras para exponer
 const { aplicarPaginacion } = require('../utils/paginacion');
+const cacheSesiones = require('../utils/cacheSesiones');
 
 // Acceso a la tabla "profiles". Todas las funciones devuelven { data, error } tal como
 // lo entrega Supabase; el controller decide qué responder.
@@ -56,8 +57,10 @@ async function listZones() {
   return { data: zonas.sort((a, b) => a.localeCompare(b, 'es')), error: null };
 }
 
+// Destinatarios de un aviso general. Las cuentas desactivadas no pueden
+// entrar a la app, así que no reciben avisos ni correos.
 function listRegisteredUsersForNotifications() {
-  return supabaseAdmin.from(TABLE).select('id, nombre, correo, rol');
+  return supabaseAdmin.from(TABLE).select('id, nombre, correo, rol').eq('activo', true);
 }
 
 function create(datos) {
@@ -68,20 +71,31 @@ function create(datos) {
 // incluir `updated_at` si el llamador quiere sellar la hora del cambio (lo
 // hace editarPerfil, para el límite mensual de autoedición; la edición hecha
 // por un administrador no lo sella, así no consume el cupo del usuario).
-function update(id, cambios, db = supabaseAdmin) {
-  return db.from(TABLE).update(cambios).eq('id', id).select(COLUMNAS_PERFIL_PUBLICO).single();
+//
+// Toda escritura en un perfil invalida las sesiones en caché de esa persona
+// (utils/cacheSesiones.js), para que un cambio de rol, estado o zona aplique
+// desde la siguiente petición.
+async function update(id, cambios, db = supabaseAdmin) {
+  const resultado = await db.from(TABLE).update(cambios).eq('id', id).select(COLUMNAS_PERFIL_PUBLICO).single();
+  cacheSesiones.invalidarUsuario(id);
+  return resultado;
 }
 
 // Actualiza sin devolver el registro (códigos de verificación, banderas internas...).
-function saveFields(id, cambios) {
-  return supabaseAdmin.from(TABLE).update(cambios).eq('id', id);
+async function saveFields(id, cambios) {
+  const resultado = await supabaseAdmin.from(TABLE).update(cambios).eq('id', id);
+  cacheSesiones.invalidarUsuario(id);
+  return resultado;
 }
 
 // El acueducto tiene un único fontanero: baja a "usuario" a quien lo sea, salvo `except`.
-function demotePlumbers(except) {
+async function demotePlumbers(except) {
   let query = supabaseAdmin.from(TABLE).update({ rol: 'usuario' }).eq('rol', 'fontanero');
   if (except) query = query.neq('id', except);
-  return query;
+  const resultado = await query;
+  // No se sabe de antemano a quién se degradó: se vacía todo el caché.
+  cacheSesiones.limpiar();
+  return resultado;
 }
 
 module.exports = {

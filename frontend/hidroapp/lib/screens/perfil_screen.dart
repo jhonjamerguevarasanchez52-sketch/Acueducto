@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import 'cambiar_password_screen.dart';
 import '../widgets/core/core.dart';
@@ -140,9 +141,14 @@ class PerfilScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Apariencia',
+                    'Ajustes',
                     style: textTheme.titleSmall
                         ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Apariencia',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: colores.secondaryText),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -173,6 +179,7 @@ class PerfilScreen extends StatelessWidget {
                     onSelectionChanged: (seleccion) =>
                         context.read<ThemeProvider>().cambiar(seleccion.first),
                   ),
+                  const _AjusteBiometria(),
                 ],
               ),
             ),
@@ -217,6 +224,71 @@ class PerfilScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Interruptor "Iniciar sesión con huella o rostro". Solo aparece si el
+/// dispositivo tiene biometría configurada. Una cuenta nueva entra siempre
+/// con correo y contraseña hasta que el usuario lo active aquí.
+class _AjusteBiometria extends StatefulWidget {
+  const _AjusteBiometria();
+
+  @override
+  State<_AjusteBiometria> createState() => _AjusteBiometriaState();
+}
+
+class _AjusteBiometriaState extends State<_AjusteBiometria> {
+  late final Future<bool> _soportada =
+      context.read<AuthProvider>().deviceSupportsBiometrics();
+  bool _cambiando = false;
+
+  Future<void> _cambiar(bool activar) async {
+    setState(() => _cambiando = true);
+    try {
+      final hecho = await context.read<AuthProvider>().setBiometricEnabled(activar);
+      if (!mounted || !hecho) return;
+      AppSnackbar.success(
+        context,
+        activar
+            ? 'Listo. La próxima vez podrás entrar con tu huella o rostro.'
+            : 'Ingreso con huella o rostro desactivado.',
+      );
+    } on ApiException catch (e) {
+      if (mounted) AppSnackbar.error(context, e.message);
+    } catch (_) {
+      if (mounted) AppSnackbar.error(context, 'No se pudo validar la biometría. Intenta de nuevo.');
+    } finally {
+      if (mounted) setState(() => _cambiando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
+    final activa = context.watch<AuthProvider>().biometricEnabled;
+    return FutureBuilder<bool>(
+      future: _soportada,
+      builder: (context, snapshot) {
+        if (snapshot.data != true) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 18),
+          child: SwitchListTile(
+            key: const ValueKey('ajuste-biometria'),
+            contentPadding: EdgeInsets.zero,
+            secondary: Icon(Icons.fingerprint, color: colores.info),
+            title: const Text('Iniciar sesión con huella o rostro'),
+            subtitle: Text(
+              activa
+                  ? 'Al abrir la app te pediremos tu huella o rostro.'
+                  : 'Desactivado: entras con tu correo y contraseña.',
+              style: TextStyle(fontSize: 12.5, color: colores.secondaryText),
+            ),
+            value: activa,
+            onChanged: _cambiando ? null : _cambiar,
+          ),
+        );
+      },
     );
   }
 }

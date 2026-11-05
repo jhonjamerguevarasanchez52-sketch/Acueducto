@@ -9,6 +9,7 @@ const { enviarCorreo } = require('../config/mailer');
 const { notificar } = require('../utils/notificar');
 const { escaparHtml } = require('../utils/html');
 const { normalizarCorreo } = require('../utils/formato');
+const cacheSesiones = require('../utils/cacheSesiones');
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
@@ -163,10 +164,23 @@ async function cambiarRol(req, res) {
     return res.status(400).json({ error: 'Rol inválido. Usa: administrador, usuario o fontanero' });
   }
 
+  // Igual que con la desactivación: quitarse el rol de administrador a sí
+  // mismo podría dejar el panel sin nadie que lo administre.
+  if (userId === req.usuario.id && rol !== 'administrador') {
+    return res.status(400).json({ error: 'No puedes quitarte tu propio rol de administrador' });
+  }
+
   // El acueducto contempla un único fontanero a la vez: si ya hay uno asignado
   // a otro usuario, hay que quitarle el rol (o eliminarlo) antes de asignar uno nuevo.
   try {
     if (rol === 'fontanero') {
+      // Se confirma el destino antes de degradar al fontanero actual: si el
+      // id no existe, el acueducto no debe quedarse sin fontanero.
+      const { data: destino, error: errorDestino } = await profileModel.getById(userId, { columns: 'id' });
+      if (errorDestino || !destino) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
       const { error: errorDegradacion } = await profileModel.demotePlumbers(userId);
 
       if (errorDegradacion) {
@@ -299,6 +313,8 @@ async function eliminarUsuario(req, res) {
       return errorConsulta(res, error);
     }
 
+    // Su sesión en caché no debe seguir abriendo puertas tras borrarlo.
+    cacheSesiones.invalidarUsuario(userId);
     return res.status(200).json({ message: 'Usuario eliminado permanentemente' });
   } catch (err) {
     return errorInesperado(res, err);

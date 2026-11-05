@@ -17,6 +17,9 @@ export const resourceEndpointBySection = {
   tarifas: 'tarifas',
 }
 
+// Listados sin tope de tamaño: se descargan por páginas (ver apiRequestAll).
+export const paginatedEndpoints = new Set(['adminUsers', 'facturasTodas', 'pagos', 'cortes'])
+
 export const MAX_BULK_USERS = 100
 export const MAX_USER_FILE_SIZE_BYTES = 5 * 1024 * 1024
 

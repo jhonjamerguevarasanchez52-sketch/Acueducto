@@ -373,8 +373,8 @@ export default function SectionViews({ activeSection, context }) {
                       <td className="row-actions">
                         {payment.recibo_url && <a className="link-button" href={payment.recibo_url} target="_blank" rel="noreferrer">Ver recibo</a>}
                         {!payment.confirmado && <>
-                          <button type="button" className="link-button" onClick={() => performAction('pagos', `${endpoints.pagos}/${payment.id}/confirmar`, 'PUT')}>Confirmar</button>
-                          <button type="button" className="link-button danger-link" onClick={() => performAction('pagos', `${endpoints.pagos}/${payment.id}`, 'DELETE', undefined, '¿Eliminar este pago pendiente?')}>Eliminar</button>
+                          <button type="button" className="link-button" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}/confirmar`, 'PUT')}>Confirmar</button>
+                          <button type="button" className="link-button danger-link" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}`, 'DELETE', undefined, '¿Eliminar este pago pendiente?')}>Eliminar</button>
                         </>}
                       </td>
                     </tr>

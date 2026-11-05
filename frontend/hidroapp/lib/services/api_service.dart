@@ -26,14 +26,30 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// La petición superó el tiempo máximo de espera. Se distingue de un fallo de
+/// conexión porque no conviene reintentarla automáticamente.
+class _TiempoAgotado extends ApiException {
+  _TiempoAgotado()
+    : super(
+        'El servidor no respondió a tiempo. Verifica tu conexión e intenta de nuevo.',
+      );
+}
+
 /// Cliente HTTP delgado sobre el backend REST.
 ///
 /// Inyecta el token `Authorization: Bearer <token>` cuando está disponible y
 /// normaliza los errores a [ApiException].
 class ApiService {
-  ApiService({http.Client? client}) : _client = client ?? http.Client();
+  ApiService({http.Client? client, this.tiempoMaximo = tiempoMaximoPorDefecto})
+    : _client = client ?? http.Client();
 
   final http.Client _client;
+
+  /// Render (plan gratuito) tarda 30–60 s en despertar el servidor dormido.
+  static const Duration tiempoMaximoPorDefecto = Duration(seconds: 45);
+
+  /// Tiempo máximo de espera por petición (configurable para las pruebas).
+  final Duration tiempoMaximo;
 
   /// Token de acceso de Supabase. Lo setea el [AuthProvider] al iniciar sesión.
   String? authToken;
@@ -49,52 +65,61 @@ class ApiService {
 
   static const _rutaRenovarSesion = '/auth/renovar-sesion';
 
-  /// Render (plan gratuito) tarda 30–60 s en despertar el servidor dormido.
-  static const Duration _timeout = Duration(seconds: 45);
-
   Uri _uri(String path) => Uri.parse('${ApiConfig.baseUrl}$path');
 
   Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        if (authToken != null) 'Authorization': 'Bearer $authToken',
-      };
+    'Content-Type': 'application/json',
+    if (authToken != null) 'Authorization': 'Bearer $authToken',
+  };
 
   /// Los GET no cambian nada en el servidor, así que se reintentan una vez
-  /// ante un timeout o fallo de red (típico mientras Render despierta).
+  /// ante un fallo de conexión (típico mientras Render despierta). Tras un
+  /// timeout NO se reintenta: el usuario ya esperó el máximo y volver a
+  /// esperar lo mismo duplicaría la espera sin avisarle.
   Future<dynamic> get(String path) => _send(
-        path,
-        () => _client.get(_uri(path), headers: _headers).timeout(_timeout),
-        reintentarFalloDeRed: true,
-      );
+    path,
+    () => _client.get(_uri(path), headers: _headers).timeout(tiempoMaximo),
+    reintentarFalloDeRed: true,
+  );
 
-  Future<dynamic> post(String path, {Object? body}) => _send(path, () => _client
-      .post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
-      .timeout(_timeout));
+  Future<dynamic> post(String path, {Object? body}) => _send(
+    path,
+    () => _client
+        .post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
+        .timeout(tiempoMaximo),
+  );
 
   Future<dynamic> postBytes(
     String path, {
     required List<int> bytes,
     required String contentType,
     Map<String, String> headers = const {},
-  }) =>
-      _send(
-        path,
-        () => _client
-            .post(
-              _uri(path),
-              headers: {
-                ...headers,
-                'Content-Type': contentType,
-                if (authToken != null) 'Authorization': 'Bearer $authToken',
-              },
-              body: bytes,
-            )
-            .timeout(_timeout),
-      );
+  }) => _send(
+    path,
+    () => _client
+        .post(
+          _uri(path),
+          headers: {
+            ...headers,
+            'Content-Type': contentType,
+            if (authToken != null) 'Authorization': 'Bearer $authToken',
+          },
+          body: bytes,
+        )
+        .timeout(tiempoMaximo),
+  );
 
-  Future<dynamic> put(String path, {Object? body}) => _send(path, () => _client
-      .put(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
-      .timeout(_timeout));
+  Future<dynamic> put(String path, {Object? body}) => _send(
+    path,
+    () => _client
+        .put(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
+        .timeout(tiempoMaximo),
+  );
+
+  Future<dynamic> delete(String path) => _send(
+    path,
+    () => _client.delete(_uri(path), headers: _headers).timeout(tiempoMaximo),
+  );
 
   Future<dynamic> _send(
     String path,
@@ -105,8 +130,8 @@ class ApiService {
     http.Response res;
     try {
       res = await _ejecutar(request);
-    } on ApiException {
-      if (!reintentarFalloDeRed) rethrow;
+    } on ApiException catch (e) {
+      if (!reintentarFalloDeRed || e is _TiempoAgotado) rethrow;
       res = await _ejecutar(request);
     }
 
@@ -116,7 +141,8 @@ class ApiService {
     if (res.statusCode == 401 &&
         tokenUsado != null &&
         path != _rutaRenovarSesion) {
-      final renovado = authToken != tokenUsado ||
+      final renovado =
+          authToken != tokenUsado ||
           (onRenovarSesion != null && await onRenovarSesion!());
       if (renovado && authToken != null) res = await _ejecutar(request);
     }
@@ -152,7 +178,7 @@ class ApiService {
       return await request();
     } on TimeoutException catch (e) {
       if (kDebugMode) debugPrint('[ApiService] timeout: $e');
-      throw ApiException('El servidor no respondió a tiempo. Verifica tu conexión.');
+      throw _TiempoAgotado();
     } catch (e, st) {
       // No filtramos el error real al usuario (podría ser un detalle técnico
       // sin sentido para él), pero sí lo dejamos en el log para poder
