@@ -47,9 +47,12 @@ void main() {
         (_) async =>
             http.Response(jsonEncode({'error': 'La sesión expiró'}), 401),
       );
-      final api = ApiService(client: client);
+      final api = ApiService(client: client)..authToken = 'token-prueba';
       var unauthorizedCalls = 0;
-      api.onUnauthorized = () => unauthorizedCalls += 1;
+      api.onUnauthorized = () async {
+        unauthorizedCalls++;
+        return false;
+      };
       addTearDown(api.dispose);
 
       await expectLater(
@@ -59,6 +62,10 @@ void main() {
             (error) => error.statusCode,
             'statusCode',
             401,
+          ).having(
+            (error) => error.data,
+            'data',
+            {'error': 'La sesión expiró'},
           ),
         ),
       );
