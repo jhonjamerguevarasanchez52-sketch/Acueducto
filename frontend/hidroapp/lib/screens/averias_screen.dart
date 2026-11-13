@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/averias/averias.dart';
 import '../widgets/core/core.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Módulo "Averías": el usuario reporta una avería del servicio y hace
 /// seguimiento del estado en que la deja el fontanero.
@@ -201,14 +202,14 @@ class _AveriasScreenState extends State<AveriasScreen> {
           IconButton(
             tooltip: 'Actualizar averías',
             onPressed: () => _refrescar(),
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(LucideIcons.refreshCw),
           ),
         ],
       ),
       floatingActionButton: puedeReportar
           ? FloatingActionButton.extended(
               onPressed: _abrirReporte,
-              icon: const Icon(Icons.add),
+              icon: const Icon(LucideIcons.plus),
               label: const Text('Reportar'),
             )
           : null,
@@ -242,7 +243,7 @@ class _AveriasScreenState extends State<AveriasScreen> {
                 children: [
                   _barraFiltros(todasLasAverias),
                   MensajeEstado(
-                    icono: Icons.build_outlined,
+                    icono: LucideIcons.wrench,
                     titulo: 'Sin averías reportadas',
                     detalle: _esFontanero
                         ? 'No hay averías para mostrar.'
@@ -270,7 +271,7 @@ class _AveriasScreenState extends State<AveriasScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(top: 48),
                     child: MensajeEstado(
-                      icono: Icons.filter_list_off,
+                      icono: LucideIcons.filterX,
                       titulo:
                           'No hay averías ${_filtrosEstado.firstWhere((f) => f.$1 == _filtroEstado).$2.toLowerCase()}',
                       detalle: 'Prueba otro filtro para ver más averías.',
@@ -347,7 +348,7 @@ class _AveriaReportadaDialogState extends State<_AveriaReportadaDialog>
             child: CircleAvatar(
               radius: 34,
               backgroundColor: colores.success.withValues(alpha: 0.14),
-              child: Icon(Icons.water_drop, size: 38, color: colores.success),
+              child: Icon(LucideIcons.droplet, size: 38, color: colores.success),
             ),
           ),
           const SizedBox(height: 16),

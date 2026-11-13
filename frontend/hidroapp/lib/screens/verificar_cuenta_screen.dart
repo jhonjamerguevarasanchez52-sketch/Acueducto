@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../widgets/auth/auth.dart';
 import '../widgets/core/hidro_logo.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Pantalla de confirmación de cuenta.
 ///
@@ -58,7 +59,7 @@ class _Encabezado extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: IconButton(
             onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
             tooltip: 'Volver',
           ),
         ),

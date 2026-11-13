@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/averia.dart';
 import '../../theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Pide al backend un enlace temporal para reproducir [audio]. Devuelve null
 /// si ya no se puede escuchar (quien la implementa avisa al usuario).
@@ -131,8 +132,8 @@ class _AveriaAudioTileState extends State<AveriaAudioTile> {
                     )
                   : Icon(
                       _sonando
-                          ? Icons.pause_circle_filled
-                          : Icons.play_circle_fill,
+                          ? LucideIcons.circlePause
+                          : LucideIcons.circlePlay,
                       color: AppTheme.primary,
                       size: 30,
                     ),
@@ -140,7 +141,7 @@ class _AveriaAudioTileState extends State<AveriaAudioTile> {
           else
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Icon(Icons.mic_off_outlined, color: colores.secondaryText),
+              child: Icon(LucideIcons.micOff, color: colores.secondaryText),
             ),
           Expanded(
             child: Column(

@@ -10,6 +10,7 @@ import '../widgets/core/core.dart';
 import 'averias_screen.dart';
 import 'estado_servicio_screen.dart';
 import 'facturas_screen.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Módulo "Notificaciones": avisos del acueducto (facturas, pagos, averías,
 /// cortes, mensajes generales). Se pueden marcar como leídas una a una o
@@ -234,7 +235,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.campaign_outlined),
+                  : const Icon(LucideIcons.megaphone),
             ),
           if (_noLeidas > 0)
             TextButton(
@@ -270,7 +271,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
               return ListView(
                 children: const [
                   MensajeEstado(
-                    icono: Icons.notifications_none,
+                    icono: LucideIcons.bell,
                     titulo: 'Sin notificaciones',
                     detalle: 'Aquí llegarán los avisos del acueducto.',
                   ),
@@ -329,7 +330,7 @@ class _FondoEliminar extends StatelessWidget {
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           ),
           SizedBox(width: 8),
-          Icon(Icons.delete_outline, color: Colors.white),
+          Icon(LucideIcons.trash2, color: Colors.white),
         ],
       ),
     );
@@ -343,17 +344,17 @@ class _NotificacionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   static const _iconos = {
-    'factura': Icons.receipt_long,
-    'pago': Icons.payments_outlined,
-    'averia': Icons.build_outlined,
-    'corte': Icons.water_drop_outlined,
-    'general': Icons.campaign_outlined,
+    'factura': LucideIcons.receiptText,
+    'pago': LucideIcons.banknote,
+    'averia': LucideIcons.wrench,
+    'corte': LucideIcons.droplet,
+    'general': LucideIcons.megaphone,
   };
 
   @override
   Widget build(BuildContext context) {
     final leida = notificacion.leida;
-    final icono = _iconos[notificacion.tipo] ?? Icons.notifications_none;
+    final icono = _iconos[notificacion.tipo] ?? LucideIcons.bell;
     final colores = AppColors.of(context);
 
     return Material(

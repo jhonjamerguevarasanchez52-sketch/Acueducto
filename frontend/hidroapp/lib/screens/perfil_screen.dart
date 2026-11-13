@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import 'cambiar_password_screen.dart';
 import '../widgets/core/core.dart';
 import 'editar_perfil_screen.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Pestaña "Perfil": muestra los datos de la cuenta del usuario, permite
 /// editarlos y cerrar sesión.
@@ -67,7 +68,7 @@ class PerfilScreen extends StatelessWidget {
                 CircleAvatar(
                   radius: 40,
                   backgroundColor: colores.chipBackground,
-                  child: const Icon(Icons.person,
+                  child: const Icon(LucideIcons.user,
                       color: Color.fromARGB(255, 91, 153, 247), size: 44),
                 ),
                 const SizedBox(height: 12),
@@ -108,25 +109,25 @@ class PerfilScreen extends StatelessWidget {
             child: Column(
               children: [
                 _Dato(
-                  icono: Icons.badge_outlined,
+                  icono: LucideIcons.idCard,
                   etiqueta: 'Número de lote',
                   valor: perfil?.numeroLote,
                 ),
                 const Divider(height: 1),
                 _Dato(
-                  icono: Icons.location_on_outlined,
+                  icono: LucideIcons.mapPin,
                   etiqueta: 'Dirección',
                   valor: perfil?.direccion,
                 ),
                 const Divider(height: 1),
                 _Dato(
-                  icono: Icons.map_outlined,
+                  icono: LucideIcons.map,
                   etiqueta: 'Zona',
                   valor: perfil?.zona,
                 ),
                 const Divider(height: 1),
                 _Dato(
-                  icono: Icons.phone_outlined,
+                  icono: LucideIcons.phone,
                   etiqueta: 'Teléfono',
                   valor: perfil?.telefono,
                 ),
@@ -160,17 +161,17 @@ class PerfilScreen extends StatelessWidget {
                     segments: const [
                       ButtonSegment(
                         value: ThemeMode.light,
-                        icon: Icon(Icons.light_mode_outlined),
+                        icon: Icon(LucideIcons.sun),
                         label: Text('Claro'),
                       ),
                       ButtonSegment(
                         value: ThemeMode.dark,
-                        icon: Icon(Icons.dark_mode_outlined),
+                        icon: Icon(LucideIcons.moon),
                         label: Text('Oscuro'),
                       ),
                       ButtonSegment(
                         value: ThemeMode.system,
-                        icon: Icon(Icons.settings_suggest_outlined),
+                        icon: Icon(LucideIcons.settings2),
                         label: Text('Auto'),
                       ),
                     ],
@@ -187,7 +188,7 @@ class PerfilScreen extends StatelessWidget {
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () => _editarPerfil(context),
-            icon: const Icon(Icons.edit_outlined),
+            icon: const Icon(LucideIcons.pencil),
             label: const Text('Editar perfil'),
           ),
           const SizedBox(height: 8),
@@ -205,7 +206,7 @@ class PerfilScreen extends StatelessWidget {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CambiarPasswordScreen()),
             ),
-            icon: const Icon(Icons.lock_reset),
+            icon: const Icon(LucideIcons.rotateCcwKey),
             label: const Text('Cambiar contraseña'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppTheme.primary,
@@ -215,7 +216,7 @@ class PerfilScreen extends StatelessWidget {
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => _cerrarSesion(context),
-            icon: const Icon(Icons.logout),
+            icon: const Icon(LucideIcons.logOut),
             label: const Text('Cerrar sesión'),
             style: OutlinedButton.styleFrom(
               foregroundColor: colores.danger,
@@ -276,7 +277,7 @@ class _AjusteBiometriaState extends State<_AjusteBiometria> {
           child: SwitchListTile(
             key: const ValueKey('ajuste-biometria'),
             contentPadding: EdgeInsets.zero,
-            secondary: Icon(Icons.fingerprint, color: colores.info),
+            secondary: Icon(LucideIcons.fingerprint, color: colores.info),
             title: const Text('Iniciar sesión con huella o rostro'),
             subtitle: Text(
               activa

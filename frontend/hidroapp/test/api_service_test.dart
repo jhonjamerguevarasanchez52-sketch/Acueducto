@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show HandshakeException, SocketException;
 
 import 'package:acueducto_app/services/api_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -138,5 +139,55 @@ void main() {
     expect(capturada?.method, 'DELETE');
     expect(capturada?.url.path, endsWith('/notificaciones/abc'));
     expect(capturada?.headers['Authorization'], 'Bearer t');
+  });
+
+  group('mensaje según el tipo de fallo de red', () {
+    test('certificado o fecha del teléfono', () {
+      expect(
+        ApiService.mensajeFalloDeRed(const HandshakeException('CERT')),
+        contains('RED-TLS'),
+      );
+    });
+
+    test('sin internet o DNS', () {
+      expect(
+        ApiService.mensajeFalloDeRed(
+          const SocketException('Failed host lookup: hidro-app.onrender.com'),
+        ),
+        contains('RED-DNS'),
+      );
+    });
+
+    test('conexión rechazada', () {
+      expect(
+        ApiService.mensajeFalloDeRed(
+          const SocketException('Connection refused'),
+        ),
+        contains('RED-SOCKET'),
+      );
+    });
+
+    test('conexión cortada', () {
+      expect(
+        ApiService.mensajeFalloDeRed(http.ClientException('reiniciada')),
+        contains('RED-CONEXION'),
+      );
+    });
+
+    test('la petición fallida muestra el código al usuario', () async {
+      final api = ApiService(
+        client: MockClient(
+          (_) async => throw const SocketException('Failed host lookup: x'),
+        ),
+      );
+      addTearDown(api.dispose);
+
+      await expectLater(
+        api.post('/auth/login'),
+        throwsA(
+          isA<ApiException>().having((e) => e.message, 'message', contains('RED-DNS')),
+        ),
+      );
+    });
   });
 }

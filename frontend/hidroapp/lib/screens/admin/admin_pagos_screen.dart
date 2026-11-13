@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'admin_api.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AdminPagosScreen extends StatefulWidget {
   const AdminPagosScreen({super.key, required this.api});
@@ -10,7 +12,14 @@ class AdminPagosScreen extends StatefulWidget {
 }
 
 class _AdminPagosScreenState extends State<AdminPagosScreen> {
-  late Future<List<dynamic>> _futuro;
+  late Future<List<Map<String, dynamic>>> _futuro;
+
+  Future<void> _verRecibo(String url) async {
+    final uri = Uri.tryParse(url);
+    final abierto = uri != null &&
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!abierto && mounted) _aviso('No se pudo abrir el recibo.');
+  }
 
   @override
   void initState() {
@@ -30,6 +39,7 @@ class _AdminPagosScreenState extends State<AdminPagosScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: const Text('Confirmar pago'),
         content: Text(
           'Monto: \$${p['monto']}\n'
@@ -65,8 +75,8 @@ class _AdminPagosScreenState extends State<AdminPagosScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Pagos sin confirmar')),
-      body: FutureBuilder<List<dynamic>>(
+      appBar: AppBar(title: const Text('Recibos por revisar')),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _futuro,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
@@ -76,7 +86,7 @@ class _AdminPagosScreenState extends State<AdminPagosScreen> {
 
           final pagos = snap.data!;
           if (pagos.isEmpty) {
-            return const Center(child: Text('No hay pagos pendientes'));
+            return const Center(child: Text('No hay recibos por revisar'));
           }
 
           return RefreshIndicator(
@@ -84,11 +94,19 @@ class _AdminPagosScreenState extends State<AdminPagosScreen> {
             child: ListView.builder(
               itemCount: pagos.length,
               itemBuilder: (_, i) {
-                final p = Map<String, dynamic>.from(pagos[i]);
+                final p = pagos[i];
+                final recibo = p['recibo_url'];
                 return ListTile(
-                  leading: const Icon(Icons.hourglass_bottom),
+                  leading: const Icon(LucideIcons.hourglass),
                   title: Text('\$${p['monto']} · ${p['metodo']}'),
-                  subtitle: Text('Ref: ${p['referencia'] ?? '-'}'),
+                  subtitle: Text(
+                    recibo is String && recibo.isNotEmpty
+                        ? 'Toca para ver el recibo'
+                        : 'Sin imagen del recibo',
+                  ),
+                  onTap: recibo is String && recibo.isNotEmpty
+                      ? () => _verRecibo(recibo)
+                      : null,
                   trailing: FilledButton(
                     // El tema da ancho infinito a los botones; en una fila
                     // de lista eso rompe el diseño.

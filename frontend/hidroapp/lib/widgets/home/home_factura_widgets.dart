@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Contenedor blanco elevado que "flota" sobre la cabecera azul de la pestaña
 /// "Inicio".
@@ -95,7 +96,7 @@ class BotonPagarAhora extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: const [
-                Icon(Icons.payments_outlined, color: Colors.white, size: 18),
+                Icon(LucideIcons.banknote, color: Colors.white, size: 18),
                 SizedBox(width: 8),
                 Text(
                   'Pagar ahora',

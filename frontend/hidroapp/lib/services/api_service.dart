@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show HandshakeException, SocketException, TlsException;
 
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kDebugMode, visibleForTesting;
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import '../utils/lenguaje_ofensivo.dart';
 
 /// Error de API con el mensaje que devuelve el backend (`{ "error": "..." }`).
 class ApiException implements Exception {
@@ -82,12 +85,21 @@ class ApiService {
     reintentarFalloDeRed: true,
   );
 
-  Future<dynamic> post(String path, {Object? body}) => _send(
-    path,
-    () => _client
-        .post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
-        .timeout(tiempoMaximo),
-  );
+  /// Ningún texto con groserías o lenguaje ofensivo sale de la app: se avisa
+  /// al instante sin esperar al servidor (que tiene la misma regla).
+  static Future<dynamic>? _rechazarOfensivo(Object? body) =>
+      cuerpoConLenguajeOfensivo(body)
+          ? Future.error(ApiException(mensajeLenguajeOfensivo, statusCode: 400))
+          : null;
+
+  Future<dynamic> post(String path, {Object? body}) =>
+      _rechazarOfensivo(body) ??
+      _send(
+        path,
+        () => _client
+            .post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
+            .timeout(tiempoMaximo),
+      );
 
   Future<dynamic> postBytes(
     String path, {
@@ -109,12 +121,14 @@ class ApiService {
         .timeout(tiempoMaximo),
   );
 
-  Future<dynamic> put(String path, {Object? body}) => _send(
-    path,
-    () => _client
-        .put(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
-        .timeout(tiempoMaximo),
-  );
+  Future<dynamic> put(String path, {Object? body}) =>
+      _rechazarOfensivo(body) ??
+      _send(
+        path,
+        () => _client
+            .put(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
+            .timeout(tiempoMaximo),
+      );
 
   Future<dynamic> delete(String path) => _send(
     path,
@@ -185,8 +199,31 @@ class ApiService {
       // diagnosticar problemas reales (DNS, certificado, etc.) en vez de que
       // todo se vea igual que "sin internet".
       if (kDebugMode) debugPrint('[ApiService] fallo de red: $e\n$st');
-      throw ApiException('No se pudo conectar con el servidor.');
+      throw ApiException(mensajeFalloDeRed(e));
     }
+  }
+
+  /// Traduce el fallo de red a un mensaje que el usuario pueda resolver, con
+  /// un código corto para que nos diga qué le salió sin ver el log.
+  @visibleForTesting
+  static String mensajeFalloDeRed(Object e) {
+    if (e is HandshakeException || e is TlsException) {
+      return 'No se pudo establecer una conexión segura con el servidor. '
+          'Revisa que la fecha y la hora del teléfono estén en automático. '
+          '(código RED-TLS)';
+    }
+    final texto = e.toString();
+    if (texto.contains('Failed host lookup') ||
+        texto.contains('No address associated with hostname')) {
+      return 'No hay internet o no se encontró el servidor. Revisa tus datos '
+          'o el Wi-Fi y vuelve a intentar. (código RED-DNS)';
+    }
+    if (e is SocketException) {
+      return 'No se pudo conectar con el servidor. Revisa tu conexión y que '
+          'la app tenga permiso de usar datos. (código RED-SOCKET)';
+    }
+    return 'Se interrumpió la conexión con el servidor. Intenta de nuevo. '
+        '(código RED-CONEXION)';
   }
 
   void dispose() => _client.close();

@@ -4,17 +4,19 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/lenguaje_ofensivo.dart';
 import '../core/app_snackbar.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Problemas frecuentes: el usuario toca uno en vez de escribir. El texto del
 /// botón se convierte en el inicio de la descripción que recibe el fontanero.
 const tiposAveria = <(IconData, String)>[
-  (Icons.water_drop_outlined, 'No llega el agua'),
-  (Icons.plumbing, 'Fuga de agua'),
-  (Icons.speed, 'Baja presión'),
-  (Icons.opacity, 'Agua turbia o con mal olor'),
-  (Icons.av_timer, 'Daño en el contador'),
-  (Icons.more_horiz, 'Otro problema'),
+  (LucideIcons.droplet, 'No llega el agua'),
+  (LucideIcons.wrench, 'Fuga de agua'),
+  (LucideIcons.gauge, 'Baja presión'),
+  (LucideIcons.droplets, 'Agua turbia o con mal olor'),
+  (LucideIcons.timer, 'Daño en el contador'),
+  (LucideIcons.ellipsis, 'Otro problema'),
 ];
 
 const _otroProblema = 'Otro problema';
@@ -143,7 +145,7 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                             alignment: Alignment.centerRight,
                             child: IconButton(
                               onPressed: _enviando ? null : widget.onCerrar,
-                              icon: const Icon(Icons.close),
+                              icon: const Icon(LucideIcons.x),
                               tooltip: 'Cerrar',
                               visualDensity: VisualDensity.compact,
                             ),
@@ -194,7 +196,7 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                         if (esOtro && t.length < 10) {
                           return 'Describe el problema en pocas palabras (mínimo 10 letras)';
                         }
-                        return null;
+                        return validarSinGroserias(t);
                       },
                     ),
                     const SizedBox(height: 8),
@@ -206,13 +208,13 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                         decoration: const InputDecoration(
                           labelText: 'Ubicación de la avería',
                           hintText: 'Dirección, zona o número de lote',
-                          prefixIcon: Icon(Icons.location_on_outlined),
+                          prefixIcon: Icon(LucideIcons.mapPin),
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Indica dónde está la avería';
                           }
-                          return null;
+                          return validarSinGroserias(value);
                         },
                       )
                     else if (ubicacion != null)
@@ -225,7 +227,7 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.location_on_outlined, color: colores.info),
+                            Icon(LucideIcons.mapPin, color: colores.info),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
@@ -267,7 +269,7 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.send),
+                          : const Icon(LucideIcons.send),
                       label: const Text('Avisar al fontanero'),
                     ),
                   ],

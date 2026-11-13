@@ -46,6 +46,24 @@ class Pago {
 
   bool get reemplazado => !confirmado && estadoWompi == 'SUPERSEDED';
 
+  /// El acueducto devolvió el dinero de un cobro que no se pudo aplicar.
+  bool get reembolsado => !confirmado && estadoWompi == 'REEMBOLSADO';
+
+  /// Minutos tras los que un checkout de Wompi sin respuesta se da por
+  /// abandonado (igual que el backend): Wompi no avisa si se cierra sin pagar.
+  static const minutosCheckoutAbandonado = 30;
+
+  /// Checkout de Wompi que se abrió y nunca se completó. Se puede volver a
+  /// pagar: el servidor libera este intento y abre uno nuevo.
+  bool abandonado([DateTime? ahora]) =>
+      !confirmado &&
+      metodo == 'wompi' &&
+      estadoWompi == 'PENDING' &&
+      (transaccionId == null || transaccionId!.isEmpty) &&
+      fechaPago != null &&
+      (ahora ?? DateTime.now()).difference(fechaPago!).inMinutes >=
+          minutosCheckoutAbandonado;
+
   factory Pago.fromJson(Map<String, dynamic> json) {
     return Pago(
       id: json['id']?.toString() ?? '',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
 import 'chat_mensaje.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Burbuja de un mensaje del chat. Alineada a la derecha y en azul si es del
 /// usuario; a la izquierda, blanca (o roja si es un error) si es del asistente.
@@ -73,7 +74,7 @@ class ChatBurbuja extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.mic, size: 14, color: texto.withValues(alpha: 0.8)),
+                    Icon(LucideIcons.mic, size: 14, color: texto.withValues(alpha: 0.8)),
                     const SizedBox(width: 4),
                     Text(
                       'Audio',
@@ -94,7 +95,7 @@ class ChatBurbuja extends StatelessWidget {
               const SizedBox(height: 10),
               FilledButton.icon(
                 onPressed: onConfirmarAveria,
-                icon: const Icon(Icons.handyman_outlined, size: 18),
+                icon: const Icon(LucideIcons.hammer, size: 18),
                 label: const Text('Sí, avisar al fontanero'),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppTheme.primary,
@@ -109,7 +110,7 @@ class ChatBurbuja extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.refresh, size: 16, color: colores.danger),
+                    Icon(LucideIcons.refreshCw, size: 16, color: colores.danger),
                     const SizedBox(width: 4),
                     Text(
                       'Reintentar',

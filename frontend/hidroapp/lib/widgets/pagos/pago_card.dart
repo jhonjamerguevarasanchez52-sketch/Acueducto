@@ -5,6 +5,7 @@ import '../../models/pago.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
 import '../core/fila_detalle.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Tarjeta de un pago del historial: monto, método, estado de confirmación y,
 /// mientras no esté confirmado, un botón para volver a intentarlo.
@@ -32,37 +33,51 @@ class PagoCard extends StatelessWidget {
       return (
         texto: 'Confirmado',
         color: colores.success,
-        icono: Icons.check_circle,
+        icono: LucideIcons.circleCheck,
       );
     }
     if (pago.rechazado) {
-      return (texto: 'Rechazado', color: colores.danger, icono: Icons.cancel);
+      return (texto: 'Rechazado', color: colores.danger, icono: LucideIcons.circleX);
     }
     if (pago.requiereRevision) {
       return (
         texto: 'Requiere revisión del acueducto',
         color: colores.warning,
-        icono: Icons.support_agent,
+        icono: LucideIcons.headset,
+      );
+    }
+    if (pago.reembolsado) {
+      return (
+        texto: 'El acueducto te devolvió este cobro',
+        color: colores.secondaryText,
+        icono: LucideIcons.info,
       );
     }
     if (pago.reemplazado) {
       return (
-        texto: 'Cerrado: la factura se pagó con otro intento',
+        texto: 'Intento cerrado: ya no está en curso',
         color: colores.secondaryText,
-        icono: Icons.info_outline,
+        icono: LucideIcons.info,
+      );
+    }
+    if (pago.abandonado()) {
+      return (
+        texto: 'El pago en línea no se completó',
+        color: colores.secondaryText,
+        icono: LucideIcons.info,
       );
     }
     if (pago.estadoWompi == 'PENDING') {
       return (
         texto: 'Esperando respuesta de Wompi',
         color: colores.warning,
-        icono: Icons.hourglass_bottom,
+        icono: LucideIcons.hourglass,
       );
     }
     return (
       texto: 'Pendiente de confirmación',
       color: colores.warning,
-      icono: Icons.hourglass_bottom,
+      icono: LucideIcons.hourglass,
     );
   }
 
@@ -118,38 +133,38 @@ class PagoCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             FilaDetalle(
-              icono: Icons.event_outlined,
+              icono: LucideIcons.calendar,
               texto: 'Registrado: ${Formato.fechaHora(pago.fechaPago)}',
             ),
             if (pago.cargoWompi > 0)
               FilaDetalle(
-                icono: Icons.account_balance_wallet_outlined,
+                icono: LucideIcons.wallet,
                 texto: 'Cargo Wompi: ${Formato.pesos(pago.cargoWompi)}',
               ),
             if (pago.montoTotal != null)
               FilaDetalle(
-                icono: Icons.payments_outlined,
+                icono: LucideIcons.banknote,
                 texto: 'Total cobrado: ${Formato.pesos(pago.montoTotal)}',
               ),
             if (pago.confirmado && pago.fechaConfirmacion != null)
               FilaDetalle(
-                icono: Icons.verified_outlined,
+                icono: LucideIcons.badgeCheck,
                 texto:
                     'Confirmado: ${Formato.fechaHora(pago.fechaConfirmacion)}',
               ),
             if (pago.referencia != null && pago.metodo != 'fisico')
               FilaDetalle(
-                icono: Icons.tag,
+                icono: LucideIcons.hash,
                 texto: 'Referencia: ${pago.referencia}',
               ),
             if (pago.transaccionId != null)
               FilaDetalle(
-                icono: Icons.receipt_long_outlined,
+                icono: LucideIcons.receiptText,
                 texto: 'Transacción Wompi: ${pago.transaccionId}',
               ),
             if (pago.medioPagoWompi != null)
               FilaDetalle(
-                icono: Icons.credit_card_outlined,
+                icono: LucideIcons.creditCard,
                 texto: 'Medio Wompi: ${Formato.etiqueta(pago.medioPagoWompi)}',
               ),
             if (pago.reciboUrl != null) ...[
@@ -161,17 +176,17 @@ class PagoCard extends StatelessWidget {
                     Uri.parse(pago.reciboUrl!),
                     mode: LaunchMode.externalApplication,
                   ),
-                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                  icon: const Icon(LucideIcons.receiptText, size: 18),
                   label: const Text('Ver recibo enviado'),
                 ),
               ),
             ],
-            if (!pago.confirmado && pago.rechazado) ...[
+            if (!pago.confirmado && (pago.rechazado || pago.abandonado())) ...[
               const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: onPagar,
-                icon: const Icon(Icons.payments_outlined, size: 18),
-                label: Text(pago.rechazado ? 'Volver a pagar' : 'Pagar'),
+                icon: const Icon(LucideIcons.banknote, size: 18),
+                label: const Text('Volver a pagar'),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(44),
                   textStyle: const TextStyle(

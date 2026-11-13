@@ -5,6 +5,7 @@ import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
 import 'home_factura_widgets.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Tarjeta de la factura pendiente en la pestaña "Inicio": periodo, valor,
 /// vencimiento, anillo de avance del ciclo y botón "Pagar ahora". Si no hay
@@ -58,7 +59,7 @@ class ProximaFactura extends StatelessWidget {
       return CajaBlanca(
         child: Row(
           children: [
-            Icon(Icons.cloud_off_outlined, color: colores.secondaryText),
+            Icon(LucideIcons.cloudOff, color: colores.secondaryText),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -91,7 +92,7 @@ class ProximaFactura extends StatelessWidget {
       return CajaBlanca(
         child: Row(
           children: [
-            Icon(Icons.check_circle, color: colores.success, size: 30),
+            Icon(LucideIcons.circleCheck, color: colores.success, size: 30),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -199,7 +200,7 @@ class ProximaFactura extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.schedule, size: 14, color: color),
+                Icon(LucideIcons.clock, size: 14, color: color),
                 const SizedBox(width: 6),
                 Text(
                   aviso,

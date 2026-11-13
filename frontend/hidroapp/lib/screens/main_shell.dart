@@ -8,6 +8,7 @@ import 'facturas_screen.dart';
 import 'home_screen.dart';
 import 'notificaciones_screen.dart';
 import 'perfil_screen.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Contenedor principal de la app tras iniciar sesión: mantiene la navegación
 /// inferior fija y va mostrando cada módulo en su pestaña. Las pantallas
@@ -36,11 +37,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       ];
 
   static const _iconos = [
-    (Icons.home_outlined, Icons.home, 'Inicio'),
-    (Icons.receipt_long_outlined, Icons.receipt_long, 'Factura'),
-    (Icons.build_outlined, Icons.build, 'Averías'),
-    (Icons.notifications_outlined, Icons.notifications, 'Avisos'),
-    (Icons.person_outline, Icons.person, 'Perfil'),
+    (LucideIcons.house, LucideIcons.house, 'Inicio'),
+    (LucideIcons.receiptText, LucideIcons.receiptText, 'Factura'),
+    (LucideIcons.wrench, LucideIcons.wrench, 'Averías'),
+    (LucideIcons.bell, LucideIcons.bellRing, 'Avisos'),
+    (LucideIcons.user, LucideIcons.user, 'Perfil'),
   ];
 
   @override

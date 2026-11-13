@@ -8,6 +8,7 @@ import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../core/app_snackbar.dart';
 import 'auth_style.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Tarjeta blanca con el formulario de inicio de sesión: correo, contraseña y
 /// el botón de entrar. Conserva su propio estado (controllers, validación y la
@@ -141,7 +142,7 @@ class _LoginFormState extends State<LoginForm> {
               decoration: authInputDecoration(
                 context,
                 hint: 'tucorreo@ejemplo.com',
-                icon: Icons.mail_outline,
+                icon: LucideIcons.mail,
               ),
               validator: (v) {
                 final t = v?.trim() ?? '';
@@ -162,13 +163,13 @@ class _LoginFormState extends State<LoginForm> {
               decoration: authInputDecoration(
                 context,
                 hint: '••••••••',
-                icon: Icons.lock_outline,
+                icon: LucideIcons.lock,
                 suffix: IconButton(
                   splashRadius: 20,
                   icon: Icon(
                     _verPassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
+                        ? LucideIcons.eyeOff
+                        : LucideIcons.eye,
                     color: authMutedDe(context),
                     size: 20,
                   ),

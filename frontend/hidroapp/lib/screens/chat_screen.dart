@@ -7,9 +7,11 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/audio_gota_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/lenguaje_ofensivo.dart';
 import '../widgets/chat/chat.dart';
 import '../widgets/core/app_snackbar.dart';
 import '../widgets/core/hidro_app_bar.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Pantalla del asistente virtual "GOTA". Conversación simple contra el
 /// endpoint `POST /api/chat`, que responde `{ "respuesta": "..." }` y, si
@@ -100,6 +102,17 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _enviar() async {
     final texto = _entradaCtrl.text.trim();
     if (texto.isEmpty || _enviando) return;
+
+    // Las groserías no se envían ni se muestran: GOTA pide respeto.
+    if (contieneLenguajeOfensivo(texto)) {
+      setState(() {
+        _mensajes.add(ChatMensaje.asistente(respuestaGotaLenguajeOfensivo));
+        _textoDeAudio = false;
+        _entradaCtrl.clear();
+      });
+      _bajarAlFinal();
+      return;
+    }
 
     final deAudio = _textoDeAudio;
     setState(() {
@@ -298,7 +311,7 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               radius: 14,
               backgroundColor: Colors.white,
-              child: Icon(Icons.water_drop, size: 16, color: AppTheme.primary),
+              child: Icon(LucideIcons.droplet, size: 16, color: AppTheme.primary),
             ),
             SizedBox(width: 10),
             Text('GOTA'),

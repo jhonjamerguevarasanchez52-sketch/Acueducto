@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/core/core.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Ingreso sin contraseña en dos pasos:
 /// 1) el usuario escribe su correo y recibe un código de 6 dígitos,
@@ -115,7 +116,7 @@ class _IngresarConCodigoScreenState extends State<IngresarConCodigoScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                _codigoEnviado ? Icons.mark_email_read_outlined : Icons.mail_lock_outlined,
+                _codigoEnviado ? LucideIcons.mailCheck : LucideIcons.keyRound,
                 size: 48,
                 color: tema.colorScheme.primary,
               ),
@@ -160,7 +161,7 @@ class _IngresarConCodigoScreenState extends State<IngresarConCodigoScreen> {
             decoration: const InputDecoration(
               labelText: 'Correo electrónico',
               hintText: 'tucorreo@ejemplo.com',
-              prefixIcon: Icon(Icons.email_outlined),
+              prefixIcon: Icon(LucideIcons.mail),
             ),
             validator: (v) {
               final valor = (v ?? '').trim();

@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
 import '../core/fila_detalle.dart';
 import '../core/mensaje_estado.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Aviso de un corte programado por el acueducto (mantenimiento o daño
 /// general): cuándo empieza, cuándo termina, el motivo y a qué zona aplica.
@@ -30,7 +31,7 @@ class CorteProgramadoCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.campaign_outlined, color: color),
+                Icon(LucideIcons.megaphone, color: color),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
@@ -48,15 +49,15 @@ class CorteProgramadoCard extends StatelessWidget {
             Text(corte.motivo),
             const SizedBox(height: 8),
             FilaDetalle(
-              icono: Icons.schedule,
+              icono: LucideIcons.clock,
               texto: 'Desde: ${Formato.fechaHora(corte.inicio)}',
             ),
             FilaDetalle(
-              icono: Icons.event_available_outlined,
+              icono: LucideIcons.calendarCheck,
               texto: 'Hasta: ${Formato.fechaHora(corte.fin)}',
             ),
             FilaDetalle(
-              icono: Icons.place_outlined,
+              icono: LucideIcons.mapPin,
               texto: corte.zona == null ? 'Todo el acueducto' : 'Zona ${corte.zona}',
             ),
             if (!enCurso) ...[

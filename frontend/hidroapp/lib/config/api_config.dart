@@ -18,8 +18,10 @@ class ApiConfig {
 
   static const String _override =
       String.fromEnvironment('API_BASE_URL', defaultValue: '');
+  // Solo para probar un build de release contra un servidor en la red local:
+  // hay que pedirlo explícitamente con --dart-define=ALLOW_INSECURE_LOCAL_API=true.
   static const bool _allowInsecureLocalApi =
-      bool.fromEnvironment('ALLOW_INSECURE_LOCAL_API', defaultValue: true);
+      bool.fromEnvironment('ALLOW_INSECURE_LOCAL_API', defaultValue: false);
 
   static String get baseUrl {
     // 1. Si se pasó --dart-define, tiene prioridad (validado en release).

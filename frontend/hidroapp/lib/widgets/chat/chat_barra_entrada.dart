@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Estado del micrófono de la barra del chat.
 enum EstadoAudio { inactivo, grabando, transcribiendo }
@@ -74,7 +75,7 @@ class ChatBarraEntrada extends StatelessWidget {
             padding: const EdgeInsets.only(left: 4, bottom: 6),
             child: Row(
               children: [
-                Icon(Icons.mic, size: 15, color: colores.info),
+                Icon(LucideIcons.mic, size: 15, color: colores.info),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -122,7 +123,7 @@ class ChatBarraEntrada extends StatelessWidget {
                           ? onGrabar
                           : onEnviar,
                   icon: Icon(
-                    usarMicrofono ? Icons.mic_rounded : Icons.send_rounded,
+                    usarMicrofono ? LucideIcons.mic : LucideIcons.send,
                   ),
                   style: _estiloBoton(AppTheme.primary),
                 );
@@ -141,12 +142,12 @@ class ChatBarraEntrada extends StatelessWidget {
         IconButton(
           tooltip: 'Descartar audio',
           onPressed: onCancelarGrabacion,
-          icon: Icon(Icons.delete_outline, color: colores.danger),
+          icon: Icon(LucideIcons.trash2, color: colores.danger),
         ),
         Expanded(
           child: Row(
             children: [
-              Icon(Icons.fiber_manual_record, size: 14, color: colores.danger),
+              Icon(LucideIcons.circleSmall, size: 14, color: colores.danger),
               const SizedBox(width: 8),
               Text(
                 _formato(grabado),
@@ -172,7 +173,7 @@ class ChatBarraEntrada extends StatelessWidget {
         IconButton.filled(
           tooltip: 'Terminar audio',
           onPressed: onTerminarGrabacion,
-          icon: const Icon(Icons.check_rounded),
+          icon: const Icon(LucideIcons.check),
           style: _estiloBoton(AppTheme.primary),
         ),
       ],

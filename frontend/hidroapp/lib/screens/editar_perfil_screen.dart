@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/lenguaje_ofensivo.dart';
 import '../widgets/core/core.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Formulario para que el propio usuario edite sus datos de perfil.
 ///
@@ -106,9 +108,10 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
       readOnly: bloqueado,
       enabled: !bloqueado,
       textCapitalization: capitalizacion,
+      validator: bloqueado ? null : validarSinGroserias,
       decoration: InputDecoration(
         labelText: etiqueta,
-        suffixIcon: bloqueado ? const Icon(Icons.lock_outline, size: 18) : null,
+        suffixIcon: bloqueado ? const Icon(LucideIcons.lock, size: 18) : null,
         helperText: bloqueado ? 'Lo cambia el administrador' : 'Escríbelo con cuidado: luego solo lo cambia el administrador',
         helperMaxLines: 2,
       ),
@@ -132,7 +135,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: colores.info),
+                  Icon(LucideIcons.info, color: colores.info),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
@@ -156,7 +159,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                   textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(labelText: 'Nombre'),
                   validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                      (v == null || v.trim().isEmpty)
+                          ? 'Requerido'
+                          : validarSinGroserias(v),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -164,7 +169,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                   textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(labelText: 'Apellido'),
                   validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                      (v == null || v.trim().isEmpty)
+                          ? 'Requerido'
+                          : validarSinGroserias(v),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -177,6 +184,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                   controller: _ocupacionCtrl,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(labelText: 'Ocupación'),
+                  validator: validarSinGroserias,
                 ),
                 const SizedBox(height: 14),
                 _campoUbicacion(

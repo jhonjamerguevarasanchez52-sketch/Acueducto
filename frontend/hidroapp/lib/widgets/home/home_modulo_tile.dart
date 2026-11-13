@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
 import '../core/app_snackbar.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Atajo a un módulo desde la pestaña "Inicio". Si [destino] es `null`, el
 /// módulo aún no está implementado y solo muestra un aviso.
@@ -32,7 +33,7 @@ class HomeModuloTile extends StatelessWidget {
           child: Icon(icon, color: AppTheme.primaryDark),
         ),
         title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        trailing: const Icon(Icons.chevron_right, color: Colors.black38),
+        trailing: const Icon(LucideIcons.chevronRight, color: Colors.black38),
         onTap: () {
           final destino = this.destino;
           if (destino == null) {

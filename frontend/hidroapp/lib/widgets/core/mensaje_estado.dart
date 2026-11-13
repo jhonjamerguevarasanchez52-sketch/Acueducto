@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Mensaje centrado a pantalla completa para los estados "vacío" y "error"
 /// de las listas de los módulos (facturas, pagos, averías, etc.).
@@ -21,7 +22,7 @@ class MensajeEstado extends StatelessWidget {
     super.key,
     required String mensaje,
     required VoidCallback this.onReintentar,
-  })  : icono = Icons.cloud_off_outlined,
+  })  : icono = LucideIcons.cloudOff,
         titulo = 'No se pudo cargar',
         detalle = mensaje;
 
@@ -68,7 +69,7 @@ class MensajeEstado extends StatelessWidget {
               const SizedBox(height: 20),
               OutlinedButton.icon(
                 onPressed: onReintentar,
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(LucideIcons.refreshCw),
                 label: const Text('Reintentar'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(0, 44),
