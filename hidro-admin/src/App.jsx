@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import Sidebar from './components/Sidebar.jsx'
 import AuthScreen from './features/auth/AuthScreen.jsx'
+import ForcedPasswordChange from './features/auth/ForcedPasswordChange.jsx'
 import exportTreasuryWorkbookFile from './features/reports/exportTreasuryWorkbook.js'
 import { imprimirFactura } from './features/invoices/printInvoice.js'
 import SectionViews from './features/sections/SectionViews.jsx'
@@ -29,6 +30,7 @@ const fetchResource = (endpointName) => (
 )
 import { formatMoney, formatDate, formatInvoiceNumber } from './utils/formatters.js'
 import { parseUsersCsv, parseUsersExcel } from './utils/usersCsv.js'
+import { diaColombia, esPagoPendiente, fechaRecaudo, requiereAccion } from './utils/pagos.js'
 import hidroAppLogo from './assets/hidroapp-logo.png'
 
 function App() {
@@ -103,7 +105,7 @@ function App() {
           throw new Error('Esta cuenta no tiene permisos de administrador')
         }
         setProfile(currentProfile)
-        setSessionStatus('authenticated')
+        setSessionStatus(currentProfile.debe_cambiar_password ? 'must-change-password' : 'authenticated')
       })
       .catch((error) => {
         clearToken()
@@ -362,10 +364,12 @@ function App() {
       if (!confirmar) return
     }
     if (operationType === 'facturaExtraordinaria' && operationForm.perfil_ids === 'todos') {
-      const cantidad = users.filter((user) => user.activo && user.rol === 'usuario').length
+      // Igual que el backend: se factura a todas las cuentas activas, también
+      // administradores y fontanero (también son suscriptores del acueducto).
+      const cantidad = users.filter((user) => user.activo).length
       const total = cantidad * Number(operationForm.valor_total || 0)
       const confirmar = window.confirm(
-        `Se generará una factura extraordinaria por ${formatMoney(operationForm.valor_total)} a cada uno de los ${cantidad} usuarios activos. Total: ${formatMoney(total)}. Concepto: ${operationForm.concepto}. ¿Continuar?`,
+        `Se generará una factura extraordinaria por ${formatMoney(operationForm.valor_total)} a cada una de las ${cantidad} cuentas activas. Total: ${formatMoney(total)}. Concepto: ${operationForm.concepto}. ¿Continuar?`,
       )
       if (!confirmar) return
     }
@@ -375,9 +379,16 @@ function App() {
       )
       if (!confirmar) return
     }
+    const esEdicion = definition.method === 'PUT'
+    // En una edición, vaciar un campo de texto o fecha opcional significa
+    // borrarlo (null); al crear, un campo vacío simplemente no se envía.
+    const sePuedeBorrar = (field) => esEdicion && !field.required
+      && !['number', 'select', 'user', 'recipient', 'checkbox'].includes(field.type)
     const body = Object.fromEntries(definition.fields
-      .filter((field) => field.type !== 'recipient' && operationForm[field.name] !== '')
+      .filter((field) => field.type !== 'recipient'
+        && (operationForm[field.name] !== '' || sePuedeBorrar(field)))
       .map((field) => {
+        if (operationForm[field.name] === '') return [field.name, null]
         const valor = operationForm[field.name]
         if (field.type === 'number') return [field.name, Number(valor)]
         // datetime-local llega sin zona horaria: se interpreta en la hora del
@@ -465,7 +476,9 @@ function App() {
         throw new Error('Esta cuenta no tiene permisos de administrador')
       }
       setProfile(currentProfile)
-      setSessionStatus('authenticated')
+      // Con la contraseña temporal el servidor solo deja cambiarla.
+      if (currentProfile.debe_cambiar_password) setCurrentProfilePassword(password)
+      setSessionStatus(currentProfile.debe_cambiar_password ? 'must-change-password' : 'authenticated')
       setPassword('')
     } catch (error) {
       clearToken()
@@ -540,6 +553,11 @@ function App() {
       setCurrentProfilePassword('')
       setNewProfilePassword('')
       setConfirmProfilePassword('')
+      if (sessionStatus === 'must-change-password') {
+        const currentProfile = await apiRequest(endpoints.profile)
+        setProfile(currentProfile)
+        setSessionStatus('authenticated')
+      }
     } catch (error) {
       setPasswordError(error.message || 'No fue posible cambiar la contraseña.')
     } finally {
@@ -619,16 +637,20 @@ function App() {
   const payments = sectionData.pagos || []
   const cuts = sectionData.cortes || []
   const confirmedPayments = payments.filter((payment) => payment.confirmado)
+  const pendingPayments = payments.filter((payment) => esPagoPendiente(payment))
   const inReportRange = (value) => {
     if (!value) return false
-    const day = String(value).slice(0, 10)
+    const day = diaColombia(value)
     return (!reportFrom || day >= reportFrom) && (!reportTo || day <= reportTo)
   }
-  const reportPayments = payments.filter((payment) => inReportRange(payment.fecha_pago))
+  // Un pago confirmado cuenta el día en que se confirmó (el dinero se recibió
+  // ese día); uno sin confirmar, el día en que se inició.
+  const reportPayments = payments.filter((payment) => inReportRange(fechaRecaudo(payment)))
   const reportInvoices = invoices.filter((invoice) => inReportRange(invoice.fecha_emision))
   const reportConfirmedPayments = reportPayments.filter((payment) => payment.confirmado)
+  const reportPendingPayments = reportPayments.filter((payment) => esPagoPendiente(payment))
   const reportRevenue = reportConfirmedPayments.reduce((sum, payment) => sum + Number(payment.monto || 0), 0)
-  const reportPendingRevenue = reportPayments.filter((payment) => !payment.confirmado)
+  const reportPendingRevenue = reportPendingPayments
     .reduce((sum, payment) => sum + Number(payment.monto || 0), 0)
   const activeUsers = users.filter((user) => user.activo)
   const pendingInvoices = invoices.filter((invoice) => invoice.estado === 'pendiente')
@@ -644,11 +666,11 @@ function App() {
   ]
   const monthlyRevenue = new Map()
   confirmedPayments.forEach((payment) => {
-    const date = new Date(payment.fecha_pago)
-    if (Number.isNaN(date.getTime())) return
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const day = diaColombia(fechaRecaudo(payment))
+    if (!/^\d{4}-\d{2}/.test(day)) return
+    const key = day.slice(0, 7)
     const current = monthlyRevenue.get(key) || {
-      name: date.toLocaleDateString('es-CO', { month: 'short' }),
+      name: new Date(`${key}-15T12:00:00Z`).toLocaleDateString('es-CO', { month: 'short', timeZone: 'UTC' }),
       valor: 0,
     }
     current.valor += Number(payment.monto || 0)
@@ -676,7 +698,7 @@ function App() {
   }))
   const reportSummary = [
     { label: 'Usuarios registrados', value: metricValue('usuarios', users.length) },
-    { label: 'Pagos por confirmar', value: metricValue('pagos', payments.filter((payment) => !payment.confirmado).length) },
+    { label: 'Pagos que requieren acción', value: metricValue('pagos', payments.filter((payment) => requiereAccion(payment)).length) },
     { label: 'Cortes activos', value: metricValue('cortes', activeCuts.length) },
   ]
   const sectionTitles = {
@@ -693,6 +715,24 @@ function App() {
 
   if (sessionStatus === 'checking') {
     return <main className="auth-shell"><p className="auth-loading">Verificando sesión...</p></main>
+  }
+
+  if (sessionStatus === 'must-change-password') {
+    return (
+      <ForcedPasswordChange
+        correo={profile?.correo}
+        currentPassword={currentProfilePassword}
+        setCurrentPassword={setCurrentProfilePassword}
+        newPassword={newProfilePassword}
+        setNewPassword={setNewProfilePassword}
+        confirmPassword={confirmProfilePassword}
+        setConfirmPassword={setConfirmProfilePassword}
+        error={passwordError}
+        isSaving={isChangingProfilePassword}
+        onSubmit={handleChangeProfilePassword}
+        onLogout={handleLogout}
+      />
+    )
   }
 
   if (sessionStatus !== 'authenticated') {
@@ -728,6 +768,7 @@ function App() {
     reportPayments,
     reportInvoices,
     reportConfirmedPayments,
+    reportPendingPayments,
     reportRevenue,
     reportPendingRevenue,
     reportFrom,
@@ -761,6 +802,8 @@ function App() {
     reportPayments,
     reportInvoices,
     reportConfirmedPayments,
+    reportPendingPayments,
+    pendingPayments,
     reportRevenue,
     reportPendingRevenue,
     reportFrom,

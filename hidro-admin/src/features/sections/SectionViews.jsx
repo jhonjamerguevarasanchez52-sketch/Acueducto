@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import StatCard from '../../components/StatCard.jsx'
 import { formatDateTime } from '../../utils/formatters.js'
+import { accionesPago, estadoPago } from '../../utils/pagos.js'
 
 // Las gráficas (recharts) se cargan bajo demanda para que el panel abra más rápido.
 const AnalyticsCharts = lazy(() => import('../../components/AnalyticsCharts.jsx'))
@@ -39,14 +40,14 @@ export default function SectionViews({ activeSection, context }) {
     formatDate,
     users,
     invoices,
-    payments,
     handleNavigate,
     confirmedPayments,
     activeUsers,
     activeCuts,
-    reportPayments,
     reportInvoices,
     reportConfirmedPayments,
+    reportPendingPayments,
+    pendingPayments,
     reportRevenue,
     reportPendingRevenue,
     reportFrom,
@@ -369,13 +370,24 @@ export default function SectionViews({ activeSection, context }) {
                       <td>{formatMoney(payment.monto)}</td>
                       <td>{payment.metodo === 'fisico' ? 'Pago físico' : payment.metodo === 'wompi' ? 'Wompi' : payment.metodo || '—'}</td>
                       <td>{formatDate(payment.fecha_pago)}</td>
-                      <td>{payment.confirmado ? 'Confirmado' : 'Pendiente'}</td>
+                      <td>
+                        <span className={`payment-status payment-status-${estadoPago(payment).tono}`}>{estadoPago(payment).etiqueta}</span>
+                        {payment.transaccion_id && <small className="payment-trx">Wompi {payment.transaccion_id}</small>}
+                      </td>
                       <td className="row-actions">
                         {payment.recibo_url && <a className="link-button" href={payment.recibo_url} target="_blank" rel="noreferrer">Ver recibo</a>}
-                        {!payment.confirmado && <>
-                          <button type="button" className="link-button" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}/confirmar`, 'PUT')}>Confirmar</button>
-                          <button type="button" className="link-button danger-link" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}`, 'DELETE', undefined, '¿Eliminar este pago pendiente?')}>Eliminar</button>
-                        </>}
+                        {accionesPago(payment).includes('confirmar') && (
+                          <button type="button" className="link-button" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}/confirmar`, 'PUT', undefined, `¿Confirmar el pago de ${formatMoney(payment.monto)}? Revisa antes que el recibo sea válido: la factura quedará pagada.`)}>Confirmar</button>
+                        )}
+                        {accionesPago(payment).includes('eliminar') && (
+                          <button type="button" className="link-button danger-link" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}`, 'DELETE', undefined, payment.metodo === 'wompi' ? '¿Quitar este intento rechazado de la lista?' : '¿Eliminar este recibo pendiente? El usuario podrá enviar otro.')}>Eliminar</button>
+                        )}
+                        {accionesPago(payment).includes('liberar') && (
+                          <button type="button" className="link-button" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}`, 'DELETE', undefined, '¿Liberar este checkout abandonado? Se conserva en el historial y, si el usuario llega a pagarlo, el pago se registra igual.')}>Liberar</button>
+                        )}
+                        {accionesPago(payment).includes('devolver') && (
+                          <button type="button" className="link-button danger-link" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}`, 'DELETE', { reembolsado: true }, `Wompi cobró ${formatMoney(payment.monto_total ?? payment.monto)} pero el pago no se aplicó a la factura. ¿Ya le devolviste el dinero al usuario desde el panel de Wompi?`)}>Marcar devuelto</button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -576,7 +588,7 @@ export default function SectionViews({ activeSection, context }) {
         </div>
         <div className="treasury-kpis">
           <div><span>Ingresos recaudados</span><strong>{sectionErrors.pagos ? '—' : formatMoney(reportRevenue)}</strong><small>{reportConfirmedPayments.length} pagos confirmados</small></div>
-          <div><span>Pagos por confirmar</span><strong>{sectionErrors.pagos ? '—' : formatMoney(reportPendingRevenue)}</strong><small>{reportPayments.filter((payment) => !payment.confirmado).length} transacciones</small></div>
+          <div><span>Pagos pendientes</span><strong>{sectionErrors.pagos ? '—' : formatMoney(reportPendingRevenue)}</strong><small>{reportPendingPayments.length} recibos por revisar o pagos en curso</small></div>
           <div><span>Facturas emitidas</span><strong>{sectionErrors.facturas ? '—' : formatMoney(reportInvoices.reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0))}</strong><small>{reportInvoices.length} facturas del periodo</small></div>
           <div><span>Facturas pendientes</span><strong>{sectionErrors.facturas ? '—' : reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).length}</strong><small>Incluye vencidas</small></div>
         </div>
@@ -620,8 +632,8 @@ export default function SectionViews({ activeSection, context }) {
             <div className="overview-item">
               <div className="overview-icon blue"><Clock3 size={16} /></div>
               <div>
-                <strong>{metricValue('pagos', payments.filter((payment) => !payment.confirmado).length)}</strong>
-                <span>Pagos por confirmar</span>
+                <strong>{metricValue('pagos', pendingPayments.length)}</strong>
+                <span>Pagos pendientes</span>
               </div>
             </div>
             <div className="overview-item">

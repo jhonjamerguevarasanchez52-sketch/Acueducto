@@ -1,4 +1,5 @@
 import { formatDate, formatInvoiceNumber } from '../../utils/formatters.js'
+import { diaColombia, estadoPago, fechaRecaudo } from '../../utils/pagos.js'
 import hidroAppLogo from '../../assets/hidroapp-logo.png'
 
 export default async function exportTreasuryWorkbook({
@@ -9,6 +10,7 @@ export default async function exportTreasuryWorkbook({
   reportPayments,
   reportInvoices,
   reportConfirmedPayments,
+  reportPendingPayments = [],
   reportRevenue,
   reportPendingRevenue,
   reportFrom,
@@ -45,7 +47,7 @@ export default async function exportTreasuryWorkbook({
       const user = profileById.get(payment.perfil_id)
       const invoice = invoiceById.get(payment.factura_id)
       return {
-        Fecha: formatDate(payment.fecha_pago),
+        Fecha: formatDate(fechaRecaudo(payment)),
         Suscriptor: userName(payment.perfil_id),
         Correo: user?.correo || '',
         Dirección: user?.direccion || user?.zona || '',
@@ -53,7 +55,7 @@ export default async function exportTreasuryWorkbook({
         Periodo: invoice?.periodo || '',
         Monto: Number(payment.monto || 0),
         Método: payment.metodo || '',
-        Estado: payment.confirmado ? 'Confirmado' : 'Pendiente por confirmar',
+        Estado: estadoPago(payment).etiqueta,
         Referencia: payment.referencia || payment.transaccion_id || '',
         'ID de pago': payment.id,
       }
@@ -95,12 +97,12 @@ export default async function exportTreasuryWorkbook({
     })
     const monthlyTotals = new Map()
     reportConfirmedPayments.forEach((payment) => {
-      const month = String(payment.fecha_pago || '').slice(0, 7) || 'Sin fecha'
+      const month = diaColombia(fechaRecaudo(payment)).slice(0, 7) || 'Sin fecha'
       monthlyTotals.set(month, (monthlyTotals.get(month) || 0) + Number(payment.monto || 0))
     })
     const balanceRows = [
       { Concepto: 'Ingresos recibidos y confirmados', Cantidad: reportConfirmedPayments.length, Valor: reportRevenue },
-      { Concepto: 'Pagos pendientes de confirmar', Cantidad: reportPayments.filter((payment) => !payment.confirmado).length, Valor: reportPendingRevenue },
+      { Concepto: 'Pagos pendientes (recibos por revisar y pagos en curso)', Cantidad: reportPendingPayments.length, Valor: reportPendingRevenue },
       { Concepto: 'Facturas emitidas', Cantidad: reportInvoices.length, Valor: reportInvoices.reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0) },
       { Concepto: 'Facturas pendientes o vencidas', Cantidad: reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).length, Valor: reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0) },
       ...[...monthlyTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, value]) => ({ Concepto: `Recaudo confirmado · ${month}`, Cantidad: '', Valor: value })),
@@ -197,9 +199,9 @@ export default async function exportTreasuryWorkbook({
             const status = String(cell.value || '').toLowerCase()
             const color = status.includes('confirmado') || status === 'pagada' || status === 'activo'
               ? 'FFE1F4EB'
-              : status.includes('pendiente') || status === 'vencida'
+              : status.includes('pendiente') || status.includes('revisar') || status.includes('en curso') || status === 'vencida'
                 ? 'FFFFF1D8'
-                : status === 'anulada' || status === 'inactivo' ? 'FFFCE6E6' : null
+                : status === 'anulada' || status === 'inactivo' || status.includes('devolver') ? 'FFFCE6E6' : null
             if (color) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } }
           }
         })
