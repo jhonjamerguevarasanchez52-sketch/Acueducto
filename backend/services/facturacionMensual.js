@@ -40,6 +40,15 @@ function fechaVencimiento(periodo) {
   return proximoMes.toISOString().slice(0, 10);
 }
 
+// Mes (AAAA-MM, hora de Colombia) en que se creó la cuenta. null si no se sabe.
+function periodoDeCreacion(perfil) {
+  if (!perfil?.created_at) return null;
+  const fecha = new Date(perfil.created_at);
+  if (Number.isNaN(fecha.getTime())) return null;
+  const { anio, mes } = obtenerFechaBogota(fecha);
+  return `${anio}-${String(mes).padStart(2, '0')}`;
+}
+
 function esDuplicado(error) {
   return error && error.code === '23505';
 }
@@ -88,6 +97,7 @@ async function generarFacturasMensuales({
     facturasCreadas: 0,
     facturasExistentes: 0,
     periodosPrepagados: 0,
+    usuariosPosteriores: 0,
     correosEnviados: 0,
     correosFallidos: 0,
     errores: [],
@@ -103,6 +113,14 @@ async function generarFacturasMensuales({
 
   for (const perfil of perfiles || []) {
     let factura = facturasExistentes.get(perfil.id);
+    // Una cuenta creada después de terminar el periodo no recibió ese mes de
+    // servicio: no se le factura (sí se le enviaría el correo de una factura
+    // que ya tuviera, por eso se revisa solo cuando no existe).
+    const creadoEn = periodoDeCreacion(perfil);
+    if (!factura && creadoEn && creadoEn > periodo) {
+      resumen.usuariosPosteriores += 1;
+      continue;
+    }
     if (factura) {
       resumen.facturasExistentes += 1;
       if (!factura.generada_automaticamente || factura.correo_factura_enviado_at) continue;
@@ -112,7 +130,7 @@ async function generarFacturasMensuales({
         {
           p_perfil_id: perfil.id,
           p_periodo: periodo,
-          p_valor_total: valorMensual,
+          p_valor_total: Math.round(valorMensual),
           p_fecha_emision: fechaEmision.toISOString(),
           p_fecha_vencimiento: vencimiento,
         },

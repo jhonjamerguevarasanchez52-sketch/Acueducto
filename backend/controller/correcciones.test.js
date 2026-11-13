@@ -55,8 +55,14 @@ test('actualizar factura distingue no encontrada, conflicto y valor inválido', 
   silenciar(t);
   const original = invoiceModel.update;
   const originalEstado = invoiceModel.getState;
-  t.after(() => { invoiceModel.update = original; invoiceModel.getState = originalEstado; });
+  const originalActivo = paymentModel.hasActiveByInvoice;
+  t.after(() => {
+    invoiceModel.update = original;
+    invoiceModel.getState = originalEstado;
+    paymentModel.hasActiveByInvoice = originalActivo;
+  });
   invoiceModel.getState = async () => ({ data: { id: 'f1', estado: 'pendiente' }, error: null });
+  paymentModel.hasActiveByInvoice = async () => ({ data: false, error: null });
   const req = (body) => ({ params: { id: 'f1' }, body });
 
   let res = respuesta();

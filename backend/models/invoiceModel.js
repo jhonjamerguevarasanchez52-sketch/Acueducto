@@ -66,9 +66,14 @@ function create({ perfil_id, periodo, valor_total, fecha_vencimiento, observacio
     .single();
 }
 
-// Estado actual de una factura (cualquier titular). data es null si no existe.
+// Estado y datos editables de una factura (cualquier titular), para comparar
+// antes de editarla. data es null si no existe.
 function getState(id) {
-  return supabaseAdmin.from(TABLE).select('id, estado').eq('id', id).maybeSingle();
+  return supabaseAdmin
+    .from(TABLE)
+    .select('id, estado, perfil_id, valor_total, fecha_vencimiento, observacion')
+    .eq('id', id)
+    .maybeSingle();
 }
 
 // Facturas pendientes que vencen exactamente en `fecha` (AAAA-MM-DD) y aún

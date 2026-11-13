@@ -8,6 +8,12 @@ const { errorInesperado } = require('../utils/httpErrores');
 const notificarAveria = require('../services/notificarAveria');
 const audiosAveriaService = require('../services/audiosAveriaService');
 const { obtenerGroq } = require('../config/groqClient');
+const {
+  contieneLenguajeOfensivo,
+  MENSAJE_LENGUAJE_OFENSIVO,
+  RESPUESTA_LENGUAJE_OFENSIVO,
+} = require('../utils/lenguajeOfensivo');
+const { esFueraDeTema, MENSAJE_FUERA_DE_TEMA, REGLA_TEMA_PROMPT } = require('../utils/temaAcueducto');
 
 // Un audio de 60 s transcrito ocupa unos 900 caracteres.
 const MAX_MENSAJE = 1000;
@@ -61,9 +67,18 @@ async function registrarAveriaConfirmada(req, res, perfilId, descripcionRecibida
   if (!perfilId) {
     return res.status(401).json({ respuesta: 'Inicia sesión para registrar la avería y avisar al fontanero.' });
   }
+  // Mismas reglas que POST /api/averias: reportan los usuarios y el
+  // administrador; el fontanero atiende las averías, no las reporta.
+  const rol = req.usuario?.rol;
+  if (rol === 'fontanero') {
+    return res.status(403).json({ respuesta: 'Como fontanero no reportas averías por aquí: las ves y las atiendes en la sección Averías.' });
+  }
   const descripcion = typeof descripcionRecibida === 'string' ? descripcionRecibida.trim().slice(0, 1000) : '';
   if (descripcion.length < MIN_DESCRIPCION) {
     return res.status(400).json({ respuesta: 'Cuéntame en una frase qué pasó (por ejemplo, dónde está la fuga o qué servicio falta) y la registro para avisar al fontanero.' });
+  }
+  if (contieneLenguajeOfensivo(descripcion)) {
+    return res.status(400).json({ respuesta: MENSAJE_LENGUAJE_OFENSIVO });
   }
 
   const { data: perfil, error: errorPerfil } = await profileModel.getById(perfilId, {
@@ -74,7 +89,12 @@ async function registrarAveriaConfirmada(req, res, perfilId, descripcionRecibida
     return res.status(403).json({ respuesta: 'Tu perfil no está activo. Contacta al administrador del acueducto.' });
   }
   if (!perfil.zona && !perfil.direccion) {
-    return res.status(200).json({ respuesta: 'Tu perfil no tiene una ubicación registrada. Pídele al administrador que actualice tu dirección para poder enviar la avería.' });
+    // El administrador reporta averías de cualquier sitio: indica la
+    // ubicación en el formulario de Averías, que la pide aparte.
+    const respuesta = rol === 'administrador'
+      ? 'Como administrador, registra la avería desde la sección Averías: ahí indicas la ubicación exacta del daño.'
+      : 'Tu perfil no tiene una ubicación registrada. Pídele al administrador que actualice tu dirección para poder enviar la avería.';
+    return res.status(200).json({ respuesta });
   }
 
   // Un doble toque en el botón no debe crear dos averías.
@@ -119,6 +139,14 @@ async function chatearConAsistente(req, res) {
     const mensajeActual = mensaje.trim();
     if (mensajeActual.length > MAX_MENSAJE) {
       return res.status(400).json({ error: `El mensaje no puede superar ${MAX_MENSAJE} caracteres.` });
+    }
+
+    // Groserías y temas ajenos al acueducto se responden sin llamar a la IA.
+    if (contieneLenguajeOfensivo(mensajeActual)) {
+      return res.status(200).json({ respuesta: RESPUESTA_LENGUAJE_OFENSIVO });
+    }
+    if (esFueraDeTema(mensajeActual)) {
+      return res.status(200).json({ respuesta: MENSAJE_FUERA_DE_TEMA, fueraDeTema: true });
     }
 
     const cliente = obtenerGroq();
@@ -219,6 +247,8 @@ ${averiasTexto}`.trim();
     const promptSistema = `Eres GOTA, asistente de HIDROAPP, el acueducto Campo Amor de Majo, Garzón, Huila.
 Responde en español colombiano, con calidez y de forma breve. Usa la conversación reciente para entender referencias y no preguntes otra vez algo que el usuario ya dijo.
 
+${REGLA_TEMA_PROMPT}
+
 AVERÍAS:
 - Distingue entre reportar un problema nuevo y consultar el estado de una avería existente. Para consultas de estado, usa las averías recientes del usuario y cita su estado, fecha o nota del fontanero cuando estén disponibles.
 - Interpreta expresiones coloquiales, mensajes cortos y errores de escritura. "No me llega el agua", "botó agua" o "se rompió el tubo" pueden describir una avería.
@@ -229,7 +259,7 @@ AVERÍAS:
 
 OTROS TEMAS:
 - Usa únicamente los datos de tarifas, facturas y perfil incluidos abajo. Si falta información, dilo y orienta al usuario con claridad.
-- No inventes valores, fechas ni estados. Si la consulta no es del acueducto, redirígela brevemente.
+- No inventes valores, fechas ni estados.
 
 TARIFAS:
 ${contextoTarifas || 'Sin tarifas registradas.'}

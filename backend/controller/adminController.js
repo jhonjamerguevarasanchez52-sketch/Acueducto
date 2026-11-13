@@ -10,6 +10,7 @@ const { notificar } = require('../utils/notificar');
 const { escaparHtml } = require('../utils/html');
 const { normalizarCorreo } = require('../utils/formato');
 const cacheSesiones = require('../utils/cacheSesiones');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
@@ -54,23 +55,15 @@ async function crearUsuario(req, res) {
 
     userId = creado.user.id;
 
-    // El acueducto contempla un único fontanero: si se asigna, se quita al anterior.
-    if (rol === 'fontanero') {
-      const { error: errorDegradacion } = await profileModel.demotePlumbers();
-
-      if (errorDegradacion) {
-        await authModel.deleteUser(userId).catch(() => {});
-        return errorConsulta(res, errorDegradacion);
-      }
-    }
-
+    // El fontanero nace como "usuario" y se asigna después en una sola
+    // transacción: si algo falla, el fontanero actual no pierde su rol.
     const { error: profileError } = await profileModel.create({
       ...datosOpcionales,
       id: userId,
       nombre: String(nombre).trim(),
       apellido: String(apellido).trim(),
       correo,
-      rol,
+      rol: rol === 'fontanero' ? 'usuario' : rol,
       activo: true,
       is_verified: true,
       debe_cambiar_password: true,
@@ -81,6 +74,24 @@ async function crearUsuario(req, res) {
       await authModel.deleteUser(userId).catch(() => {});
       return errorConsulta(res, profileError);
     }
+
+    if (rol === 'fontanero') {
+      const { data: asignado, error: errorAsignacion } = await profileModel.assignPlumber(userId);
+      if (errorAsignacion || !asignado) {
+        await authModel.deleteUser(userId).catch(() => {});
+        return errorAsignacion
+          ? errorConsulta(res, errorAsignacion)
+          : res.status(500).json({ error: 'No se pudo asignar el rol de fontanero.' });
+      }
+    }
+
+    await registrarAuditoria({
+      adminId: req.usuario?.id,
+      accion: 'usuario_creado',
+      tabla: 'profiles',
+      registroId: userId,
+      detalle: { correo, rol },
+    });
 
     let correoEnviado = false;
     try {
@@ -170,34 +181,32 @@ async function cambiarRol(req, res) {
     return res.status(400).json({ error: 'No puedes quitarte tu propio rol de administrador' });
   }
 
-  // El acueducto contempla un único fontanero a la vez: si ya hay uno asignado
-  // a otro usuario, hay que quitarle el rol (o eliminarlo) antes de asignar uno nuevo.
   try {
-    if (rol === 'fontanero') {
-      // Se confirma el destino antes de degradar al fontanero actual: si el
-      // id no existe, el acueducto no debe quedarse sin fontanero.
-      const { data: destino, error: errorDestino } = await profileModel.getById(userId, { columns: 'id' });
-      if (errorDestino || !destino) {
-        return res.status(404).json({ error: 'Usuario no encontrado' });
-      }
+    const { data: anterior } = await profileModel.getById(userId, { columns: 'id, rol' });
 
-      const { error: errorDegradacion } = await profileModel.demotePlumbers(userId);
-
-      if (errorDegradacion) {
-        return errorConsulta(res, errorDegradacion);
-      }
-    }
-
-    const { data, error } = await profileModel.update(userId, { rol });
+    // El acueducto contempla un único fontanero a la vez: el anterior baja a
+    // "usuario" en la misma transacción en que se asigna el nuevo.
+    const { data, error } = rol === 'fontanero'
+      ? await profileModel.assignPlumber(userId)
+      : await profileModel.update(userId, { rol });
 
     if (error?.code === '23505') {
       return res.status(409).json({
         error: 'Ya existe un fontanero asignado. Actualiza la lista de usuarios e inténtalo de nuevo.',
       });
     }
+    if (error && error.code !== 'PGRST116') return errorConsulta(res, error);
     if (error || !data) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
+
+    await registrarAuditoria({
+      adminId: req.usuario?.id,
+      accion: 'usuario_rol_cambiado',
+      tabla: 'profiles',
+      registroId: userId,
+      detalle: { antes: anterior?.rol ?? null, despues: rol },
+    });
 
     return res.status(200).json({ message: `Rol actualizado a "${rol}"`, perfil: data });
   } catch (err) {
@@ -222,6 +231,14 @@ async function editarUsuario(req, res) {
     if (error || !data) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
+
+    await registrarAuditoria({
+      adminId: req.usuario?.id,
+      accion: 'usuario_editado',
+      tabla: 'profiles',
+      registroId: userId,
+      detalle: { campos: Object.keys(cambios) },
+    });
 
     return res.status(200).json({ message: 'Usuario actualizado', perfil: data });
   } catch (err) {
@@ -249,6 +266,14 @@ async function cambiarEstadoUsuario(req, res) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    await registrarAuditoria({
+      adminId: req.usuario?.id,
+      accion: activo ? 'usuario_activado' : 'usuario_desactivado',
+      tabla: 'profiles',
+      registroId: userId,
+      detalle: { correo: data.correo ?? null },
+    });
+
     return res.status(200).json({
       message: activo ? 'Usuario activado' : 'Usuario desactivado',
       perfil: data,
@@ -258,13 +283,12 @@ async function cambiarEstadoUsuario(req, res) {
   }
 }
 
-// Eliminar un usuario definitivamente.
-// Borra la cuenta de Supabase Auth; por la cascada definida en el esquema
-// (profiles -> auth.users, y los datos del usuario como titular -> profiles),
-// esto también borra su perfil y su historial. Las averías asignadas a un
-// fontanero conservan su historial y quedan sin asignación. Es irreversible:
-// para solo bloquear el acceso sin perder el historial, usa
-// cambiarEstadoUsuario (activo: false) en su lugar.
+// Eliminar un usuario definitivamente (por ejemplo, una cuenta creada por
+// error). Solo se permite si no tiene facturas ni pagos: la base de datos lo
+// impide con ON DELETE RESTRICT y aquí se revisa antes para dar un mensaje
+// claro. Las averías asignadas al fontanero conservan su historial y quedan
+// sin asignación. Para bloquear el acceso conservando todo, se desactiva
+// (cambiarEstadoUsuario con activo: false).
 async function eliminarUsuario(req, res) {
   const { userId } = req.params;
 
@@ -315,6 +339,13 @@ async function eliminarUsuario(req, res) {
 
     // Su sesión en caché no debe seguir abriendo puertas tras borrarlo.
     cacheSesiones.invalidarUsuario(userId);
+    await registrarAuditoria({
+      adminId: req.usuario?.id,
+      accion: 'usuario_eliminado',
+      tabla: 'profiles',
+      registroId: userId,
+      detalle: null,
+    });
     return res.status(200).json({ message: 'Usuario eliminado permanentemente' });
   } catch (err) {
     return errorInesperado(res, err);

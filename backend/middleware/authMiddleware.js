@@ -24,6 +24,19 @@ async function resolverSesion(token, db) {
   return sesion;
 }
 
+// Mientras la cuenta tenga la contraseña temporal que generó el administrador,
+// solo puede leer su perfil y cambiar la contraseña. Antes esto lo imponía
+// únicamente la app; ahora también el servidor (el panel y cualquier cliente).
+const RUTAS_CON_CLAVE_TEMPORAL = new Set([
+  'GET /api/profile/mi-perfil',
+  'POST /api/auth/cambiar-password',
+]);
+
+function rutaPermitidaConClaveTemporal(req) {
+  const ruta = `${req.baseUrl || ''}${req.path || ''}`.replace(/\/+$/, '');
+  return RUTAS_CON_CLAVE_TEMPORAL.has(`${req.method} ${ruta}`);
+}
+
 async function verificarToken(req, res, next) {
   const authHeader = req.headers.authorization;
 
@@ -52,6 +65,13 @@ async function verificarToken(req, res, next) {
       });
     }
 
+    if (sesion.perfil.debe_cambiar_password === true && !rutaPermitidaConClaveTemporal(req)) {
+      return res.status(403).json({
+        error: 'Debes cambiar tu contraseña temporal antes de continuar.',
+        debeCambiarPassword: true,
+      });
+    }
+
     req.db = db;
     req.token = token;
     // Combinamos: datos de Auth (id, email, etc.) + datos del perfil (rol, zona, etc.)
@@ -67,4 +87,4 @@ async function verificarToken(req, res, next) {
   }
 }
 
-module.exports = { verificarToken, resolverSesion };
+module.exports = { verificarToken, resolverSesion, rutaPermitidaConClaveTemporal };

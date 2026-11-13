@@ -19,8 +19,24 @@ const {
 const { cotizarWompi } = require('../utils/wompiTarifa');
 
 const { escaparHtml } = require('../utils/html');
-const { fechaLarga } = require('../utils/fechas');
+const { fechaLarga, fechaBogota } = require('../utils/fechas');
 const { formatearPesos } = require('../utils/formato');
+const { registrarAuditoria } = require('../utils/auditoria');
+
+const PERIODO_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
+const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+// Mes en curso en Colombia (AAAA-MM). Un periodo solo se factura cuando ya
+// terminó: facturar el mes en curso o uno futuro cobra un servicio aún no prestado.
+function periodoActual(ahora = new Date()) {
+  return fechaBogota(ahora).slice(0, 7);
+}
+
+function fechaValida(valor) {
+  if (!FECHA_REGEX.test(String(valor))) return false;
+  const fecha = new Date(`${valor}T00:00:00Z`);
+  return !Number.isNaN(fecha.getTime()) && fecha.toISOString().slice(0, 10) === valor;
+}
 
 async function enviarCorreoFactura({ correo, nombre, periodo, valorTotal, fechaVencimiento }) {
   if (!correo) return false;
@@ -302,16 +318,34 @@ async function listarFacturas(req, res) {
 
 async function generarFacturasMensuales(req, res) {
   const { periodo } = req.body || {};
-  if (periodo !== undefined && !/^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) {
+  if (periodo !== undefined && !PERIODO_REGEX.test(periodo)) {
     return res.status(400).json({ error: 'El periodo debe tener el formato AAAA-MM.' });
+  }
+  if (periodo !== undefined && periodo >= periodoActual()) {
+    return res.status(400).json({
+      error: 'Solo se pueden facturar meses que ya terminaron. El mes en curso se factura automáticamente a comienzos del mes siguiente.',
+    });
   }
 
   try {
     const resumen = await ejecutarFacturacionMensual(periodo ? { periodo } : {});
     const message = [
       `Facturación ${resumen.periodo} finalizada: ${resumen.facturasCreadas} nuevas de ${formatearPesos(resumen.valorPorFactura)}, ${resumen.facturasExistentes} existentes, ${resumen.correosEnviados} correos enviados y ${resumen.correosFallidos} fallidos.`,
+      ...(resumen.usuariosPosteriores ? [`${resumen.usuariosPosteriores} usuario(s) creados después de ese mes no se facturaron.`] : []),
       ...resumen.avisos,
     ].join(' ');
+    await registrarAuditoria({
+      adminId: req.usuario.id,
+      accion: 'facturacion_mensual_manual',
+      tabla: 'invoices',
+      registroId: null,
+      detalle: {
+        periodo: resumen.periodo,
+        creadas: resumen.facturasCreadas,
+        existentes: resumen.facturasExistentes,
+        valor: resumen.valorPorFactura,
+      },
+    });
     return res.status(200).json({ message, ...resumen });
   } catch (err) {
     return errorInesperado(res, err);
@@ -332,9 +366,17 @@ async function crearFactura(req, res) {
     return res.status(400).json({ error: 'valor_total debe ser mayor que cero' });
   }
 
+  if (!['servicio', 'extraordinaria'].includes(tipo || 'servicio')) {
+    return res.status(400).json({ error: 'El tipo de factura debe ser servicio o extraordinaria.' });
+  }
+
   // Los planes de pago y el cron cuentan meses con este formato.
-  if ((tipo || 'servicio') === 'servicio' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))) {
+  if ((tipo || 'servicio') === 'servicio' && !PERIODO_REGEX.test(String(periodo))) {
     return res.status(400).json({ error: 'El periodo debe tener el formato AAAA-MM (por ejemplo 2026-10).' });
+  }
+
+  if (fecha_vencimiento && !fechaValida(fecha_vencimiento)) {
+    return res.status(400).json({ error: 'La fecha de vencimiento no es válida (AAAA-MM-DD).' });
   }
 
   try {
@@ -357,6 +399,14 @@ async function crearFactura(req, res) {
     });
 
     if (error) return errorConsulta(res, error);
+
+    await registrarAuditoria({
+      adminId: req.usuario.id,
+      accion: 'factura_creada',
+      tabla: 'invoices',
+      registroId: data.id,
+      detalle: { perfil_id, periodo, valor_total: Number(valor_total), tipo: tipo || 'servicio' },
+    });
 
     await notificar(
       perfil_id,
@@ -408,11 +458,20 @@ async function actualizarFactura(req, res) {
     return res.status(400).json({ error: 'valor_total debe ser mayor que cero' });
   }
 
+  if (fecha_vencimiento !== undefined && fecha_vencimiento !== null && fecha_vencimiento !== ''
+    && !fechaValida(fecha_vencimiento)) {
+    return res.status(400).json({ error: 'La fecha de vencimiento no es válida (AAAA-MM-DD).' });
+  }
+  if (observacion !== undefined && observacion !== null
+    && (typeof observacion !== 'string' || observacion.length > 500)) {
+    return res.status(400).json({ error: 'La observación admite máximo 500 caracteres.' });
+  }
+
   const cambios = {};
   if (estado) cambios.estado = estado;
   if (valor_total !== undefined) cambios.valor_total = Number(valor_total);
-  if (fecha_vencimiento !== undefined) cambios.fecha_vencimiento = fecha_vencimiento;
-  if (observacion !== undefined) cambios.observacion = observacion;
+  if (fecha_vencimiento !== undefined) cambios.fecha_vencimiento = fecha_vencimiento || null;
+  if (observacion !== undefined) cambios.observacion = observacion?.trim() || null;
 
   if (Object.keys(cambios).length === 0) {
     return res.status(400).json({ error: 'No hay campos para actualizar' });
@@ -423,12 +482,36 @@ async function actualizarFactura(req, res) {
     if (errorActual) return errorConsulta(res, errorActual);
     if (!actual) return res.status(404).json({ error: 'Factura no encontrada' });
 
+    // El panel envía el formulario completo: para las reglas de abajo solo
+    // cuentan los campos que de verdad cambian.
+    const normalizar = (campo, valor) => {
+      if (valor === undefined || valor === null || valor === '') return null;
+      if (campo === 'valor_total') return Number(valor);
+      if (campo === 'fecha_vencimiento') return String(valor).slice(0, 10);
+      return valor;
+    };
+    const camposQueCambian = Object.keys(cambios)
+      .filter((campo) => normalizar(campo, actual[campo]) !== normalizar(campo, cambios[campo]));
+
     // Una factura pagada es un registro contable cerrado: solo admite notas.
-    const soloObservacion = Object.keys(cambios).every((campo) => campo === 'observacion');
+    const soloObservacion = camposQueCambian.every((campo) => campo === 'observacion');
     if (actual.estado === 'pagada' && !soloObservacion) {
       return res.status(409).json({
         error: 'Esta factura ya está pagada: no se puede cambiar su estado, valor ni fecha. Solo puedes agregar una observación.',
       });
+    }
+
+    // Cambiar el valor o anular mientras hay un pago en curso dejaría al
+    // usuario cobrado por un monto que la factura ya no acepta.
+    if (camposQueCambian.includes('valor_total')
+      || (camposQueCambian.includes('estado') && cambios.estado === 'anulada')) {
+      const { data: pagoActivo, error: errorPagos } = await paymentModel.hasActiveByInvoice(id);
+      if (errorPagos) return errorConsulta(res, errorPagos);
+      if (pagoActivo) {
+        return res.status(409).json({
+          error: 'Esta factura tiene un pago en curso (recibo por revisar o pago en línea). Resuélvelo en "Pagos" antes de cambiar el valor o anularla.',
+        });
+      }
     }
 
     const { data, error } = await invoiceModel.update(id, cambios);
@@ -445,6 +528,18 @@ async function actualizarFactura(req, res) {
     // P0001: la regla de la base de datos (trigger validar_estado_factura).
     if (error?.code === 'P0001') return res.status(409).json({ error: error.message });
     if (error) return errorConsulta(res, error);
+
+    await registrarAuditoria({
+      adminId: req.usuario?.id ?? null,
+      accion: camposQueCambian.includes('estado') && cambios.estado === 'anulada' ? 'factura_anulada' : 'factura_actualizada',
+      tabla: 'invoices',
+      registroId: id,
+      detalle: {
+        perfil_id: actual.perfil_id ?? null,
+        antes: Object.fromEntries(camposQueCambian.map((campo) => [campo, actual[campo] ?? null])),
+        despues: Object.fromEntries(camposQueCambian.map((campo) => [campo, cambios[campo]])),
+      },
+    });
 
     return res.status(200).json({ message: 'Factura actualizada', factura: data });
   } catch (err) {
@@ -471,9 +566,28 @@ async function eliminarFactura(req, res) {
 
     const { data, error } = await invoiceModel.remove(id);
 
+    if (error?.code === '23503') {
+      return res.status(409).json({
+        error: 'No se puede eliminar una factura con pagos registrados. Anúlala en su lugar.',
+      });
+    }
     if (error || !data) {
       return res.status(404).json({ error: 'Factura no encontrada' });
     }
+
+    await registrarAuditoria({
+      adminId: req.usuario.id,
+      accion: 'factura_eliminada',
+      tabla: 'invoices',
+      registroId: id,
+      detalle: {
+        perfil_id: data.perfil_id,
+        numero_factura: data.numero_factura,
+        periodo: data.periodo,
+        valor_total: data.valor_total,
+        estado: data.estado,
+      },
+    });
 
     return res.status(200).json({ message: 'Factura eliminada', factura: data });
   } catch (err) {

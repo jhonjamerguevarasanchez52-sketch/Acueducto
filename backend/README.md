@@ -119,7 +119,8 @@ npm run facturar-mensual -- 2026-09
 
 Ya no hay que acordarse de facturar: Supabase llama al backend todos los días.
 
-1. Aplicar en Supabase `db/migrations/20261030_mejoras_integrales.sql`.
+1. Aplicar en Supabase `db/migrations/20261030_mejoras_integrales.sql` y
+   después `db/migrations/20261110_correcciones_revision.sql`.
 2. En Render, definir `CRON_SECRET` con un valor largo y aleatorio:
    `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 3. En el SQL Editor de Supabase, ejecutar UNA vez (con la URL real y el mismo
@@ -173,3 +174,19 @@ fontanero eliminado conservan su historial y quedan sin asignación.
   dígitos en el correo y entra sin contraseña.
 - Los intentos fallidos se guardan en la tabla `auth_intentos`, así que el
   bloqueo por fuerza bruta sobrevive a los reinicios del servidor.
+
+## Pagos de Wompi: qué puede hacer el administrador
+
+- **Los pagos de Wompi no se confirman a mano.** Solo el aviso firmado de Wompi
+  (webhook) prueba que el dinero llegó. El panel solo ofrece "Confirmar" en los
+  recibos físicos.
+- **Un checkout de Wompi nunca se borra mientras pueda cobrarse.** Si el usuario
+  lo abrió y lo cerró sin pagar, a los 30 minutos se libera solo (o con el botón
+  "Liberar"): queda en el historial como reemplazado y, si el usuario llega a
+  pagarlo, el webhook todavía lo encuentra y el dinero queda registrado.
+- **Cobrado sin aplicar** (`APPROVED_NO_APLICADO` o `MONTO_INVALIDO`): Wompi le
+  cobró al usuario pero el pago no se pudo aplicar a la factura. Se devuelve el
+  dinero desde el panel de Wompi y luego se usa "Marcar devuelto"
+  (estado `REEMBOLSADO`).
+- Una factura con un pago en curso no se puede anular ni cambiar de valor hasta
+  resolver ese pago.

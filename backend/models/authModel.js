@@ -33,6 +33,12 @@ function changePassword(id, password) {
   return supabaseAdmin.auth.admin.updateUserById(id, { password });
 }
 
+// Revoca sesiones (refresh tokens) a partir del JWT de una de ellas.
+// scope 'others': todas menos la de ese JWT; 'global': todas.
+function signOut(jwt, scope = 'global') {
+  return supabaseAdmin.auth.admin.signOut(jwt, scope);
+}
+
 // Crea una sesión para un correo SIN contraseña. Solo se llama después de que
 // el backend validó el código de 6 dígitos que le envió a ese correo
 // (authController.ingresarConCodigo). generateLink no envía ningún correo:
@@ -57,5 +63,6 @@ module.exports = {
   createUser,
   deleteUser,
   changePassword,
+  signOut,
   createSessionForEmail,
 };

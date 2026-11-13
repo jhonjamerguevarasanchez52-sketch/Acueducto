@@ -113,12 +113,7 @@ async function enviarNotificacion(req, res) {
   if (!TIPOS_AVISO.includes(tipo)) {
     return res.status(400).json({ error: `Tipo de aviso inválido. Usa: ${TIPOS_AVISO.join(', ')}` });
   }
-  if (req.usuario.rol === 'fontanero' && perfil_id !== 'todos') {
-    return res.status(403).json({ error: 'El fontanero solo puede enviar avisos generales' });
-  }
-  if (enviar_correo && req.usuario.rol !== 'administrador') {
-    return res.status(403).json({ error: 'Solo un administrador puede enviar avisos por correo' });
-  }
+  // La ruta solo admite administradores (notificacionRoutes).
 
   try {
     if (perfil_id === 'todos') {

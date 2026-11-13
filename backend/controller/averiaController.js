@@ -231,8 +231,7 @@ async function escucharAudio(req, res) {
   }
 }
 
-// DELETE /:id - el fontanero o el administrador borran un reporte
-// erróneo o duplicado.
+// DELETE /:id - el administrador borra un reporte erróneo o duplicado.
 async function eliminarAveria(req, res) {
   try {
     const { id } = req.params;

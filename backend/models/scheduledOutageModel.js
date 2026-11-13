@@ -5,21 +5,32 @@ const supabaseAdmin = require('../config/supabaseAdminClient');
 const TABLE = 'cortes_programados';
 const COLUMNAS = 'id, zona, motivo, inicio, fin, cancelado, created_at';
 
+// Misma normalización que profileModel.normalizarZona (sin requerirlo, para
+// no acoplar los modelos): mayúsculas, tildes y espacios no cuentan.
+function normalizarZona(zona) {
+  return String(zona ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+const MAX_CORTES_USUARIO = 10;
+
 // Cortes que todavía no terminan, para el usuario: los de su zona y los
-// generales. Con `zona` vacía solo ve los generales.
-function listUpcomingForZone(zona, ahoraIso) {
-  let query = supabaseAdmin
+// generales. Con `zona` vacía solo ve los generales. La zona se compara
+// normalizada ("Vereda Alta" = "vereda alta "), por eso se filtra aquí.
+async function listUpcomingForZone(zona, ahoraIso) {
+  const { data, error } = await supabaseAdmin
     .from(TABLE)
     .select(COLUMNAS)
     .eq('cancelado', false)
     .gte('fin', ahoraIso)
     .order('inicio', { ascending: true })
-    .limit(10);
-  // Comillas dobles: PostgREST así acepta zonas con espacios, puntos o comas.
-  query = zona
-    ? query.or(`zona.is.null,zona.eq."${String(zona).replace(/["\\]/g, '')}"`)
-    : query.is('zona', null);
-  return query;
+    .limit(200);
+  if (error) return { data: null, error };
+  const buscada = normalizarZona(zona);
+  const cortes = (data || [])
+    .filter((corte) => !corte.zona || (buscada && normalizarZona(corte.zona) === buscada))
+    .slice(0, MAX_CORTES_USUARIO);
+  return { data: cortes, error: null };
 }
 
 function list({ incluirTerminados = false } = {}) {

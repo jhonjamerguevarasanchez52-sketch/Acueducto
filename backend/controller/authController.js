@@ -10,6 +10,7 @@ const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarCodigoSeguridad, protegerCodigo, codigoCoincide } = require('../utils/securityCode');
 const { normalizarCorreo } = require('../utils/formato');
 const { escaparHtml } = require('../utils/html');
+const cacheSesiones = require('../utils/cacheSesiones');
 
 const MINUTOS_VALIDEZ_CODIGO = 15;
 const MENSAJE_CODIGO_INVALIDO = 'Código incorrecto o expirado';
@@ -90,6 +91,20 @@ function responderAuthNoDisponible(res, error) {
   return res.status(503).json({
     error: 'No pudimos conectar con el servicio de acceso. Revisa tu conexión e inténtalo de nuevo.',
   });
+}
+
+// Revoca sesiones de Supabase a partir de un JWT de la cuenta y olvida las
+// sesiones en caché del backend. Nunca rompe la petición: un fallo queda en
+// el log (la contraseña ya cambió de todos modos).
+async function cerrarSesiones(jwt, scope, userId) {
+  cacheSesiones.invalidarUsuario(userId);
+  if (!jwt) return;
+  try {
+    const { error } = await authModel.signOut(jwt, scope);
+    if (error) console.error('[sesiones] no se pudieron cerrar las sesiones:', error.message);
+  } catch (err) {
+    console.error('[sesiones] no se pudieron cerrar las sesiones:', err.message);
+  }
 }
 
 // Revisa que el perfil pueda entrar y, si la cuenta seguía sin verificar, la
@@ -233,12 +248,19 @@ async function ingresarConCodigo(req, res) {
       return res.status(400).json({ error: MENSAJE_CODIGO_INVALIDO });
     }
 
-    // El código es de un solo uso: se borra antes de crear la sesión.
-    const { error: errorLimpiar } = await profileModel.saveFields(perfil.id, {
-      codigo_acceso: null,
-      codigo_acceso_expiracion: null,
-    });
+    // El código es de un solo uso: se borra antes de crear la sesión, y solo
+    // si sigue siendo el mismo. Si dos peticiones llegan a la vez con el mismo
+    // código, solo una entra.
+    const { consumido, error: errorLimpiar } = await profileModel.consumeCode(
+      perfil.id,
+      { columna: 'codigo_acceso', columnaExpiracion: 'codigo_acceso_expiracion' },
+      perfil.codigo_acceso,
+    );
     if (errorLimpiar) return errorConsulta(res, errorLimpiar);
+    if (!consumido) {
+      await registrarFallo('codigo-acceso', correo);
+      return res.status(400).json({ error: MENSAJE_CODIGO_INVALIDO });
+    }
 
     const resultado = await validarPerfilParaIngresar(perfil.id);
     if (resultado.error) return errorConsulta(res, resultado.error);
@@ -254,7 +276,8 @@ async function ingresarConCodigo(req, res) {
     }
 
     // Quien entra con código no necesita la contraseña temporal: no se le
-    // obliga a cambiarla. Puede crear una desde su perfil si quiere.
+    // obliga a cambiarla. Si quiere una contraseña propia, la crea con
+    // "Olvidé mi contraseña" (código al correo), porque no conoce la temporal.
     if (resultado.perfil.debe_cambiar_password) {
       await profileModel.saveFields(perfil.id, { debe_cambiar_password: false });
     }
@@ -445,8 +468,10 @@ async function cambiarPasswordPropio(req, res) {
   try {
     // Confirmamos la contraseña actual reautenticando contra Supabase Auth,
     // en vez de confiar en que quien llama con el token es realmente el dueño.
-    const { error: authError } = await authModel.signIn(correo, passwordActual);
+    const { error: authError } = await iniciarSesionSupabase(correo, passwordActual);
     if (authError) {
+      // Un fallo de red no es una contraseña incorrecta: no cuenta como intento.
+      if (esErrorTransitorioAuth(authError)) return responderAuthNoDisponible(res, authError);
       await registrarFallo('cambiar-password', correo);
       return res.status(400).json({ error: 'La contraseña actual es incorrecta' });
     }
@@ -455,6 +480,10 @@ async function cambiarPasswordPropio(req, res) {
     if (updateAuthError) {
       return errorConsulta(res, updateAuthError);
     }
+
+    // Se cierran las demás sesiones (otros teléfonos, el panel y la sesión
+    // que acaba de abrir la verificación de arriba); esta sigue abierta.
+    await cerrarSesiones(req.token, 'others', userId);
 
     const { error: updatePerfilError } = await profileModel.saveFields(userId, {
       debe_cambiar_password: false,
@@ -486,9 +515,11 @@ async function solicitarRecuperacion(req, res) {
   await registrarFallo('recuperar', correo);
 
   try {
-    const { data: perfil, error: buscarError } = await profileModel.findByEmail(correo, 'id');
+    const { data: perfil, error: buscarError } = await profileModel.findByEmail(correo, 'id, activo');
 
-    if (buscarError || !perfil) {
+    // Igual que el ingreso con código: una cuenta desactivada no recibe
+    // códigos (no podría entrar con la contraseña nueva).
+    if (buscarError || !perfil || perfil.activo === false) {
       // No revelamos si el correo existe o no, por seguridad
       return res.status(200).json({ message: 'Si el correo existe, se enviará un código de recuperación' });
     }
@@ -558,6 +589,19 @@ async function resetearPassword(req, res) {
       return res.status(400).json({ error: MENSAJE_CODIGO_INVALIDO });
     }
 
+    // El código es de un solo uso: se consume antes de cambiar la contraseña
+    // para que dos peticiones simultáneas no lo usen las dos.
+    const { consumido, error: errorConsumir } = await profileModel.consumeCode(
+      perfil.id,
+      { columna: 'codigo_recuperacion', columnaExpiracion: 'codigo_expiracion' },
+      perfil.codigo_recuperacion,
+    );
+    if (errorConsumir) return errorConsulta(res, errorConsumir);
+    if (!consumido) {
+      await registrarFallo('reset', correo);
+      return res.status(400).json({ error: MENSAJE_CODIGO_INVALIDO });
+    }
+
     // La contraseña real vive en auth.users, se actualiza vía admin API
     const { error: authUpdateError } = await authModel.changePassword(perfil.id, nuevaPassword);
     if (authUpdateError) {
@@ -565,8 +609,6 @@ async function resetearPassword(req, res) {
     }
 
     const { error: updateError } = await profileModel.saveFields(perfil.id, {
-      codigo_recuperacion: null,
-      codigo_expiracion: null,
       debe_cambiar_password: false,
     });
 
@@ -576,6 +618,17 @@ async function resetearPassword(req, res) {
 
     await registrarExito('reset', correo);
     await registrarExito('login', correo);
+
+    // Quien recupera la contraseña puede estar sacando a un intruso: se
+    // cierran todas las sesiones abiertas con la contraseña anterior. Para
+    // revocarlas hace falta un JWT de la cuenta, así que se abre una sesión
+    // con la contraseña nueva y se cierra todo de forma global.
+    try {
+      const { data: sesionNueva } = await authModel.signIn(correo, nuevaPassword);
+      await cerrarSesiones(sesionNueva?.session?.access_token, 'global', perfil.id);
+    } catch (err) {
+      console.error('[reset] no se pudieron cerrar las sesiones anteriores:', err.message);
+    }
 
     try {
       await enviarCorreo({

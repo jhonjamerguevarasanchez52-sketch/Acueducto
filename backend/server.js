@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const { limiteGeneral } = require('./middleware/rateLimit');
+const { bloquearLenguajeOfensivo } = require('./utils/lenguajeOfensivo');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const facturaRoutes = require('./routes/facturaRoutes');
@@ -69,6 +70,9 @@ app.use((req, res, next) => {
   next();
 });
 app.use(limiteGeneral);
+// Ningún texto escrito por personas (chat, averías, avisos, perfiles...) puede
+// llevar groserías ni lenguaje ofensivo o racista.
+app.use(bloquearLenguajeOfensivo);
 
 // Healthcheck para Render, pg_cron (mantener despierto) y monitoreo
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
@@ -106,9 +110,9 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: 'JSON inválido en el cuerpo de la petición' });
   }
   if (err.type === 'entity.too.large') {
-    const error = req.path.startsWith('/api/chat/audio')
-      ? 'El audio puede durar máximo 60 segundos.'
-      : 'El recibo debe pesar máximo 5 MB.';
+    let error = 'El contenido enviado es demasiado grande.';
+    if (req.path.startsWith('/api/chat/audio')) error = 'El audio puede durar máximo 60 segundos.';
+    else if (/^\/api\/pagos\/[^/]+\/recibo$/.test(req.path)) error = 'El recibo debe pesar máximo 5 MB.';
     return res.status(413).json({ error });
   }
   res.status(err.status || 500).json({ error: 'Error interno del servidor' });

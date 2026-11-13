@@ -13,8 +13,9 @@ const { generarFacturasMensuales } = require('./facturacionMensual');
 // Todas son idempotentes: correrlas dos veces el mismo día no duplica nada.
 
 // La facturación del mes anterior se intenta los días 1 a 5: si el servidor
-// estaba caído el día 1, se recupera solo. Fuera de esa ventana no se
-// factura, para no cobrarle un mes completo a alguien que se afilió a mitad.
+// estaba caído el día 1, se recupera solo. Fuera de esa ventana el cron no
+// factura; si hiciera falta, el administrador lo hace desde el panel. Las
+// cuentas creadas después de terminar el mes no se facturan (facturacionMensual).
 const DIAS_VENTANA_FACTURACION = 5;
 const DIAS_AVISO_ANTES_DE_VENCER = 3;
 
