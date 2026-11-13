@@ -16,12 +16,21 @@ import {
 } from 'lucide-react'
 import Sidebar from './components/Sidebar.jsx'
 import AuthScreen from './features/auth/AuthScreen.jsx'
+import ForcedPasswordChange from './features/auth/ForcedPasswordChange.jsx'
 import exportTreasuryWorkbookFile from './features/reports/exportTreasuryWorkbook.js'
+import { imprimirFactura } from './features/invoices/printInvoice.js'
 import SectionViews from './features/sections/SectionViews.jsx'
-import { quickActions, resourceEndpointBySection, MAX_BULK_USERS, MAX_USER_FILE_SIZE_BYTES, operationDefinitions, roleColors } from './config/adminConfig.js'
-import { apiRequest, clearToken, endpoints, getToken, login } from './services/api.js'
+import { quickActions, resourceEndpointBySection, paginatedEndpoints, MAX_BULK_USERS, MAX_USER_FILE_SIZE_BYTES, operationDefinitions, roleColors } from './config/adminConfig.js'
+import { apiRequest, apiRequestAll, clearToken, endpoints, getToken, login } from './services/api.js'
+
+const fetchResource = (endpointName) => (
+  paginatedEndpoints.has(endpointName)
+    ? apiRequestAll(endpoints[endpointName])
+    : apiRequest(endpoints[endpointName])
+)
 import { formatMoney, formatDate, formatInvoiceNumber } from './utils/formatters.js'
 import { parseUsersCsv, parseUsersExcel } from './utils/usersCsv.js'
+import { diaColombia, esPagoPendiente, fechaRecaudo, requiereAccion } from './utils/pagos.js'
 import hidroAppLogo from './assets/hidroapp-logo.png'
 
 function App() {
@@ -44,7 +53,7 @@ function App() {
   const [sectionErrors, setSectionErrors] = useState({})
   const [loadingSections, setLoadingSections] = useState({})
   const [createUserOpen, setCreateUserOpen] = useState(false)
-  const [newUser, setNewUser] = useState({ nombre: '', apellido: '', correo: '', rol: 'usuario' })
+  const [newUser, setNewUser] = useState({ nombre: '', apellido: '', correo: '', rol: 'usuario', telefono: '', numero_lote: '', direccion: '', zona: '' })
   const [createUserError, setCreateUserError] = useState('')
   const [createdTemporaryPassword, setCreatedTemporaryPassword] = useState('')
   const [createdUserEmailSent, setCreatedUserEmailSent] = useState(false)
@@ -71,6 +80,7 @@ function App() {
   const [operationForm, setOperationForm] = useState({})
   const [operationError, setOperationError] = useState('')
   const [operationPending, setOperationPending] = useState(false)
+  const [zones, setZones] = useState([])
   const [invoicePreview, setInvoicePreview] = useState(null)
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
@@ -125,7 +135,7 @@ function App() {
           throw new Error('Esta cuenta no tiene permisos de administrador')
         }
         setProfile(currentProfile)
-        setSessionStatus('authenticated')
+        setSessionStatus(currentProfile.debe_cambiar_password ? 'must-change-password' : 'authenticated')
       })
       .catch((error) => {
         clearToken()
@@ -141,7 +151,7 @@ function App() {
     let cancelled = false
     Promise.all(Object.entries(resourceEndpointBySection).map(async ([section, endpointName]) => {
       try {
-        const data = await apiRequest(endpoints[endpointName])
+        const data = await fetchResource(endpointName)
         return { section, data: Array.isArray(data) ? data : [], error: '' }
       } catch (error) {
         return { section, data: [], error: error.message || 'No fue posible cargar los datos' }
@@ -168,7 +178,7 @@ function App() {
     setLoadingSections((current) => ({ ...current, [section]: true }))
     setSectionErrors((current) => ({ ...current, [section]: '' }))
     try {
-      const data = await apiRequest(endpoints[endpointName])
+      const data = await fetchResource(endpointName)
       setSectionData((current) => ({ ...current, [section]: Array.isArray(data) ? data : [] }))
     } catch (error) {
       setSectionErrors((current) => ({ ...current, [section]: error.message || 'No fue posible cargar los datos' }))
@@ -189,6 +199,7 @@ function App() {
     setSearchQuery('')
     loadSection(section)
     if (section === 'facturas' || section === 'pagos') void ensureUsersLoaded()
+    if (section === 'cortes') void loadSection('cortesProgramados')
     if (section === 'reportes') {
       void Promise.all(['usuarios', 'facturas', 'pagos'].map((name) => loadSection(name)))
     }
@@ -199,9 +210,11 @@ function App() {
     setIsCreatingUser(true)
     setCreateUserError('')
     try {
+      // Los campos opcionales vacíos no se envían.
+      const body = Object.fromEntries(Object.entries(newUser).filter(([, valor]) => String(valor).trim() !== ''))
       const result = await apiRequest(endpoints.adminUsers, {
         method: 'POST',
-        body: newUser,
+        body,
       })
       setCreatedTemporaryPassword(result.passwordTemporal || '')
       setCreatedUserEmailSent(result.correoEnviado === true)
@@ -365,7 +378,7 @@ function App() {
     setCreateUserError('')
     setCreatedTemporaryPassword('')
     setCreatedUserEmailSent(false)
-    setNewUser({ nombre: '', apellido: '', correo: '', rol: 'usuario' })
+    setNewUser({ nombre: '', apellido: '', correo: '', rol: 'usuario', telefono: '', numero_lote: '', direccion: '', zona: '' })
     setCreateUserOpen(true)
   }
 
@@ -375,6 +388,15 @@ function App() {
 
     if (definition.fields.some((field) => field.type === 'user' || field.type === 'recipient')) {
       await ensureUsersLoaded()
+    }
+    if (definition.fields.some((field) => field.type === 'zona')) {
+      try {
+        const zonas = await apiRequest(endpoints.zonas)
+        setZones(Array.isArray(zonas) ? zonas : [])
+      } catch {
+        // Sin la lista igual se puede anunciar un corte para todo el acueducto.
+        setZones([])
+      }
     }
 
     setOperationType(type)
@@ -393,26 +415,49 @@ function App() {
     const definition = operationDefinitions[operationType]
     if (operationType === 'facturacionMensual') {
       const confirmar = window.confirm(
-        `Se generarán facturas de servicio por $12.000 para los usuarios activos sin factura del periodo ${operationForm.periodo}. ¿Continuar?`,
+        `Se generarán facturas de servicio con la tarifa residencial vigente para los usuarios activos sin factura del periodo ${operationForm.periodo}. ¿Continuar?`,
       )
       if (!confirmar) return
     }
     if (operationType === 'facturaExtraordinaria' && operationForm.perfil_ids === 'todos') {
-      const cantidad = users.filter((user) => user.activo && user.rol === 'usuario').length
+      // Igual que el backend: se factura a todas las cuentas activas, también
+      // administradores y fontanero (también son suscriptores del acueducto).
+      const cantidad = users.filter((user) => user.activo).length
       const total = cantidad * Number(operationForm.valor_total || 0)
       const confirmar = window.confirm(
-        `Se generarÃ¡ una factura extraordinaria por ${formatMoney(operationForm.valor_total)} a cada uno de los ${cantidad} usuarios activos. Total: ${formatMoney(total)}. Concepto: ${operationForm.concepto}. Â¿Continuar?`,
+        `Se generará una factura extraordinaria por ${formatMoney(operationForm.valor_total)} a cada una de las ${cantidad} cuentas activas. Total: ${formatMoney(total)}. Concepto: ${operationForm.concepto}. ¿Continuar?`,
       )
       if (!confirmar) return
     }
+    if (operationType === 'registrarPago') {
+      const confirmar = window.confirm(
+        `¿Registrar el pago de ${formatMoney(operationItem?.valor_total)} (${operationForm.metodo}) para la factura ${formatInvoiceNumber(operationItem)}? La factura quedará pagada.`,
+      )
+      if (!confirmar) return
+    }
+    const esEdicion = definition.method === 'PUT'
+    // En una edición, vaciar un campo de texto o fecha opcional significa
+    // borrarlo (null); al crear, un campo vacío simplemente no se envía.
+    const sePuedeBorrar = (field) => esEdicion && !field.required
+      && !['number', 'select', 'user', 'recipient', 'checkbox'].includes(field.type)
     const body = Object.fromEntries(definition.fields
-      .filter((field) => field.type !== 'recipient' && operationForm[field.name] !== '')
-      .map((field) => [
-        field.name,
-        field.type === 'number' ? Number(operationForm[field.name]) : operationForm[field.name],
-      ]))
+      .filter((field) => field.type !== 'recipient'
+        && (operationForm[field.name] !== '' || sePuedeBorrar(field)))
+      .map((field) => {
+        if (operationForm[field.name] === '') return [field.name, null]
+        const valor = operationForm[field.name]
+        if (field.type === 'number') return [field.name, Number(valor)]
+        // datetime-local llega sin zona horaria: se interpreta en la hora del
+        // navegador del administrador (Colombia) y se envía en ISO.
+        if (field.type === 'datetime-local') return [field.name, new Date(valor).toISOString()]
+        return [field.name, valor]
+      }))
     if (operationType === 'facturaExtraordinaria' && operationForm.perfil_ids !== 'todos') {
       body.perfil_ids = [operationForm.perfil_ids]
+    }
+    // Operaciones sobre un registro que lo envían en el cuerpo (p. ej. factura_id).
+    if (definition.itemIdField && operationItem) {
+      body[definition.itemIdField] = operationItem.id
     }
     const suffix = operationType === 'editarUsuario' || operationType === 'editarTarifa' || operationType === 'editarFactura'
       ? `/${operationItem.id}`
@@ -449,6 +494,12 @@ function App() {
       setActionMessage(result.message || 'Operación completada.')
       await loadSection(section)
     } catch (error) {
+      // Un usuario con facturas o pagos no se borra (es la contabilidad):
+      // el backend sugiere desactivarlo y se ofrece hacerlo en el momento.
+      if (error.data?.puedeDesactivar && path.startsWith(`${endpoints.adminUsers}/`)
+        && window.confirm(`${error.message}\n\n¿Quieres desactivarlo ahora?`)) {
+        return performAction(section, `${path}/estado`, 'PUT', { activo: false })
+      }
       setActionError(error.message || 'No fue posible completar la operación.')
     }
   }
@@ -459,64 +510,11 @@ function App() {
   }
 
   const handleDownloadInvoice = () => {
-    const printWindow = window.open('', '_blank')
-    const invoiceDocument = document.getElementById('invoice-document')
-    if (!printWindow || !invoiceDocument) {
-      setActionError('Permite las ventanas emergentes para descargar la factura.')
-      return
-    }
-
-    printWindow.addEventListener('afterprint', () => printWindow.close(), { once: true })
-    printWindow.document.write(`<!doctype html>
-      <html lang="es">
-        <head>
-          <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <title>${formatInvoiceNumber(invoicePreview)}</title>
-          <style>
-            @page { size: A4; margin: 18mm; }
-            * { box-sizing: border-box; }
-            body { margin: 0; color: #172d35; font: 14px Arial, sans-serif; }
-            .invoice-sheet { position: relative; overflow: hidden; padding: 0; border: 1px solid #d5e5ec; background: #fff; color: #173448; }
-            .invoice-watermark { position: absolute; z-index: 0; top: 32%; right: 7%; width: 320px; max-width: 52%; opacity: .04; pointer-events: none; }
-            .invoice-watermark img { display: block; width: 100%; height: auto; }
-            .invoice-sheet > :not(.invoice-watermark) { position: relative; z-index: 1; }
-            .invoice-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 24px; background: linear-gradient(120deg, #1e5fa0, #0a3665); color: #fff; }
-            .invoice-heading-brand { display: flex; align-items: center; gap: 14px; }
-            .invoice-logo-frame { display: grid; flex: none; place-items: center; width: 54px; height: 54px; overflow: hidden; border-radius: 12px; background: #fff; }
-            .invoice-logo { display: block; width: 100%; height: 100%; object-fit: cover; }
-            .invoice-brand { color: #dceff5; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-            .invoice-heading h2 { margin: 7px 0 0; color: #fff; font-size: 24px; }
-            .invoice-number { flex: none; text-align: right; }
-            .invoice-number span { color: #dceff5; font-size: 11px; text-transform: uppercase; }
-            .invoice-number strong { display: block; margin-top: 6px; font-size: 16px; }
-            .invoice-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 22px 24px; }
-            .invoice-meta div { padding: 12px; border: 1px solid #e1edf2; background: #f3f8fa; }
-            .invoice-meta div:nth-child(1) { border-top: 3px solid #35a7d8; }
-            .invoice-meta div:nth-child(2) { border-top: 3px solid #dca934; }
-            .invoice-meta div:nth-child(3) { border-top: 3px solid #34a879; }
-            .invoice-meta div:nth-child(4) { border-top: 3px solid #e77757; }
-            .invoice-meta span, .invoice-party > span { display: block; margin-bottom: 6px; color: #607987; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-            .invoice-party { margin: 0 24px 22px; padding: 15px; border-left: 3px solid #4fc3f7; background: #f7fafc; }
-            .invoice-party p { margin: 4px 0 0; color: #607987; }
-            .invoice-lines { width: calc(100% - 48px); margin: 22px 24px 0; border-collapse: collapse; }
-            .invoice-lines th, .invoice-lines td { padding: 12px 10px; border-bottom: 1px solid #dce6ec; text-align: left; }
-            .invoice-lines th:last-child, .invoice-lines td:last-child { text-align: right; }
-            .invoice-lines th { color: #607987; font-size: 10px; text-transform: uppercase; }
-            .invoice-total { display: flex; justify-content: flex-end; gap: 28px; margin: 4px 24px 0; padding: 16px; border-left: 4px solid #00a878; background: linear-gradient(120deg, #eaf5fb, #e7f8ef); color: #173448; font-size: 17px; font-weight: 700; }
-            .invoice-note { margin: 20px 24px 0; padding: 14px 0 20px; border-top: 1px solid #dce6ec; color: #607987; }
-            @media (max-width: 600px) { .invoice-heading { gap: 12px; padding: 16px; } .invoice-heading h2 { font-size: 18px; } .invoice-logo-frame { width: 44px; height: 44px; } .invoice-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 16px; } .invoice-party { margin: 0 16px 18px; } .invoice-lines { width: calc(100% - 32px); margin: 18px 16px 0; } .invoice-total { margin: 4px 16px 0; } .invoice-note { margin: 18px 16px 0; } }
-            @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
-          </style>
-        </head>
-        <body>${invoiceDocument.innerHTML}</body>
-      </html>`)
-    printWindow.document.close()
-    printWindow.setTimeout(() => {
-      printWindow.focus()
-      printWindow.print()
-    }, 250)
-    setActionError('')
+    const abierta = imprimirFactura(
+      document.getElementById('invoice-document'),
+      formatInvoiceNumber(invoicePreview),
+    )
+    setActionError(abierta ? '' : 'Permite las ventanas emergentes para descargar la factura.')
   }
 
   const handleLogin = async (event) => {
@@ -526,15 +524,17 @@ function App() {
     setAuthNotice('')
 
     try {
-      const adminCheck = await apiRequest(endpoints.verifyAdminEmail, { method: 'POST', body: { correo: email } })
-      if (!adminCheck.esAdministrador) throw new Error('Este correo no está registrado en la base de datos.')
-      await login(email, password)
+      // El rol se valida después de entrar: no existe una ruta pública para
+      // preguntar si un correo es de administrador (permitía enumerarlos).
+      await login(email.trim().toLowerCase(), password)
       const currentProfile = await apiRequest(endpoints.profile)
       if (currentProfile.rol !== 'administrador') {
         throw new Error('Esta cuenta no tiene permisos de administrador')
       }
       setProfile(currentProfile)
-      setSessionStatus('authenticated')
+      // Con la contraseña temporal el servidor solo deja cambiarla.
+      if (currentProfile.debe_cambiar_password) setCurrentProfilePassword(password)
+      setSessionStatus(currentProfile.debe_cambiar_password ? 'must-change-password' : 'authenticated')
       setPassword('')
     } catch (error) {
       clearToken()
@@ -544,21 +544,6 @@ function App() {
     }
   }
 
-  const checkAdminEmail = async () => {
-    const normalizedEmail = email.trim().toLowerCase()
-    if (!normalizedEmail) {
-      setAuthError('Ingresa el correo de un administrador.')
-      return false
-    }
-    try {
-      await apiRequest(endpoints.verifyAdminEmail, { method: 'POST', body: { correo: normalizedEmail } })
-      setAuthError('')
-      return true
-    } catch (error) {
-      setAuthError(error.message || 'Este correo no está registrado en la base de datos.')
-      return false
-    }
-  }
   const openProfile = () => {
     setProfileForm({
       nombre: profile?.nombre || '',
@@ -624,6 +609,11 @@ function App() {
       setCurrentProfilePassword('')
       setNewProfilePassword('')
       setConfirmProfilePassword('')
+      if (sessionStatus === 'must-change-password') {
+        const currentProfile = await apiRequest(endpoints.profile)
+        setProfile(currentProfile)
+        setSessionStatus('authenticated')
+      }
     } catch (error) {
       setPasswordError(error.message || 'No fue posible cambiar la contraseña.')
     } finally {
@@ -703,16 +693,20 @@ function App() {
   const payments = sectionData.pagos || []
   const cuts = sectionData.cortes || []
   const confirmedPayments = payments.filter((payment) => payment.confirmado)
+  const pendingPayments = payments.filter((payment) => esPagoPendiente(payment))
   const inReportRange = (value) => {
     if (!value) return false
-    const day = String(value).slice(0, 10)
+    const day = diaColombia(value)
     return (!reportFrom || day >= reportFrom) && (!reportTo || day <= reportTo)
   }
-  const reportPayments = payments.filter((payment) => inReportRange(payment.fecha_pago))
+  // Un pago confirmado cuenta el día en que se confirmó (el dinero se recibió
+  // ese día); uno sin confirmar, el día en que se inició.
+  const reportPayments = payments.filter((payment) => inReportRange(fechaRecaudo(payment)))
   const reportInvoices = invoices.filter((invoice) => inReportRange(invoice.fecha_emision))
   const reportConfirmedPayments = reportPayments.filter((payment) => payment.confirmado)
+  const reportPendingPayments = reportPayments.filter((payment) => esPagoPendiente(payment))
   const reportRevenue = reportConfirmedPayments.reduce((sum, payment) => sum + Number(payment.monto || 0), 0)
-  const reportPendingRevenue = reportPayments.filter((payment) => !payment.confirmado)
+  const reportPendingRevenue = reportPendingPayments
     .reduce((sum, payment) => sum + Number(payment.monto || 0), 0)
   const activeUsers = users.filter((user) => user.activo)
   const pendingInvoices = invoices.filter((invoice) => invoice.estado === 'pendiente')
@@ -728,11 +722,11 @@ function App() {
   ]
   const monthlyRevenue = new Map()
   confirmedPayments.forEach((payment) => {
-    const date = new Date(payment.fecha_pago)
-    if (Number.isNaN(date.getTime())) return
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const day = diaColombia(fechaRecaudo(payment))
+    if (!/^\d{4}-\d{2}/.test(day)) return
+    const key = day.slice(0, 7)
     const current = monthlyRevenue.get(key) || {
-      name: date.toLocaleDateString('es-CO', { month: 'short' }),
+      name: new Date(`${key}-15T12:00:00Z`).toLocaleDateString('es-CO', { month: 'short', timeZone: 'UTC' }),
       valor: 0,
     }
     current.valor += Number(payment.monto || 0)
@@ -760,7 +754,7 @@ function App() {
   }))
   const reportSummary = [
     { label: 'Usuarios registrados', value: metricValue('usuarios', users.length) },
-    { label: 'Pagos por confirmar', value: metricValue('pagos', payments.filter((payment) => !payment.confirmado).length) },
+    { label: 'Pagos que requieren acción', value: metricValue('pagos', payments.filter((payment) => requiereAccion(payment)).length) },
     { label: 'Cortes activos', value: metricValue('cortes', activeCuts.length) },
   ]
   const sectionTitles = {
@@ -777,6 +771,24 @@ function App() {
 
   if (sessionStatus === 'checking') {
     return <main className="auth-shell"><p className="auth-loading">Verificando sesión...</p></main>
+  }
+
+  if (sessionStatus === 'must-change-password') {
+    return (
+      <ForcedPasswordChange
+        correo={profile?.correo}
+        currentPassword={currentProfilePassword}
+        setCurrentPassword={setCurrentProfilePassword}
+        newPassword={newProfilePassword}
+        setNewPassword={setNewProfilePassword}
+        confirmPassword={confirmProfilePassword}
+        setConfirmPassword={setConfirmProfilePassword}
+        error={passwordError}
+        isSaving={isChangingProfilePassword}
+        onSubmit={handleChangeProfilePassword}
+        onLogout={handleLogout}
+      />
+    )
   }
 
   if (sessionStatus !== 'authenticated') {
@@ -801,7 +813,6 @@ function App() {
         isLoggingIn={isLoggingIn}
         onLogin={handleLogin}
         onRecoverySubmit={handleRecoverySubmit}
-        onCheckAdminEmail={checkAdminEmail}
       />
     )
   }
@@ -815,6 +826,7 @@ function App() {
         reportPayments,
         reportInvoices,
         reportConfirmedPayments,
+        reportPendingPayments,
         reportRevenue,
         reportPendingRevenue,
         reportFrom,
@@ -853,6 +865,8 @@ function App() {
     reportPayments,
     reportInvoices,
     reportConfirmedPayments,
+    reportPendingPayments,
+    pendingPayments,
     reportRevenue,
     reportPendingRevenue,
     reportFrom,
@@ -884,7 +898,7 @@ function App() {
               <Menu size={18} />
             </button>
             <div>
-              <p className="eyebrow">Panel administrativo · Acueducto Campoamor</p>
+              <p className="eyebrow">Panel administrativo · Acueducto Campo Amor</p>
               <h1>{currentSectionTitle}</h1>
             </div>
           </div>
@@ -997,8 +1011,8 @@ function App() {
                 <div>
                   <strong>Usuario creado</strong>
                   <p>{createdUserEmailSent
-                    ? 'Enviamos al correo registrado la contraseña temporal y el código para verificar la cuenta.'
-                    : 'No se pudo enviar el correo. Comparte la contraseña temporal; el usuario podrá solicitar un nuevo código desde la pantalla de acceso.'}</p>
+                    ? 'Le enviamos un correo con cómo entrar: con un código a su correo (lo más fácil) o con esta contraseña temporal.'
+                    : 'No se pudo enviar el correo. Comparte esta contraseña temporal, o dile que entre con "Entrar con un código a mi correo".'}</p>
                   <code>{createdTemporaryPassword}</code>
                 </div>
               </div>
@@ -1014,6 +1028,11 @@ function App() {
                     <option value="administrador">Administrador</option>
                   </select>
                 </label>
+                {/* Opcionales: registrar la ubicación aquí evita que el usuario tenga que hacerlo. */}
+                <label>Teléfono<input type="tel" value={newUser.telefono} onChange={(event) => setNewUser({ ...newUser, telefono: event.target.value })} /></label>
+                <label>Número de lote<input value={newUser.numero_lote} onChange={(event) => setNewUser({ ...newUser, numero_lote: event.target.value })} /></label>
+                <label>Dirección<input value={newUser.direccion} onChange={(event) => setNewUser({ ...newUser, direccion: event.target.value })} /></label>
+                <label>Zona<input value={newUser.zona} onChange={(event) => setNewUser({ ...newUser, zona: event.target.value })} /></label>
                 {createUserError && <p className="auth-error form-wide" role="alert">{createUserError}</p>}
                 <button type="submit" className="primary-button form-wide" disabled={isCreatingUser}>
                   {isCreatingUser ? 'Creando...' : 'Crear usuario'}
@@ -1138,6 +1157,11 @@ function App() {
                     <select value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })} required={field.required}>
                       {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
                     </select>
+                  ) : field.type === 'zona' ? (
+                    <select value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })}>
+                      <option value="">Todo el acueducto</option>
+                      {zones.map((zona) => <option key={zona} value={zona}>{zona}</option>)}
+                    </select>
                   ) : (
                     <input type={field.type || 'text'} min={field.type === 'number' ? '0' : undefined} step={field.type === 'number' ? 'any' : undefined} value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })} required={field.required} />
                   )}
@@ -1147,7 +1171,7 @@ function App() {
               <button type="submit" className="primary-button form-wide" disabled={operationPending}>
                 {operationPending
                   ? operationType === 'facturacionMensual' ? 'Generando...' : 'Guardando...'
-                  : operationType === 'facturacionMensual' ? 'Generar facturas' : 'Guardar'}
+                  : operationDefinitions[operationType].submitLabel || (operationType === 'facturacionMensual' ? 'Generar facturas' : 'Guardar')}
               </button>
             </form>
           </section>

@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
 import '../core/fila_detalle.dart';
 import '../core/mensaje_estado.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Tarjeta de un corte del historial: motivo, si sigue activo o ya se resolvió,
 /// y las fechas de corte y reconexión.
@@ -42,12 +43,12 @@ class CorteCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             FilaDetalle(
-              icono: Icons.event_busy_outlined,
+              icono: LucideIcons.calendarX,
               texto: 'Corte: ${Formato.fechaHora(corte.fechaCorte)}',
             ),
             if (corte.fechaReconexion != null)
               FilaDetalle(
-                icono: Icons.event_available_outlined,
+                icono: LucideIcons.calendarCheck,
                 texto:
                     'Reconexión: ${Formato.fechaHora(corte.fechaReconexion)}',
               ),

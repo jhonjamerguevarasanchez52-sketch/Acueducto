@@ -5,11 +5,7 @@ const remitenteCorreo = process.env.EMAIL_USER;
 const remitenteNombre = process.env.EMAIL_SENDER_NAME || 'Acueducto Campo Amor';
 const nombreAcueducto = 'Acueducto Campo Amor';
 
-function escaparHtml(valor) {
-  return String(valor).replace(/[&<>"']/g, (caracter) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[caracter]);
-}
+const { escaparHtml } = require('../utils/html');
 
 // Plantilla compatible con clientes de correo: estilos en línea y tablas para
 // que el mismo diseño se conserve en Gmail, Outlook y dispositivos móviles.
@@ -80,4 +76,12 @@ async function enviarCorreo({ to, subject, html }) {
   });
 }
 
-module.exports = { enviarCorreo, construirCorreoHtml };
+// Brevo responde 429 (demasiadas peticiones) o 402 (sin créditos) cuando se
+// agota el cupo del plan; el plan gratuito permite 300 correos al día.
+function esCupoAgotado(error) {
+  const estado = Number(error?.statusCode ?? error?.status ?? error?.response?.status);
+  if (estado === 429 || estado === 402) return true;
+  return /daily limit|quota|credits|not enough|rate limit/i.test(String(error?.message || ''));
+}
+
+module.exports = { enviarCorreo, construirCorreoHtml, esCupoAgotado };

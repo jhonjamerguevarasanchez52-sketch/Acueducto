@@ -4,7 +4,9 @@ import '../../models/factura.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
+import '../core/dialogo_centrado.dart';
 import '../core/pagar_sheet.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Nombre comercial del plan según los meses que cubre.
 String nombrePlanPago(int meses) => switch (meses) {
@@ -60,10 +62,10 @@ Future<Map<String, dynamic>?> mostrarPlanPagoSheet(
   }
 
   if (!context.mounted) return null;
-  return showModalBottomSheet<Map<String, dynamic>>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  // Ventana centrada: en hoja inferior el botón Pagar quedaba detrás de la
+  // barra de 3 botones de algunos Android.
+  return mostrarDialogoCentrado<Map<String, dynamic>>(
+    context,
     builder: (_) => _PlanPagoSheet(
       opciones: opciones,
       puedeCambiar: respuesta['puedeCambiarPlan'] == true,
@@ -113,7 +115,8 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
     final pagarMensual = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.lock_outline),
+        scrollable: true,
+        icon: const Icon(LucideIcons.lock),
         title: Text('El plan ${nombrePlanPago(meses).toLowerCase()} no está disponible'),
         content: Text(
           opcion['motivoNoDisponible']?.toString() ??
@@ -139,43 +142,34 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
     final colores = AppColors.of(context);
     final principal = _principal;
     final otras = _otras;
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Pagar factura',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
-            ),
-            if (widget.motivo != null) ...[
-              const SizedBox(height: 5),
-              Text(widget.motivo!, style: TextStyle(color: colores.secondaryText)),
-            ],
-            const SizedBox(height: 12),
-            _tarjetaPrincipal(principal, colores, hayMas: otras.isNotEmpty),
-            if (_verMas) ...[
-              const SizedBox(height: 14),
-              Text(
-                'Paga varios meses y olvídate de la factura mensual',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: colores.secondaryText,
-                ),
-              ),
-              const SizedBox(height: 8),
-              for (final opcion in otras) _opcionLarga(opcion, colores),
-            ],
-            const SizedBox(height: 10),
+    return DialogoCentrado(
+      titulo: 'Pagar factura',
+      subtitulo: widget.motivo,
+      contenido: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _tarjetaPrincipal(principal, colores, hayMas: otras.isNotEmpty),
+          if (_verMas) ...[
+            const SizedBox(height: 14),
             Text(
-              'Con Wompi se suma la comisión de la pasarela para que al '
-              'acueducto le llegue completo el valor del servicio. '
-              'En pago físico pagas solo el valor del servicio.',
-              style: TextStyle(color: colores.secondaryText, fontSize: 12),
+              'Paga varios meses y olvídate de la factura mensual',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: colores.secondaryText,
+              ),
             ),
+            const SizedBox(height: 8),
+            for (final opcion in otras) _opcionLarga(opcion, colores),
           ],
-        ),
+          const SizedBox(height: 10),
+          Text(
+            'Con Wompi se suma la comisión de la pasarela para que al '
+            'acueducto le llegue completo el valor del servicio. '
+            'En pago físico pagas solo el valor del servicio.',
+            style: TextStyle(color: colores.secondaryText, fontSize: 12),
+          ),
+        ],
       ),
     );
   }
@@ -227,7 +221,7 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: () => _elegir(opcion),
-                    icon: const Icon(Icons.payments_outlined, size: 18),
+                    icon: const Icon(LucideIcons.banknote, size: 18),
                     label: const Text('Pagar'),
                   ),
                 ),
@@ -238,7 +232,7 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
                       onPressed: () => setState(() {
                         _verMas = !_verMas;
                       }),
-                      icon: Icon(_verMas ? Icons.expand_less : Icons.expand_more, size: 18),
+                      icon: Icon(_verMas ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18),
                       label: const Text('Más pagos'),
                     ),
                   ),
@@ -282,7 +276,7 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                       ),
                     ),
-                    Icon(disponible ? Icons.chevron_right : Icons.lock_outline),
+                    Icon(disponible ? LucideIcons.chevronRight : LucideIcons.lock),
                   ],
                 ),
                 const SizedBox(height: 4),

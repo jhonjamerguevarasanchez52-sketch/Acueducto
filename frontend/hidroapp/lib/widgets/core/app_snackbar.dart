@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Avisos flotantes consistentes en toda la app: mismo formato (ícono +
 /// color según el tipo) para no tener cada pantalla su propio `SnackBar` de
@@ -12,7 +13,7 @@ class AppSnackbar {
   static void error(BuildContext context, String mensaje) => _mostrar(
     context,
     mensaje,
-    icono: Icons.error_outline,
+    icono: LucideIcons.circleAlert,
     color: AppColors.of(context).danger,
   );
 
@@ -20,7 +21,7 @@ class AppSnackbar {
   static void success(BuildContext context, String mensaje) => _mostrar(
     context,
     mensaje,
-    icono: Icons.check_circle_outline,
+    icono: LucideIcons.circleCheck,
     color: AppColors.of(context).success,
   );
 
@@ -28,7 +29,7 @@ class AppSnackbar {
   static void info(BuildContext context, String mensaje) => _mostrar(
     context,
     mensaje,
-    icono: Icons.info_outline,
+    icono: LucideIcons.info,
     color: AppTheme.primaryDark,
   );
 

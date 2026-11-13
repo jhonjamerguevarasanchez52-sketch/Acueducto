@@ -17,52 +17,80 @@ const API_URL = import.meta.env.DEV
   ? '/api'
   : API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`
 
-export function getToken() {
-  return localStorage.getItem('hidro_token')
-}
+const TOKEN_KEY = 'hidro_token'
+const REFRESH_KEY = 'hidro_refresh_token'
 
-export function saveToken(token) {
-  if (token) {
-    localStorage.setItem('hidro_token', token)
+function leer(clave) {
+  try {
+    return localStorage.getItem(clave)
+  } catch {
+    return null
   }
 }
 
-function saveSession(session) {
-  saveToken(session?.access_token)
-  if (session?.refresh_token) localStorage.setItem('hidro_refresh_token', session.refresh_token)
+function escribir(clave, valor) {
+  try {
+    if (valor) localStorage.setItem(clave, valor)
+    else localStorage.removeItem(clave)
+  } catch {
+    // Navegación privada o almacenamiento bloqueado: la sesión dura lo que la pestaña.
+  }
+}
+
+export function getToken() {
+  return leer(TOKEN_KEY)
+}
+
+export function saveToken(token, refreshToken) {
+  if (token) escribir(TOKEN_KEY, token)
+  if (refreshToken) escribir(REFRESH_KEY, refreshToken)
 }
 
 export function clearToken() {
-  localStorage.removeItem('hidro_token')
-  localStorage.removeItem('hidro_refresh_token')
+  escribir(TOKEN_KEY, null)
+  escribir(REFRESH_KEY, null)
 }
 
-let refreshInFlight = null
+/** Error de la API con el estado HTTP y el cuerpo de la respuesta. */
+export class ApiError extends Error {
+  constructor(message, { status, data } = {}) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.data = data
+  }
+}
 
-async function refreshSession() {
-  const refreshToken = localStorage.getItem('hidro_refresh_token')
+// El token de Supabase dura una hora. Al recibir un 401 se renueva una sola
+// vez con el refresh token y se repite la petición, para que el administrador
+// no tenga que volver a iniciar sesión cada hora. Varias peticiones que vencen
+// a la vez comparten la misma renovación.
+let renovacionEnCurso = null
+
+async function renovarSesion() {
+  const refreshToken = leer(REFRESH_KEY)
   if (!refreshToken) return false
-  if (!refreshInFlight) {
-    refreshInFlight = fetch(`${API_URL}/auth/renovar-sesion`, {
+  if (!renovacionEnCurso) {
+    renovacionEnCurso = fetch(`${API_URL}/auth/renovar-sesion`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
-    }).then(async (response) => {
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok || !data.session?.access_token) {
-        clearToken()
-        return false
-      }
-      saveSession(data.session)
-      return true
-    }).catch(() => false).finally(() => {
-      refreshInFlight = null
     })
+      .then(async (response) => {
+        if (!response.ok) return false
+        const data = await response.json().catch(() => ({}))
+        if (!data.session?.access_token) return false
+        saveToken(data.session.access_token, data.session.refresh_token)
+        return true
+      })
+      .catch(() => false)
+      .finally(() => { renovacionEnCurso = null })
   }
-  return refreshInFlight
+  return renovacionEnCurso
 }
 
-async function sendRequest(path, options, token) {
+async function enviar(path, options) {
+  const token = getToken()
   const headers = { ...(options.headers || {}) }
   if (!(options.body instanceof FormData) && typeof options.body !== 'string' && options.body !== undefined) {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json'
@@ -78,9 +106,12 @@ async function sendRequest(path, options, token) {
 }
 
 export async function apiRequest(path, options = {}) {
-  let response = await sendRequest(path, options, getToken())
-  if (response.status === 401 && getToken() && await refreshSession()) {
-    response = await sendRequest(path, options, getToken())
+  const tokenUsado = getToken()
+  let response = await enviar(path, options)
+
+  const esRutaDeAcceso = path.startsWith('/auth/')
+  if (response.status === 401 && tokenUsado && !esRutaDeAcceso && await renovarSesion()) {
+    response = await enviar(path, options)
   }
 
   const contentType = response.headers.get('content-type') || ''
@@ -95,19 +126,40 @@ export async function apiRequest(path, options = {}) {
     const message = typeof data === 'object'
       ? (data.message || data.error || `Error HTTP ${response.status}`)
       : data || `Error HTTP ${response.status}`
-    if (response.status === 401) {
+    // La sesión no se pudo renovar: se avisa al panel para que vuelva a la
+    // pantalla de acceso (App escucha "hidro-session-expired").
+    if (response.status === 401 && tokenUsado && !esRutaDeAcceso) {
       clearToken()
       if (typeof window !== 'undefined') window.dispatchEvent(new Event('hidro-session-expired'))
     }
-    throw new Error(message)
+    throw new ApiError(message, { status: response.status, data })
   }
 
   return data
 }
 
+// Supabase entrega como máximo 1000 filas por consulta. Los listados que
+// crecen sin tope (usuarios, facturas, pagos, cortes) se piden por páginas y
+// se unen aquí, para que el panel y los reportes nunca trabajen con datos
+// recortados en silencio.
+export const TAMANO_PAGINA = 500
+const MAX_PAGINAS = 200
+
+export async function apiRequestAll(path, options = {}) {
+  const filas = []
+  const separador = path.includes('?') ? '&' : '?'
+  for (let pagina = 0; pagina < MAX_PAGINAS; pagina += 1) {
+    const offset = pagina * TAMANO_PAGINA
+    const datos = await apiRequest(`${path}${separador}limit=${TAMANO_PAGINA}&offset=${offset}`, options)
+    if (!Array.isArray(datos)) return datos
+    filas.push(...datos)
+    if (datos.length < TAMANO_PAGINA) return filas
+  }
+  return filas
+}
+
 export const endpoints = {
   login: '/auth/login',
-  verifyAdminEmail: '/auth/verificar-administrador',
   changePassword: '/auth/cambiar-password',
   requestPasswordReset: '/auth/solicitar-recuperacion',
   resetPassword: '/auth/resetear-password',
@@ -119,10 +171,18 @@ export const endpoints = {
   facturaExtraordinaria: '/facturas/factura-extraordinaria',
   pagosBase: '/pagos',
   pagos: '/pagos/todos',
+  // Acciones sobre un pago concreto: /pagos/:id/confirmar y DELETE /pagos/:id.
+  // No cuelgan de /pagos/todos (esa ruta solo lista).
+  pago: '/pagos',
+  registrarPagoAdmin: '/pagos/admin',
   cortes: '/cortes',
+  cortesProgramados: '/cortes/programados',
+  cortesProgramadosTodos: '/cortes/programados/todos',
+  zonas: '/cortes/zonas',
   notificaciones: '/notificaciones',
   marcarNotificacionesLeidas: '/notificaciones/marcar-todas',
   tarifas: '/tarifas',
+  tareasDiarias: '/tareas/diarias',
 }
 
 export async function login(correo, password) {
@@ -135,6 +195,6 @@ export async function login(correo, password) {
     throw new Error('El servidor no devolvió una sesión válida')
   }
 
-  saveSession(data.session)
+  saveToken(data.session.access_token, data.session.refresh_token)
   return data
 }

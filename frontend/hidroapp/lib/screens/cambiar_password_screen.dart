@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/auth/auth_style.dart';
 import 'recuperar_password_screen.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Cambio voluntario de contraseña, abierto desde "Mi perfil". Pide la
 /// contraseña actual y la nueva (dos veces). Si el usuario no recuerda la
@@ -70,7 +71,7 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
   Widget _botonVer(bool visible, VoidCallback onPressed) => IconButton(
         splashRadius: 20,
         icon: Icon(
-          visible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+          visible ? LucideIcons.eyeOff : LucideIcons.eye,
           color: authMuted,
           size: 20,
         ),
@@ -104,7 +105,7 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                     decoration: authInputDecoration(
                       context,
                       hint: 'Tu contraseña actual',
-                      icon: Icons.lock_clock_outlined,
+                      icon: LucideIcons.lockKeyhole,
                       suffix: _botonVer(_verActual,
                           () => setState(() => _verActual = !_verActual)),
                     ),
@@ -121,7 +122,7 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                     decoration: authInputDecoration(
                       context,
                       hint: 'Mínimo 8 caracteres',
-                      icon: Icons.lock_outline,
+                      icon: LucideIcons.lock,
                       suffix: _botonVer(_verNueva,
                           () => setState(() => _verNueva = !_verNueva)),
                     ),
@@ -144,7 +145,7 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                     decoration: authInputDecoration(
                       context,
                       hint: 'Repite la nueva contraseña',
-                      icon: Icons.lock_outline,
+                      icon: LucideIcons.lock,
                     ),
                     validator: (v) => v != _nuevaCtrl.text
                         ? 'Las contraseñas no coinciden'

@@ -1,4 +1,5 @@
 import { formatDate, formatInvoiceNumber } from '../../utils/formatters.js'
+import { diaColombia, estadoPago, fechaRecaudo } from '../../utils/pagos.js'
 import hidroAppLogo from '../../assets/hidroapp-logo.png'
 
 export default async function exportTreasuryWorkbook({
@@ -9,6 +10,7 @@ export default async function exportTreasuryWorkbook({
   reportPayments,
   reportInvoices,
   reportConfirmedPayments,
+  reportPendingPayments = [],
   reportRevenue,
   reportPendingRevenue,
   reportFrom,
@@ -45,7 +47,7 @@ export default async function exportTreasuryWorkbook({
       const user = profileById.get(payment.perfil_id)
       const invoice = invoiceById.get(payment.factura_id)
       return {
-        Fecha: formatDate(payment.fecha_pago),
+        Fecha: formatDate(fechaRecaudo(payment)),
         Suscriptor: userName(payment.perfil_id),
         Correo: user?.correo || '',
         Dirección: user?.direccion || user?.zona || '',
@@ -53,7 +55,7 @@ export default async function exportTreasuryWorkbook({
         Periodo: invoice?.periodo || '',
         Monto: Number(payment.monto || 0),
         Método: payment.metodo || '',
-        Estado: payment.confirmado ? 'Confirmado' : 'Pendiente por confirmar',
+        Estado: estadoPago(payment).etiqueta,
         Referencia: payment.referencia || payment.transaccion_id || '',
         'ID de pago': payment.id,
       }
@@ -95,12 +97,12 @@ export default async function exportTreasuryWorkbook({
     })
     const monthlyTotals = new Map()
     reportConfirmedPayments.forEach((payment) => {
-      const month = String(payment.fecha_pago || '').slice(0, 7) || 'Sin fecha'
+      const month = diaColombia(fechaRecaudo(payment)).slice(0, 7) || 'Sin fecha'
       monthlyTotals.set(month, (monthlyTotals.get(month) || 0) + Number(payment.monto || 0))
     })
     const balanceRows = [
       { Concepto: 'Ingresos recibidos y confirmados', Cantidad: reportConfirmedPayments.length, Valor: reportRevenue },
-      { Concepto: 'Pagos pendientes de confirmar', Cantidad: reportPayments.filter((payment) => !payment.confirmado).length, Valor: reportPendingRevenue },
+      { Concepto: 'Pagos pendientes (recibos por revisar y pagos en curso)', Cantidad: reportPendingPayments.length, Valor: reportPendingRevenue },
       { Concepto: 'Facturas emitidas', Cantidad: reportInvoices.length, Valor: reportInvoices.reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0) },
       { Concepto: 'Facturas pendientes o vencidas', Cantidad: reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).length, Valor: reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0) },
       ...[...monthlyTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, value]) => ({ Concepto: `Recaudo confirmado · ${month}`, Cantidad: '', Valor: value })),
@@ -118,7 +120,7 @@ export default async function exportTreasuryWorkbook({
       },
     }
     const workbook = new ExcelJS.Workbook()
-    workbook.creator = 'HIDRO-APP · Acueducto Campoamor'
+    workbook.creator = 'HIDRO-APP · Acueducto Campo Amor'
     workbook.subject = 'Informes de tesorería'
     workbook.title = `Informe ${report}`
     workbook.created = new Date()
@@ -163,7 +165,7 @@ export default async function exportTreasuryWorkbook({
       worksheet.getCell('A1').font = { name: 'Aptos Display', size: 18, bold: true, color: { argb: 'FFFFFFFF' } }
       worksheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left', indent: 3 }
       worksheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF123B5D' } }
-      worksheet.getCell('A2').value = `ACUEDUCTO CAMPOAMOR  |  Periodo: ${reportFrom || 'Sin límite'} al ${reportTo || 'Sin límite'}  |  Generado: ${new Date().toLocaleString('es-CO')}`
+      worksheet.getCell('A2').value = `ACUEDUCTO CAMPO AMOR  |  Periodo: ${reportFrom || 'Sin límite'} al ${reportTo || 'Sin límite'}  |  Generado: ${new Date().toLocaleString('es-CO')}`
       worksheet.getCell('A2').font = { name: 'Aptos', size: 10, color: { argb: 'FF426579' }, italic: true }
       worksheet.getCell('A2').alignment = { vertical: 'middle', horizontal: 'left', indent: 3 }
       worksheet.getRow(1).height = 43
@@ -197,16 +199,16 @@ export default async function exportTreasuryWorkbook({
             const status = String(cell.value || '').toLowerCase()
             const color = status.includes('confirmado') || status === 'pagada' || status === 'activo'
               ? 'FFE1F4EB'
-              : status.includes('pendiente') || status === 'vencida'
+              : status.includes('pendiente') || status.includes('revisar') || status.includes('en curso') || status === 'vencida'
                 ? 'FFFFF1D8'
-                : status === 'anulada' || status === 'inactivo' ? 'FFFCE6E6' : null
+                : status === 'anulada' || status === 'inactivo' || status.includes('devolver') ? 'FFFCE6E6' : null
             if (color) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } }
           }
         })
       })
       worksheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: Math.max(4, worksheet.rowCount), column: columns.length } }
       worksheet.getColumn(1).alignment = { vertical: 'middle' }
-      worksheet.headerFooter.oddFooter = '&L&HAcueducto Campoamor&CInforme de tesorería&R&P de &N'
+      worksheet.headerFooter.oddFooter = '&L&HAcueducto Campo Amor&CInforme de tesorería&R&P de &N'
     })
     const suffix = `${reportFrom || 'inicio'}-${reportTo || 'hoy'}`
     const buffer = await workbook.xlsx.writeBuffer()

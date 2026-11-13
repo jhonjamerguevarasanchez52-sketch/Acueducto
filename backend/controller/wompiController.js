@@ -80,8 +80,11 @@ async function webhook(req, res) {
     if (pagoError) {
       // Wompi can deliver an old event after its payment record was removed.
       // A missing reference is terminal; retrying it cannot make the row appear.
-      if (pagoError.code === 'PGRST116') {
-        console.warn('[wompi] pago no encontrado para referencia', referencia);
+      // 22P02: la referencia ni siquiera es un uuid (otro comercio u otra app
+      // con las mismas llaves). Reintentar tampoco la arregla.
+      if (pagoError.code === 'PGRST116' || pagoError.code === '22P02') {
+        const log = estadoWompi === 'APPROVED' && pagoError.code === 'PGRST116' ? console.error : console.warn;
+        log('[wompi] pago no encontrado para referencia', referencia, 'transacción', trx.id, 'estado', estadoWompi);
         return res.status(200).json({ received: true, ignored: true });
       }
       console.error('[wompi] error consultando pago para referencia', referencia, ':', pagoError.message);
@@ -89,8 +92,18 @@ async function webhook(req, res) {
     }
 
     if (!pago) {
-      console.warn('[wompi] pago no encontrado para referencia', referencia);
+      // Los pagos de Wompi ya no se borran desde el panel (se marcan
+      // reemplazados), así que un cobro aprobado sin registro es una anomalía
+      // que hay que revisar a mano en el panel de Wompi.
+      const log = estadoWompi === 'APPROVED' ? console.error : console.warn;
+      log(`[wompi]${estadoWompi === 'APPROVED' ? ' ALERTA: cobro aprobado' : ''} sin pago registrado para la referencia`, referencia, 'transacción', trx.id);
       return res.status(200).json({ received: true, ignored: true });
+    }
+
+    // El administrador ya devolvió este dinero: un reenvío del evento no debe
+    // volver a aplicarlo ni cambiar su estado.
+    if (pago.estado_wompi === 'REEMBOLSADO') {
+      return res.status(200).json({ received: true, alreadyProcessed: true });
     }
 
     // Un pago ya confirmado no se toca: Wompi puede reenviar el evento o

@@ -101,10 +101,12 @@ para probar. Para producción, cambia conjuntamente ambiente y las tres llaves
 por sus equivalentes `prod`; no mezcles llaves entre ambientes. No subas `.env` ni
 compartas llaves privadas.
 
-La tarea `npm run facturar-mensual` genera una factura de servicio por **$12.000 COP**
-para cada usuario activo con rol `usuario`. Se factura el periodo anterior al mes
-de ejecución, se evita duplicar facturas del mismo periodo y se intenta enviar el
-aviso al correo registrado en cada perfil.
+La tarea `npm run facturar-mensual` genera una factura de servicio para cada
+perfil activo con el valor de la **tarifa residencial vigente** que el
+administrador registra en el panel (tabla `rates`). Si no hay ninguna tarifa
+vigente, usa $12.000 como respaldo y lo avisa en el resumen. Se factura el
+periodo anterior al mes de ejecución, se evita duplicar facturas del mismo
+periodo y se intenta enviar el aviso al correo registrado en cada perfil.
 
 La fecha límite de pago es el día 15 del mes siguiente al periodo facturado. Para
 generar o reintentar el envío de correo de un periodo específico manualmente:
@@ -113,28 +115,78 @@ generar o reintentar el envío de correo de un periodo específico manualmente:
 npm run facturar-mensual -- 2026-09
 ```
 
-## Activación en Railway
+## Tareas automáticas (pg_cron de Supabase)
 
-1. En Supabase, ejecutar una vez `db/migrations/20261014_facturacion_mensual.sql`.
-   Si el índice no puede crearse porque ya hay facturas de servicio duplicadas,
-   resolver esos duplicados antes de continuar.
-2. Crear un servicio **Cron** en Railway desde el mismo repositorio, con directorio
-   raíz `backend` y comando `npm run facturar-mensual`.
-3. Configurar el cron como `0 5 1 * *` (UTC), que corresponde a las 00:00 del
-   primer día de cada mes en Colombia y factura el mes que acaba de terminar.
-4. Copiar al servicio las variables de entorno del backend, en particular las de
-   Supabase y `BREVO_API_KEY` / `EMAIL_USER` para el envío de correos.
+Ya no hay que acordarse de facturar: Supabase llama al backend todos los días.
 
-La tarea escribe un resumen en los logs y termina con error si alguna factura o
-correo falla. Guarda en la factura cuándo se envió el correo, para que una nueva
+1. Aplicar en Supabase `db/migrations/20261030_mejoras_integrales.sql` y
+   después `db/migrations/20261110_correcciones_revision.sql`.
+2. En Render, definir `CRON_SECRET` con un valor largo y aleatorio:
+   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+3. En el SQL Editor de Supabase, ejecutar UNA vez (con la URL real y el mismo
+   secreto):
+
+   ```sql
+   select public.programar_tareas_hidroapp('https://hidro-app.onrender.com', 'TU_CRON_SECRET');
+   ```
+
+Esto programa:
+
+| Tarea | Cuándo (hora Colombia) | Qué hace |
+| --- | --- | --- |
+| `hidroapp-vencer-facturas` | 00:10 diario | SQL puro: pasa a `vencida` las facturas pendientes con fecha límite cumplida y avisa en la app. |
+| `hidroapp-tareas-diarias` | 06:00 diario | `POST /api/tareas/diarias`: los días 1 a 5 factura el mes anterior; vence facturas; envía recordatorio 3 días antes del vencimiento (correo + app). |
+| `hidroapp-limpiar-audios` | cada hora | `POST /api/interno/limpiar-audios`: borra audios vencidos de GOTA. |
+| `hidroapp-mantener-despierto` | cada 10 min, 5 a. m.–11 p. m. | `GET /health` para que el plan gratuito de Render no se duerma. |
+
+Todo es idempotente: si una ejecución falla, la siguiente lo completa. Para correr
+las tareas a mano: `npm run tareas-diarias`, o el botón del panel (un
+administrador con sesión también puede llamar a `POST /api/tareas/diarias`).
+
+La facturación escribe un resumen en los logs y lo devuelve al panel. Guarda en la factura cuándo se envió el correo, para que una nueva
 ejecución del periodo reintente solo los envíos fallidos. El envío usa el proveedor
 transaccional Brevo ya integrado en el backend; no usa la API de Gmail para enviar
 desde una cuenta Gmail.
 
-## Eliminación de fontaneros
+## Eliminación de usuarios
 
-Para eliminar un fontanero y conservar el historial de averías asignadas, ejecutar
-en Supabase `db/migrations/20261014_breakdown_assignee_delete.sql`. La migración
-quita la asignación (`fontanero_id`) al borrar el perfil, sin eliminar las averías.
-La eliminación de una cuenta de usuario sigue siendo permanente y borra su propio
-historial asociado.
+Las facturas y los pagos son la contabilidad del acueducto y **nunca se borran**:
+un usuario con facturas o pagos no se puede eliminar (la API responde 409 con
+`puedeDesactivar: true` y la base de datos lo impide con `ON DELETE RESTRICT`).
+Para retirar a alguien, **desactívalo**: pierde el acceso y sale de la
+facturación, pero se conserva su historial. Solo se pueden eliminar cuentas sin
+movimientos (por ejemplo, creadas por error). Las averías asignadas a un
+fontanero eliminado conservan su historial y quedan sin asignación.
+
+## Reglas de las facturas
+
+- Una factura solo queda `pagada` al registrar o confirmar su pago (trigger
+  `validar_estado_factura`); no se puede marcar pagada a mano.
+- Una factura pagada no se puede reabrir, anular ni cambiar de valor; solo admite
+  una observación.
+
+## Acceso de los usuarios
+
+- El administrador crea la cuenta en el panel; nace verificada y le llega un
+  correo con dos formas de entrar.
+- **Entrar con código** (`POST /api/auth/codigo-acceso` y
+  `POST /api/auth/ingresar-con-codigo`): la persona recibe un código de 6
+  dígitos en el correo y entra sin contraseña.
+- Los intentos fallidos se guardan en la tabla `auth_intentos`, así que el
+  bloqueo por fuerza bruta sobrevive a los reinicios del servidor.
+
+## Pagos de Wompi: qué puede hacer el administrador
+
+- **Los pagos de Wompi no se confirman a mano.** Solo el aviso firmado de Wompi
+  (webhook) prueba que el dinero llegó. El panel solo ofrece "Confirmar" en los
+  recibos físicos.
+- **Un checkout de Wompi nunca se borra mientras pueda cobrarse.** Si el usuario
+  lo abrió y lo cerró sin pagar, a los 30 minutos se libera solo (o con el botón
+  "Liberar"): queda en el historial como reemplazado y, si el usuario llega a
+  pagarlo, el webhook todavía lo encuentra y el dinero queda registrado.
+- **Cobrado sin aplicar** (`APPROVED_NO_APLICADO` o `MONTO_INVALIDO`): Wompi le
+  cobró al usuario pero el pago no se pudo aplicar a la factura. Se devuelve el
+  dinero desde el panel de Wompi y luego se usa "Marcar devuelto"
+  (estado `REEMBOLSADO`).
+- Una factura con un pago en curso no se puede anular ni cambiar de valor hasta
+  resolver ese pago.

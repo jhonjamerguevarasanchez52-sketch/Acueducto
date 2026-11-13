@@ -1,13 +1,12 @@
 const profileModel = require('../models/profileModel');
 const {
   extraerCambiosPerfil,
-  DIAS_LIMITE_EDICION_PERFIL,
-  CORREOS_SIN_LIMITE_EDICION,
-  CAMPOS_REQUERIDOS_PERFIL_COMPLETO,
+  CAMPOS_UBICACION_SERVICIO,
 } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
-const MS_LIMITE_EDICION_PERFIL = DIAS_LIMITE_EDICION_PERFIL * 24 * 60 * 60 * 1000;
+const MENSAJE_UBICACION_BLOQUEADA =
+  'La dirección, la zona y el número de lote identifican tu servicio. Para cambiarlos, comunícate con el administrador del acueducto.';
 
 async function verPerfil(req, res) {
   const userId = req.usuario.id;
@@ -25,6 +24,9 @@ async function verPerfil(req, res) {
   }
 }
 
+// El usuario puede corregir libremente su nombre, teléfono y ocupación. La
+// ubicación del servicio (dirección, zona, lote) solo puede llenarla si está
+// vacía; una vez registrada, la cambia el administrador desde el panel.
 async function editarPerfil(req, res) {
   const userId = req.usuario.id;
 
@@ -36,35 +38,39 @@ async function editarPerfil(req, res) {
   }
 
   try {
-    // El usuario solo puede editar sus propios datos una vez cada
-    // DIAS_LIMITE_EDICION_PERFIL días. Se revisa contra `updated_at`, que
-    // solo se sella cuando el cambio lo hace el propio usuario (no cuando lo
-    // hace un administrador desde el panel).
     const { data: actual, error: errorActual } = await profileModel.getById(userId, { db: req.db });
     if (errorActual || !actual) {
       return res.status(404).json({ error: 'Perfil no encontrado' });
     }
 
-    const correoUsuario = (req.usuario.email || '').toLowerCase();
-    const exento = CORREOS_SIN_LIMITE_EDICION.includes(correoUsuario);
     const esAdministrador = req.usuario.rol === 'administrador';
-
-    const perfilActualIncompleto = CAMPOS_REQUERIDOS_PERFIL_COMPLETO.some((campo) =>
-      !String(actual[campo] ?? '').trim()
-    );
-    if (!esAdministrador && !exento && !perfilActualIncompleto && actual.updated_at) {
-      const proximaEdicion = new Date(actual.updated_at).getTime() + MS_LIMITE_EDICION_PERFIL;
-      if (Date.now() < proximaEdicion) {
-        return res.status(429).json({
-          error: `Solo puedes editar tus datos una vez cada ${DIAS_LIMITE_EDICION_PERFIL} días.`,
-          proximaEdicionDisponible: new Date(proximaEdicion).toISOString(),
-        });
+    let tocaUbicacion = false;
+    for (const campo of CAMPOS_UBICACION_SERVICIO) {
+      if (!(campo in datosActualizar)) continue;
+      const anterior = String(actual[campo] ?? '').trim();
+      const nuevo = String(datosActualizar[campo] ?? '').trim();
+      if (anterior === nuevo) {
+        delete datosActualizar[campo];
+        continue;
       }
+      if (anterior && !esAdministrador) {
+        return res.status(403).json({ error: MENSAJE_UBICACION_BLOQUEADA, campo });
+      }
+      tocaUbicacion = true;
     }
 
-    // updated_at lo sella Postgres mediante un trigger para que un cliente no
-    // pueda alterar el límite de edición enviando su propio timestamp.
-    const { data, error } = await profileModel.update(userId, datosActualizar, req.db);
+    if (Object.keys(datosActualizar).length === 0) {
+      return res.status(200).json({ message: 'No había cambios por guardar', perfil: actual });
+    }
+
+    // La app no tiene permiso de columna sobre la ubicación (ver migración
+    // 20261030): cuando el backend ya validó que es un primer registro, la
+    // escritura va por el cliente de servicio. El resto usa el JWT del usuario.
+    const { data, error } = await profileModel.update(
+      userId,
+      datosActualizar,
+      tocaUbicacion ? undefined : req.db,
+    );
 
     if (error) {
       return errorConsulta(res, error);

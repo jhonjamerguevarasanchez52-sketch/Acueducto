@@ -18,12 +18,20 @@ function listForChatbot() {
     .order('vigente_desde', { ascending: false });
 }
 
-// Tarifa residencial vigente en la fecha `today` (YYYY-MM-DD): ya empezó y no ha vencido.
+// Una tarifa por id. Falla (PGRST116) si no existe.
+function getById(id) {
+  return supabaseAdmin.from(TABLE).select('*').eq('id', id).single();
+}
+
+// Tarifa residencial vigente en la fecha `today` (YYYY-MM-DD): ya empezó y no
+// ha vencido. Misma regla que la función SQL tarifa_mensual_vigente (cuota
+// mayor que cero), para que la app, GOTA y la facturación nunca difieran.
 function getCurrent(today, { columns = '*', db = supabaseAdmin } = {}) {
   return db
     .from(TABLE)
     .select(columns)
     .eq('tipo', 'residencial')
+    .gt('cuota_fija', 0)
     .lte('vigente_desde', today)
     .or(`vigente_hasta.is.null,vigente_hasta.gte.${today}`)
     .order('vigente_desde', { ascending: false })
@@ -44,4 +52,4 @@ function create({ tipo, cuota_fija, vigente_desde, vigente_hasta }) {
     .single();
 }
 
-module.exports = { list, listForChatbot, getCurrent, create, ...crudBase(TABLE) };
+module.exports = { list, listForChatbot, getById, getCurrent, create, ...crudBase(TABLE) };

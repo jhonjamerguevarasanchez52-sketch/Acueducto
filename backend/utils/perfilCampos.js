@@ -10,17 +10,11 @@ const COLUMNAS_PERFIL_PUBLICO =
   'id, nombre, apellido, correo, rol, activo, is_verified, debe_cambiar_password, ' +
   'telefono, numero_lote, direccion, ocupacion, zona, created_at, updated_at';
 
-// Días que debe esperar el usuario entre una edición de su perfil y la
-// siguiente (ver profileController.editarPerfil).
-const DIAS_LIMITE_EDICION_PERFIL = 30;
-
-// Correos exentos del límite mensual de edición de perfil (comparación en
-// minúsculas). Excepción puntual pedida por el propio dueño de la cuenta.
-const CORREOS_SIN_LIMITE_EDICION = ['tovardeimer71@gmail.com'];
-
-// El plazo comienza cuando la cuenta ya tiene los datos de contacto y
-// ubicación necesarios para identificar el servicio.
-const CAMPOS_REQUERIDOS_PERFIL_COMPLETO = ['telefono', 'numero_lote', 'direccion', 'zona'];
+// Datos de la ubicación del servicio: identifican a quién se le factura y a
+// dónde va el fontanero. El propio usuario solo puede llenarlos si están
+// vacíos; después solo los cambia el administrador
+// (ver profileController.editarPerfil).
+const CAMPOS_UBICACION_SERVICIO = ['numero_lote', 'direccion', 'zona'];
 
 const MAX_LARGO_CAMPO_PERFIL = 150;
 const CAMPOS_OBLIGATORIOS_PERFIL = ['nombre', 'apellido'];
@@ -53,7 +47,5 @@ module.exports = {
   extraerCambiosPerfil,
   CAMPOS_EDITABLES_PERFIL,
   COLUMNAS_PERFIL_PUBLICO,
-  DIAS_LIMITE_EDICION_PERFIL,
-  CORREOS_SIN_LIMITE_EDICION,
-  CAMPOS_REQUERIDOS_PERFIL_COMPLETO,
+  CAMPOS_UBICACION_SERVICIO,
 };

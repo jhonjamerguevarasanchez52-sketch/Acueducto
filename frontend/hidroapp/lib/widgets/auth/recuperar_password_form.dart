@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import 'auth_style.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Tarjeta blanca con el flujo de recuperación de contraseña en dos pasos:
 /// 1. el correo, al que el backend envía un código de 6 dígitos;
@@ -165,7 +166,7 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
           decoration: authInputDecoration(
             context,
             hint: 'tucorreo@ejemplo.com',
-            icon: Icons.mail_outline,
+            icon: LucideIcons.mail,
           ),
           validator: (v) {
             final t = v?.trim() ?? '';
@@ -212,13 +213,13 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
           decoration: authInputDecoration(
             context,
             hint: 'Mínimo 8 caracteres',
-            icon: Icons.lock_outline,
+            icon: LucideIcons.lock,
             suffix: IconButton(
               splashRadius: 20,
               icon: Icon(
                 _verPassword
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
+                    ? LucideIcons.eyeOff
+                    : LucideIcons.eye,
                 color: authMuted,
                 size: 20,
               ),
@@ -239,7 +240,7 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
           decoration: authInputDecoration(
             context,
             hint: 'Repite la contraseña',
-            icon: Icons.lock_outline,
+            icon: LucideIcons.lock,
           ),
           validator: (v) => v != _passwordCtrl.text
               ? 'Las contraseñas no coinciden'

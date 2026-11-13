@@ -3,6 +3,7 @@ const facturaExtraordinariaModel = require('../models/facturaextraordinariaModel
 const { notificar } = require('../utils/notificar');
 const { enviarCorreo } = require('../config/mailer');
 const { escaparHtml } = require('../utils/html');
+const { registrarAuditoria } = require('../utils/auditoria');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 function formatearMoneda(valor) {
@@ -32,6 +33,17 @@ async function crearFacturaExtraordinaria(req, res) {
     return res.status(400).json({ error: 'perfil_ids debe ser un arreglo no vacío' });
   }
 
+  if (typeof concepto !== 'string' || concepto.trim().length < 3 || concepto.trim().length > 200) {
+    return res.status(400).json({ error: 'El concepto debe tener entre 3 y 200 caracteres.' });
+  }
+  if (String(periodo).trim().length > 40) {
+    return res.status(400).json({ error: 'El periodo admite máximo 40 caracteres.' });
+  }
+  if (fecha_vencimiento && (!/^\d{4}-\d{2}-\d{2}$/.test(String(fecha_vencimiento))
+    || Number.isNaN(new Date(`${fecha_vencimiento}T00:00:00Z`).getTime()))) {
+    return res.status(400).json({ error: 'La fecha de vencimiento no es válida (AAAA-MM-DD).' });
+  }
+
   try {
     const { data: perfiles, error: perfilesError } = await profileModel.listActiveForBilling();
 
@@ -55,11 +67,25 @@ async function crearFacturaExtraordinaria(req, res) {
 
     if (error) return errorConsulta(res, error);
 
+    await registrarAuditoria({
+      adminId: req.usuario?.id,
+      accion: 'factura_extraordinaria_creada',
+      tabla: 'invoices',
+      registroId: null,
+      detalle: {
+        periodo,
+        concepto,
+        valor_total: Number(valor_total),
+        facturas: (data || []).length,
+        todos: perfil_ids === undefined,
+      },
+    });
+
     await Promise.all(
       perfilesSeleccionados.map((perfil) =>
         notificar(
           perfil.id,
-          `Se generó una cuota extraordinaria de $${valor_total} por concepto de ${concepto}.`,
+          `Se generó una cuota extraordinaria de $${formatearMoneda(valor_total)} por concepto de ${concepto}.`,
           'cuota_extraordinaria'
         )
       )

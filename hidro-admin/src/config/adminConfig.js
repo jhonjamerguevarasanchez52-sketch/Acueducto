@@ -12,9 +12,13 @@ export const resourceEndpointBySection = {
   facturas: 'facturasTodas',
   pagos: 'pagos',
   cortes: 'cortes',
+  cortesProgramados: 'cortesProgramadosTodos',
   notificaciones: 'notificaciones',
   tarifas: 'tarifas',
 }
+
+// Listados sin tope de tamaño: se descargan por páginas (ver apiRequestAll).
+export const paginatedEndpoints = new Set(['adminUsers', 'facturasTodas', 'pagos', 'cortes'])
 
 export const MAX_BULK_USERS = 100
 export const MAX_USER_FILE_SIZE_BYTES = 5 * 1024 * 1024
@@ -44,20 +48,43 @@ export const operationDefinitions = {
   facturacionMensual: {
     title: 'Generar facturas mensuales', section: 'facturas', endpoint: endpoints.generarFacturasMensuales, method: 'POST',
     fields: [
-      { name: 'periodo', label: 'Periodo · usuarios activos · $12.000 por factura', type: 'month', required: true },
+      { name: 'periodo', label: 'Periodo · usuarios activos · valor de la tarifa residencial vigente', type: 'month', required: true },
     ],
   },
   editarFactura: {
     title: 'Editar factura', section: 'facturas', endpoint: endpoints.facturas, method: 'PUT',
     fields: [
-      { name: 'estado', label: 'Estado', type: 'select', options: ['pendiente', 'pagada', 'anulada', 'vencida'] },
+      // "pagada" no se elige aquí: se usa "Registrar pago" para que el dinero quede en la contabilidad.
+      { name: 'estado', label: 'Estado', type: 'select', options: ['pendiente', 'anulada', 'vencida'] },
       { name: 'valor_total', label: 'Valor total', type: 'number' },
       { name: 'fecha_vencimiento', label: 'Fecha de vencimiento', type: 'date' },
       { name: 'observacion', label: 'Observación' },
     ],
   },
+  registrarPago: {
+    // El monto siempre es el valor de la factura (lo pone el backend). La
+    // factura queda pagada y, si el usuario tenía el servicio cortado, se reconecta.
+    title: 'Registrar pago', section: 'facturas', endpoint: endpoints.registrarPagoAdmin, method: 'POST',
+    itemIdField: 'factura_id',
+    submitLabel: 'Registrar pago',
+    fields: [
+      { name: 'metodo', label: 'Medio de pago', type: 'select', options: ['efectivo', 'transferencia', 'otro'], defaultValue: 'efectivo' },
+      { name: 'referencia', label: 'Referencia o número de recibo (opcional)' },
+    ],
+  },
+  corteProgramado: {
+    title: 'Anunciar corte por zona', section: 'cortesProgramados', endpoint: endpoints.cortesProgramados, method: 'POST',
+    submitLabel: 'Anunciar corte',
+    fields: [
+      { name: 'zona', label: 'Zona (vacío = todo el acueducto)', type: 'zona' },
+      { name: 'motivo', label: 'Motivo (ej.: lavado del tanque)', type: 'textarea', required: true },
+      { name: 'inicio', label: 'Inicia', type: 'datetime-local', required: true },
+      { name: 'fin', label: 'Termina', type: 'datetime-local', required: true },
+      { name: 'enviar_correo', label: 'Avisar también por correo', type: 'checkbox', defaultValue: true },
+    ],
+  },
   corte: {
-    title: 'Programar corte', section: 'cortes', endpoint: endpoints.cortes, method: 'POST',
+    title: 'Suspender servicio a un usuario', section: 'cortes', endpoint: endpoints.cortes, method: 'POST',
     fields: [
       { name: 'perfil_id', label: 'Suscriptor', type: 'user', required: true },
       { name: 'motivo', label: 'Motivo', required: true },

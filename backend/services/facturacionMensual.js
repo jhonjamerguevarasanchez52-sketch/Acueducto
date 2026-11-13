@@ -1,9 +1,14 @@
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const profileModel = require('../models/profileModel');
 const mailer = require('../config/mailer');
+const { fechaLarga, ZONA_HORARIA } = require('../utils/fechas');
+const { escaparHtml } = require('../utils/html');
+const { formatearPesos } = require('../utils/formato');
+const { VALOR_MENSUAL_POR_DEFECTO, valorMensualDePeriodo } = require('./tarifaServicio');
 
-const VALOR_MENSUAL = 12000;
-const ZONA_HORARIA = 'America/Bogota';
+// Se conserva el nombre por compatibilidad: es solo el respaldo cuando no hay
+// una tarifa residencial vigente registrada en la tabla `rates`.
+const VALOR_MENSUAL = VALOR_MENSUAL_POR_DEFECTO;
 
 function obtenerFechaBogota(fecha) {
   const partes = new Intl.DateTimeFormat('en-CA', {
@@ -35,14 +40,13 @@ function fechaVencimiento(periodo) {
   return proximoMes.toISOString().slice(0, 10);
 }
 
-function escaparHtml(valor = '') {
-  return String(valor).replace(/[&<>"']/g, (caracter) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[caracter]);
+// Mes (AAAA-MM, hora de Colombia) en que se creó la cuenta. null si no se sabe.
+function periodoDeCreacion(perfil) {
+  if (!perfil?.created_at) return null;
+  const fecha = new Date(perfil.created_at);
+  if (Number.isNaN(fecha.getTime())) return null;
+  const { anio, mes } = obtenerFechaBogota(fecha);
+  return `${anio}-${String(mes).padStart(2, '0')}`;
 }
 
 function esDuplicado(error) {
@@ -60,8 +64,14 @@ async function generarFacturasMensuales({
   obtenerPerfilesActivos = () => profileModel.listActiveForBilling(),
   db = supabaseAdmin,
   enviarCorreo = (opciones) => mailer.enviarCorreo(opciones),
+  obtenerValorMensual = () => valorMensualDePeriodo(periodo, { db }),
 } = {}) {
   validarPeriodo(periodo);
+
+  // La cuota sale de la tarifa vigente que el administrador registra en el
+  // panel; así la factura, la app y GOTA muestran siempre el mismo valor.
+  const tarifa = await obtenerValorMensual();
+  const valorMensual = tarifa.valor;
 
   const { data: perfiles, error: errorPerfiles } = await obtenerPerfilesActivos();
   if (errorPerfiles) {
@@ -81,19 +91,36 @@ async function generarFacturasMensuales({
   const facturasExistentes = new Map((existentes || []).map((factura) => [factura.perfil_id, factura]));
   const resumen = {
     periodo,
-    valorPorFactura: VALOR_MENSUAL,
+    valorPorFactura: valorMensual,
+    origenTarifa: tarifa.origen,
     usuariosActivos: (perfiles || []).length,
     facturasCreadas: 0,
     facturasExistentes: 0,
     periodosPrepagados: 0,
+    usuariosPosteriores: 0,
     correosEnviados: 0,
     correosFallidos: 0,
     errores: [],
+    avisos: [],
   };
+  if (tarifa.origen === 'defecto') {
+    resumen.avisos.push(
+      `No hay una tarifa residencial vigente para ${periodo}: se facturó el valor de respaldo de ${formatearPesos(valorMensual)}. Registra la tarifa en el panel.`
+    );
+  }
   const vencimiento = fechaVencimiento(periodo);
+  let cupoCorreoAgotado = false;
 
   for (const perfil of perfiles || []) {
     let factura = facturasExistentes.get(perfil.id);
+    // Una cuenta creada después de terminar el periodo no recibió ese mes de
+    // servicio: no se le factura (sí se le enviaría el correo de una factura
+    // que ya tuviera, por eso se revisa solo cuando no existe).
+    const creadoEn = periodoDeCreacion(perfil);
+    if (!factura && creadoEn && creadoEn > periodo) {
+      resumen.usuariosPosteriores += 1;
+      continue;
+    }
     if (factura) {
       resumen.facturasExistentes += 1;
       if (!factura.generada_automaticamente || factura.correo_factura_enviado_at) continue;
@@ -103,7 +130,7 @@ async function generarFacturasMensuales({
         {
           p_perfil_id: perfil.id,
           p_periodo: periodo,
-          p_valor_total: VALOR_MENSUAL,
+          p_valor_total: Math.round(valorMensual),
           p_fecha_emision: fechaEmision.toISOString(),
           p_fecha_vencimiento: vencimiento,
         },
@@ -133,15 +160,23 @@ async function generarFacturasMensuales({
       continue;
     }
 
+    // Con el cupo de Brevo agotado se siguen creando las facturas, pero no se
+    // insiste con los correos: quedan sin marca de envío y la ejecución del
+    // día siguiente (días 1 a 5 del mes) los reintenta.
+    if (cupoCorreoAgotado) {
+      resumen.correosFallidos += 1;
+      continue;
+    }
+
     try {
       const respuesta = await enviarCorreo({
         to: perfil.correo,
-        subject: `Nueva factura - periodo ${periodo} - Acueducto Campoamor`,
+        subject: `Nueva factura - periodo ${periodo} - Acueducto Campo Amor`,
         html: `<p>Hola ${escaparHtml(perfil.nombre || '')},</p>
                <p>Se generó tu factura del periodo <strong>${periodo}</strong> por un valor de
-               <strong>$${VALOR_MENSUAL.toLocaleString('es-CO')}</strong>.</p>
-               <p>Fecha límite de pago: ${new Date(`${vencimiento}T12:00:00`).toLocaleDateString('es-CO')}.</p>
-               <p>Puedes consultar el detalle desde la aplicación de Acueducto Campoamor.</p>`,
+               <strong>${formatearPesos(factura.valor_total ?? valorMensual)}</strong>.</p>
+               <p>Fecha límite de pago: ${fechaLarga(factura.fecha_vencimiento || vencimiento)}.</p>
+               <p>Puedes consultar el detalle y pagar desde la aplicación de Acueducto Campo Amor.</p>`,
       });
       if (!respuesta) throw new Error('El servicio de correo no confirmó el envío.');
       if (factura && factura.generada_automaticamente) {
@@ -156,7 +191,14 @@ async function generarFacturasMensuales({
       resumen.correosEnviados += 1;
     } catch (errorCorreo) {
       resumen.correosFallidos += 1;
-      resumen.errores.push(`No se pudo enviar el correo a ${perfil.correo}: ${errorCorreo.message}`);
+      if (mailer.esCupoAgotado(errorCorreo)) {
+        cupoCorreoAgotado = true;
+        resumen.avisos.push(
+          'Brevo rechazó los correos por cupo agotado. Las facturas se crearon; los correos pendientes se reintentan en la próxima ejecución.'
+        );
+      } else {
+        resumen.errores.push(`No se pudo enviar el correo a ${perfil.correo}: ${errorCorreo.message}`);
+      }
     }
   }
 

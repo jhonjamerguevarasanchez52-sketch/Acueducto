@@ -1,0 +1,69 @@
+# Integración continua: en cada push y pull request corre las pruebas de las
+# tres partes del proyecto. Si algo se rompe, GitHub lo marca en rojo antes de
+# unir la rama.
+name: CI
+
+on:
+  push:
+    branches: [main, deimer]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Node)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Valores ficticios: las pruebas simulan Supabase y no salen a la red.
+      SUPABASE_URL: https://ci.invalid
+      SUPABASE_KEY: ci-anon
+      SUPABASE_SERVICE_KEY: ci-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  panel:
+    name: Panel administrativo (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hidro-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: hidro-admin/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  app:
+    name: App móvil (Flutter)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/hidroapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
