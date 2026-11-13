@@ -101,6 +101,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .report-filters label { display: grid; gap: 6px; color: var(--muted); font-size: .78rem; font-weight: 700; }
 .report-filters input { min-height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; color: var(--text); background: white; font: inherit; }
 .report-filters > span { color: var(--muted); font-size: .8rem; padding-bottom: 10px; }
+.report-presets { display: flex; flex-wrap: wrap; gap: 8px; }
 .treasury-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .treasury-kpis > div { display: grid; gap: 6px; padding: 17px; border: 1px solid var(--line); border-radius: 13px; background: white; }
 .treasury-kpis span, .treasury-kpis small { color: var(--muted); font-size: .8rem; }

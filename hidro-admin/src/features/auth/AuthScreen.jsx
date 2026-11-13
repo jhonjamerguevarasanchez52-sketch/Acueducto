@@ -60,8 +60,30 @@ export default function AuthScreen({
             autoComplete="username"
             value={email}
             onChange={(event) => { setEmail(event.target.value); setAuthError('') }}
+            readOnly={authMode === 'reset'}
             required
           />
+          {authMode === 'reset' && (
+            <>
+              <p className="auth-notice" role="status">
+                El código corresponde a {email}. Si necesitas usar otro correo, solicita un código nuevo.
+              </p>
+              <button
+                type="button"
+                className="link-button auth-link"
+                onClick={() => {
+                  setAuthMode('request-reset')
+                  setRecoveryCode('')
+                  setNewPassword('')
+                  setConfirmNewPassword('')
+                  setAuthError('')
+                  setAuthNotice('')
+                }}
+              >
+                Cambiar correo y solicitar otro código
+              </button>
+            </>
+          )}
           {authMode === 'login' && (
             <>
               <label htmlFor="admin-password">Contraseña</label>

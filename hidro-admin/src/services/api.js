@@ -1,5 +1,17 @@
-﻿const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://hidro-app.onrender.com')
-  .trim()
+const API_BASE_FALLBACK = 'https://hidro-app.onrender.com'
+const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+const configuredApiOrigin = (() => {
+  try {
+    return new URL(configuredApiUrl).origin
+  } catch {
+    return ''
+  }
+})()
+// Evita enviar las peticiones al sitio estático cuando Render tiene su URL
+// configurada por error como VITE_API_URL.
+const apuntaAlPanel = typeof window !== 'undefined'
+  && configuredApiOrigin === window.location.origin
+const API_BASE_URL = (configuredApiUrl && !apuntaAlPanel ? configuredApiUrl : API_BASE_FALLBACK)
   .replace(/\/+$/, '')
 const API_URL = import.meta.env.DEV
   ? '/api'
@@ -80,34 +92,32 @@ async function renovarSesion() {
 async function enviar(path, options) {
   const token = getToken()
   const headers = { ...(options.headers || {}) }
-
   if (!(options.body instanceof FormData) && typeof options.body !== 'string' && options.body !== undefined) {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json'
   }
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-
+  if (token) headers.Authorization = `Bearer ${token}`
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers,
-    body:
-      options.body !== undefined && !(options.body instanceof FormData) && typeof options.body !== 'string'
-        ? JSON.stringify(options.body)
-        : options.body,
+    body: options.body !== undefined && !(options.body instanceof FormData) && typeof options.body !== 'string'
+      ? JSON.stringify(options.body)
+      : options.body,
   })
 }
 
 export async function apiRequest(path, options = {}) {
+  const tokenUsado = getToken()
   let response = await enviar(path, options)
 
   const esRutaDeAcceso = path.startsWith('/auth/')
-  if (response.status === 401 && !esRutaDeAcceso && await renovarSesion()) {
+  if (response.status === 401 && tokenUsado && !esRutaDeAcceso && await renovarSesion()) {
     response = await enviar(path, options)
   }
 
   const contentType = response.headers.get('content-type') || ''
+  if (response.ok && !contentType.includes('application/json')) {
+    throw new Error('El servidor API no devolvió una respuesta válida. Revisa VITE_API_URL en Render.')
+  }
   const data = contentType.includes('application/json')
     ? await response.json().catch(() => ({}))
     : await response.text().catch(() => '')
@@ -116,6 +126,12 @@ export async function apiRequest(path, options = {}) {
     const message = typeof data === 'object'
       ? (data.message || data.error || `Error HTTP ${response.status}`)
       : data || `Error HTTP ${response.status}`
+    // La sesión no se pudo renovar: se avisa al panel para que vuelva a la
+    // pantalla de acceso (App escucha "hidro-session-expired").
+    if (response.status === 401 && tokenUsado && !esRutaDeAcceso) {
+      clearToken()
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('hidro-session-expired'))
+    }
     throw new ApiError(message, { status: response.status, data })
   }
 
@@ -153,6 +169,7 @@ export const endpoints = {
   facturasTodas: '/facturas/todas',
   generarFacturasMensuales: '/facturas/generar-mensuales',
   facturaExtraordinaria: '/facturas/factura-extraordinaria',
+  pagosBase: '/pagos',
   pagos: '/pagos/todos',
   // Acciones sobre un pago concreto: /pagos/:id/confirmar y DELETE /pagos/:id.
   // No cuelgan de /pagos/todos (esa ruta solo lista).

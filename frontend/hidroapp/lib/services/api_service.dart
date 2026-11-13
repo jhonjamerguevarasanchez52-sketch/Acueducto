@@ -57,14 +57,11 @@ class ApiService {
   /// Token de acceso de Supabase. Lo setea el [AuthProvider] al iniciar sesión.
   String? authToken;
 
-  /// Se invoca cuando una respuesta llega con 401 (token expirado/ inválido)
-  /// para que quien mantiene la sesión (el [AuthProvider]) pueda reaccionar.
-  void Function()? onUnauthorized;
-
   /// Se invoca cuando una petición autenticada recibe 401, antes de dar la
   /// sesión por perdida: debe renovar [authToken] con el refresh token
-  /// guardado y devolver `true` si lo logró, para reintentar la petición.
-  Future<bool> Function()? onRenovarSesion;
+  /// guardado y devolver `true` si lo logró, para reintentar la petición una
+  /// sola vez. Si devuelve `false`, quien la implementa cierra la sesión.
+  Future<bool> Function()? onUnauthorized;
 
   static const _rutaRenovarSesion = '/auth/renovar-sesion';
 
@@ -135,6 +132,36 @@ class ApiService {
     () => _client.delete(_uri(path), headers: _headers).timeout(tiempoMaximo),
   );
 
+  /// Cambia el refresh token por una sesión nueva llamando directamente al
+  /// endpoint público, sin pasar por [_send]: así un refresh rechazado nunca
+  /// dispara otra renovación (bucle de 401).
+  Future<dynamic> renewSession(String refreshToken) async {
+    final res = await _ejecutar(
+      () => _client
+          .post(
+            _uri(_rutaRenovarSesion),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({'refreshToken': refreshToken}),
+          )
+          .timeout(tiempoMaximo),
+    );
+    final data = _decodificar(res);
+    if (res.statusCode >= 200 && res.statusCode < 300) return data;
+    final msg = data is Map && data['error'] is String
+        ? data['error'] as String
+        : 'No se pudo renovar la sesión.';
+    throw ApiException(msg, statusCode: res.statusCode, data: data);
+  }
+
+  static dynamic _decodificar(http.Response res) {
+    if (res.body.isEmpty) return null;
+    try {
+      return jsonDecode(res.body);
+    } catch (_) {
+      return res.body;
+    }
+  }
+
   Future<dynamic> _send(
     String path,
     Future<http.Response> Function() request, {
@@ -157,18 +184,11 @@ class ApiService {
         path != _rutaRenovarSesion) {
       final renovado =
           authToken != tokenUsado ||
-          (onRenovarSesion != null && await onRenovarSesion!());
+          (onUnauthorized != null && await _renovar());
       if (renovado && authToken != null) res = await _ejecutar(request);
     }
 
-    dynamic data;
-    if (res.body.isNotEmpty) {
-      try {
-        data = jsonDecode(res.body);
-      } catch (_) {
-        data = res.body;
-      }
-    }
+    final data = _decodificar(res);
 
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return data;
@@ -178,11 +198,18 @@ class ApiService {
         ? data['error'] as String
         : 'Error ${res.statusCode}';
 
-    if (res.statusCode == 401) {
-      onUnauthorized?.call();
-    }
-
     throw ApiException(msg, statusCode: res.statusCode, data: data);
+  }
+
+  /// Un fallo inesperado al renovar cuenta como "no se pudo": la petición
+  /// original termina con su 401 en vez de con un error confuso.
+  Future<bool> _renovar() async {
+    try {
+      return await onUnauthorized!();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ApiService] no se pudo renovar la sesión: $e');
+      return false;
+    }
   }
 
   Future<http.Response> _ejecutar(

@@ -39,8 +39,7 @@ class AuthProvider extends ChangeNotifier {
   }) : _api = api ?? ApiService(),
        _storage = storage ?? FlutterAuthSessionStorage(),
        _localAuth = localAuth ?? LocalAuthentication() {
-    _api.onUnauthorized = _manejarSesionExpirada;
-    _api.onRenovarSesion = _renovarSesion;
+    _api.onUnauthorized = _renovarSesion;
   }
 
   final ApiService _api;
@@ -50,6 +49,7 @@ class AuthProvider extends ChangeNotifier {
   // Se conserva el nombre histórico de la clave para no perder las sesiones
   // ya guardadas; hoy guarda el refresh token de cualquier sesión.
   static const _refreshTokenKey = 'biometric_refresh_token';
+  static const _legacyRefreshTokenKey = 'refresh_token';
   static const _biometricEnabledKey = 'biometric_enabled';
 
   AuthStatus _status = AuthStatus.unknown;
@@ -170,6 +170,10 @@ class AuthProvider extends ChangeNotifier {
     final refreshToken = (data['session'] as Map)['refresh_token'];
     if (refreshToken is String && refreshToken.isNotEmpty) {
       await _storage.write(_refreshTokenKey, refreshToken);
+      await _storage.delete(_legacyRefreshTokenKey);
+    } else {
+      await _storage.delete(_refreshTokenKey);
+      await _storage.delete(_legacyRefreshTokenKey);
     }
     _api.authToken = token;
     await _loadProfile();
@@ -194,7 +198,8 @@ class AuthProvider extends ChangeNotifier {
       if (!supported) {
         throw ApiException('Este dispositivo no tiene huella ni rostro configurados.');
       }
-      final refreshToken = await _storage.read(_refreshTokenKey);
+      final refreshToken = await _storage.read(_refreshTokenKey) ??
+          await _storage.read(_legacyRefreshTokenKey);
       if (refreshToken == null || refreshToken.isEmpty) {
         throw ApiException(
           'Cierra sesión y vuelve a ingresar con tu contraseña para activarlo.',
@@ -220,7 +225,8 @@ class AuthProvider extends ChangeNotifier {
     if (!_biometricEnabled) {
       throw ApiException('El acceso biométrico está desactivado.');
     }
-    final refreshToken = await _storage.read(_refreshTokenKey);
+    final refreshToken = await _storage.read(_refreshTokenKey) ??
+        await _storage.read(_legacyRefreshTokenKey);
     if (refreshToken == null || refreshToken.isEmpty) {
       throw ApiException(
         'Ingresa con tu correo y contraseña para volver a habilitar la biometría.',
@@ -236,14 +242,15 @@ class AuthProvider extends ChangeNotifier {
     _setStatus(AuthStatus.authenticated);
   }
 
+  Future<String?> _leerRefreshToken() async =>
+      await _storage.read(_refreshTokenKey) ??
+      await _storage.read(_legacyRefreshTokenKey);
+
   /// Cambia el refresh token por una sesión nueva y la guarda. Supabase rota
   /// el refresh token en cada uso, así que siempre guardamos el nuevo: si se
   /// conservara el viejo, la siguiente renovación fallaría.
   Future<void> _pedirNuevaSesion(String refreshToken) async {
-    final data = await _api.post(
-      '/auth/renovar-sesion',
-      body: {'refreshToken': refreshToken},
-    );
+    final data = await _api.renewSession(refreshToken);
     if (data is! Map || data['session'] is! Map) {
       throw ApiException(
         'No se pudo renovar la sesión. Ingresa con tu contraseña.',
@@ -258,26 +265,52 @@ class AuthProvider extends ChangeNotifier {
     await _storage.write(_tokenKey, token);
     if (nuevoRefresh is String && nuevoRefresh.isNotEmpty) {
       await _storage.write(_refreshTokenKey, nuevoRefresh);
+      await _storage.delete(_legacyRefreshTokenKey);
     }
     _api.authToken = token;
   }
 
   /// Renueva en silencio el access token vencido (dura ≈1 h) para que la
   /// sesión no se cierre mientras se usa la app. Lo invoca [ApiService] al
-  /// recibir un 401.
+  /// recibir un 401; si no se puede renovar, cierra la sesión y vuelve a la
+  /// pantalla de acceso en vez de dejar al usuario viendo un error suelto.
   Future<bool> _renovarSesion() =>
       _renovacionEnCurso ??= _intentarRenovar().whenComplete(
         () => _renovacionEnCurso = null,
       );
 
   Future<bool> _intentarRenovar() async {
-    final refreshToken = await _storage.read(_refreshTokenKey);
-    if (refreshToken == null || refreshToken.isEmpty) return false;
+    final refreshToken = await _leerRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await _sesionExpirada(conservarRefresh: false);
+      return false;
+    }
     try {
       await _pedirNuevaSesion(refreshToken);
       return true;
-    } catch (_) {
+    } catch (error) {
+      final statusCode = error is ApiException ? error.statusCode : null;
+      // Ante una falla temporal (red, servidor caído, límite de peticiones)
+      // se conserva el refresh token para poder reintentar luego.
+      final temporal = statusCode == null ||
+          statusCode >= 500 ||
+          statusCode == 408 ||
+          statusCode == 429;
+      await _sesionExpirada(conservarRefresh: temporal);
       return false;
+    }
+  }
+
+  Future<void> _sesionExpirada({required bool conservarRefresh}) async {
+    if (conservarRefresh) {
+      await _storage.delete(_tokenKey);
+      _api.authToken = null;
+      _profile = null;
+    } else {
+      await _clear();
+    }
+    if (_status == AuthStatus.authenticated) {
+      _setStatus(AuthStatus.unauthenticated);
     }
   }
 
@@ -361,6 +394,7 @@ class AuthProvider extends ChangeNotifier {
     await _storage.delete(_tokenKey);
     if (!preserveBiometric) {
       await _storage.delete(_refreshTokenKey);
+      await _storage.delete(_legacyRefreshTokenKey);
       await _storage.delete(_biometricEnabledKey);
       _biometricEnabled = false;
     }
@@ -371,15 +405,6 @@ class AuthProvider extends ChangeNotifier {
   void _setStatus(AuthStatus status) {
     _status = status;
     notifyListeners();
-  }
-
-  /// Se llama cuando cualquier llamada autenticada recibe un 401 en medio de
-  /// la sesión (token expirado): cierra sesión y vuelve a la pantalla de
-  /// acceso en vez de dejar al usuario viendo un error suelto.
-  void _manejarSesionExpirada() {
-    if (_status != AuthStatus.authenticated) return;
-    _setStatus(AuthStatus.unauthenticated);
-    _clear(preserveBiometric: _biometricEnabled);
   }
 
   @override
