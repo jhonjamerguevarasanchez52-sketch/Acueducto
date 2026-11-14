@@ -19,6 +19,8 @@ create table if not exists public.profiles (
   nombre                         text not null,
   apellido                       text not null,
   correo                         text unique not null,
+  -- solo dígitos; opcional pero única (también sirve para iniciar sesión)
+  cedula                         text unique check (cedula ~ '^[0-9]{5,15}$'),
   rol                            text not null default 'usuario'
                                    check (rol in ('administrador', 'usuario', 'fontanero')),
   activo                         boolean not null default true,
@@ -294,6 +296,8 @@ create policy "cortes: ver los propios"
 --  esta sección para añadir las columnas nuevas que usa el backend.
 --  (Son idempotentes: "if not exists".)
 -- ============================================================================
+-- (la cédula tiene su propia migración: migrations/20261113_profiles_cedula.sql)
+alter table public.profiles        add column if not exists cedula            text;
 alter table public.invoices        add column if not exists periodo           text;
 alter table public.invoices        add column if not exists numero_factura    bigint;
 alter table public.invoices        add column if not exists tipo              text not null default 'servicio';
@@ -403,7 +407,7 @@ revoke select on table public.profiles from public, anon, authenticated;
 grant select (
   id, nombre, apellido, correo, rol, activo, is_verified,
   debe_cambiar_password, telefono, numero_lote, direccion, ocupacion, zona,
-  created_at, updated_at
+  cedula, created_at, updated_at
 ) on table public.profiles to authenticated;
 
 revoke update on table public.profiles from public, anon, authenticated;

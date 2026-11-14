@@ -15,6 +15,14 @@ function correoDelCuerpo(req) {
   return correo.trim().toLowerCase().slice(0, 254);
 }
 
+// Login con cédula: se cuenta igual que un correo (solo los dígitos).
+function cedulaDelCuerpo(req) {
+  const cedula = req.body && ['string', 'number'].includes(typeof req.body.cedula)
+    ? String(req.body.cedula).replace(/\D/g, '').slice(0, 20)
+    : '';
+  return cedula ? `cedula:${cedula}` : '';
+}
+
 // Límite general para toda la API: protege ante abuso y bucles del cliente.
 // Es holgado porque una sola IP puede representar a muchos usuarios.
 const limiteGeneral = rateLimit({
@@ -34,8 +42,8 @@ const limiteAuth = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    const correo = correoDelCuerpo(req);
-    return correo ? `${claveIp(req)}|${correo}` : claveIp(req);
+    const cuenta = correoDelCuerpo(req) || cedulaDelCuerpo(req);
+    return cuenta ? `${claveIp(req)}|${cuenta}` : claveIp(req);
   },
   message: { error: 'Demasiados intentos. Espera unos minutos antes de volver a intentar.' },
 });

@@ -8,7 +8,7 @@ const CAMPOS_EDITABLES_PERFIL = [
 // verificación/recuperación de contraseña, que nunca deben salir de authController.
 const COLUMNAS_PERFIL_PUBLICO =
   'id, nombre, apellido, correo, rol, activo, is_verified, debe_cambiar_password, ' +
-  'telefono, numero_lote, direccion, ocupacion, zona, created_at, updated_at';
+  'telefono, numero_lote, direccion, ocupacion, zona, cedula, created_at, updated_at';
 
 // Datos de la ubicación del servicio: identifican a quién se le factura y a
 // dónde va el fontanero. El propio usuario solo puede llenarlos si están
@@ -43,8 +43,32 @@ function extraerCambiosPerfil(cuerpo = {}) {
   return { cambios };
 }
 
+// Cédula: solo dígitos. Al escribirla se aceptan puntos, espacios y guiones,
+// que se quitan. Devuelve '' si viene vacía y null si el formato no es válido.
+function normalizarCedula(valor) {
+  if (valor === undefined || valor === null) return '';
+  if (typeof valor !== 'string' && typeof valor !== 'number') return null;
+  const limpia = String(valor).replace(/[\s.-]/g, '');
+  if (!limpia) return '';
+  return /^[0-9]{5,15}$/.test(limpia) ? limpia : null;
+}
+
+// La cédula solo la registra o cambia un administrador: el propio usuario no
+// puede, porque con ella se inicia sesión. Devuelve { cambios } (con
+// { cedula } solo si vino en el cuerpo) o { error }.
+function extraerCedula(cuerpo = {}) {
+  if (cuerpo.cedula === undefined) return { cambios: {} };
+  const cedula = normalizarCedula(cuerpo.cedula);
+  if (cedula === null) {
+    return { error: 'La cédula debe tener solo números (entre 5 y 15 dígitos).' };
+  }
+  return { cambios: { cedula: cedula || null } };
+}
+
 module.exports = {
   extraerCambiosPerfil,
+  extraerCedula,
+  normalizarCedula,
   CAMPOS_EDITABLES_PERFIL,
   COLUMNAS_PERFIL_PUBLICO,
   CAMPOS_UBICACION_SERVICIO,

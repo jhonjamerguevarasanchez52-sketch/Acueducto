@@ -178,3 +178,62 @@ test('un perfil sin rol no puede iniciar sesión', async () => {
   const res = await ejecutarLogin();
   assert.equal(res.statusCode, 403);
 });
+
+// --- Inicio de sesión con cédula ---
+
+function ejecutarLoginCedula(cedula, password = 'clave-valida') {
+  const res = respuestaCapturada();
+  return iniciarSesion({ body: { cedula, password } }, res).then(() => res);
+}
+
+test('con la cédula busca el correo de la cuenta e inicia sesión', async () => {
+  let cedulaBuscada = null;
+  profileModel.findByCedula = async (cedula) => {
+    cedulaBuscada = cedula;
+    return { data: { correo: 'Vecina@Ejemplo.com' }, error: null };
+  };
+  authModel.signIn = async (correo, password) => {
+    assert.equal(correo, 'vecina@ejemplo.com');
+    assert.equal(password, 'clave-valida');
+    return { data: { user: { id: 'user-1' }, session: { access_token: 'token' } }, error: null };
+  };
+  profileModel.getById = async () => ({
+    data: { rol: 'usuario', is_verified: true, activo: true },
+    error: null,
+  });
+
+  const res = await ejecutarLoginCedula('1.023.456.789');
+
+  assert.equal(cedulaBuscada, '1023456789');
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.session.access_token, 'token');
+});
+
+test('una cédula no registrada responde 401 sin intentar el login', async () => {
+  let llamadasAuth = 0;
+  profileModel.findByCedula = async () => ({ data: null, error: null });
+  authModel.signIn = async () => { llamadasAuth += 1; return {}; };
+  const fallosAntes = attempts.fallos;
+
+  const res = await ejecutarLoginCedula('99999999');
+
+  assert.equal(res.statusCode, 401);
+  assert.match(res.body.error, /cédula o contraseña/i);
+  assert.equal(llamadasAuth, 0);
+  assert.ok(attempts.fallos > fallosAntes);
+});
+
+test('la contraseña incorrecta con cédula usa un mensaje de cédula', async () => {
+  profileModel.findByCedula = async () => ({ data: { correo: 'vecina@ejemplo.com' }, error: null });
+  authModel.signIn = async () => ({ error: { status: 400, message: 'Invalid login credentials' } });
+
+  const res = await ejecutarLoginCedula('10234567');
+
+  assert.equal(res.statusCode, 401);
+  assert.match(res.body.error, /cédula o contraseña/i);
+});
+
+test('una cédula con letras se rechaza con 400', async () => {
+  const res = await ejecutarLoginCedula('12ab34');
+  assert.equal(res.statusCode, 400);
+});
