@@ -4,6 +4,7 @@ import '../../models/factura.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
+import '../core/aviso_pago_en_curso.dart';
 import 'home_factura_widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -130,7 +131,9 @@ class ProximaFactura extends StatelessWidget {
     final String aviso;
     if (dias == null) {
       color = factura.estado == 'vencida' ? colores.danger : colores.info;
-      aviso = factura.estado == 'vencida' ? 'Factura vencida' : 'Sin fecha límite';
+      aviso = factura.estado == 'vencida'
+          ? 'Factura vencida'
+          : 'Sin fecha límite';
     } else if (dias < 0) {
       color = colores.danger;
       aviso = dias == -1 ? 'Venció hace 1 día' : 'Venció hace ${-dias} días';
@@ -214,7 +217,10 @@ class ProximaFactura extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          BotonPagarAhora(onPressed: () => onPagar(factura)),
+          if (factura.tienePagoEnCurso)
+            const AvisoPagoEnCurso()
+          else
+            BotonPagarAhora(onPressed: () => onPagar(factura)),
         ],
       ),
     );

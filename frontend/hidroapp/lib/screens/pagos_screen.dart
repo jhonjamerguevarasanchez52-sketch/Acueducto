@@ -120,6 +120,7 @@ class _PagosScreenState extends State<PagosScreen> with WidgetsBindingObserver {
               );
             }
 
+            final reintentables = Pago.reintentables(pagos);
             return ListView.builder(
               // Espacio extra abajo: la barra de botones de Android y la gota
               // flotante no deben tapar el botón Pagar de la última tarjeta.
@@ -134,6 +135,7 @@ class _PagosScreenState extends State<PagosScreen> with WidgetsBindingObserver {
                 retraso: AppTheme.motionEscalon * i,
                 child: PagoCard(
                   pago: pagos[i],
+                  puedeReintentar: reintentables.contains(pagos[i].id),
                   onPagar: () => _pagar(pagos[i]),
                 ),
               ),

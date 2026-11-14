@@ -70,6 +70,12 @@ class Factura {
     });
   }
 
+  /// `true` si la factura ya tiene un pago por revisar o en curso en Wompi.
+  /// Mientras sea así, el servidor no acepta otro pago: la app muestra el
+  /// aviso en lugar del botón "Pagar".
+  bool get tienePagoEnCurso =>
+      estaPendiente && pagos.any((pago) => pago.enCurso());
+
   /// Pagos confirmados de la factura (excluye intentos rechazados o pendientes).
   List<Pago> get pagosConfirmados =>
       pagos.where((pago) => pago.confirmado).toList();

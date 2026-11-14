@@ -64,6 +64,46 @@ class Pago {
       (ahora ?? DateTime.now()).difference(fechaPago!).inMinutes >=
           minutosCheckoutAbandonado;
 
+  /// Pago sin confirmar que todavía bloquea un pago nuevo de la misma
+  /// factura: un recibo por revisar, un checkout de Wompi en curso o un cobro
+  /// de Wompi que el acueducto debe revisar. Es la misma regla del backend
+  /// (`findPendingByInvoice` sin los checkouts abandonados): mientras exista,
+  /// el servidor responde 409 a cualquier intento de pago.
+  bool enCurso([DateTime? ahora]) {
+    if (confirmado || abandonado(ahora)) return false;
+    return estadoWompi == null ||
+        const {
+          'PENDING',
+          'APPROVED_NO_APLICADO',
+          'MONTO_INVALIDO',
+        }.contains(estadoWompi);
+  }
+
+  /// Ids de los pagos que se pueden volver a intentar desde "Mis pagos":
+  /// solo el intento más reciente de cada factura, y solo si esa factura no
+  /// tiene ya un pago confirmado o en curso. Así no se ofrece "Volver a
+  /// pagar" en intentos viejos de una factura que ya quedó pagada.
+  static Set<String> reintentables(List<Pago> pagos, [DateTime? ahora]) {
+    final porFactura = <String, List<Pago>>{};
+    for (final pago in pagos) {
+      porFactura.putIfAbsent(pago.facturaId, () => []).add(pago);
+    }
+    final ids = <String>{};
+    for (final intentos in porFactura.values) {
+      if (intentos.any((p) => p.confirmado || p.enCurso(ahora))) continue;
+      final candidatos = intentos
+          .where((p) => p.rechazado || p.abandonado(ahora))
+          .toList();
+      if (candidatos.isEmpty) continue;
+      candidatos.sort(
+        (a, b) =>
+            (b.fechaPago ?? DateTime(0)).compareTo(a.fechaPago ?? DateTime(0)),
+      );
+      ids.add(candidatos.first.id);
+    }
+    return ids;
+  }
+
   factory Pago.fromJson(Map<String, dynamic> json) {
     return Pago(
       id: json['id']?.toString() ?? '',
