@@ -109,7 +109,10 @@ export async function apiRequest(path, options = {}) {
   const tokenUsado = getToken()
   let response = await enviar(path, options)
 
-  const esRutaDeAcceso = path.startsWith('/auth/')
+  // Las rutas públicas de acceso (login, códigos, recuperación) no renuevan la
+  // sesión. Cambiar la contraseña sí exige sesión: si el token venció, se
+  // renueva como en cualquier otra petición.
+  const esRutaDeAcceso = path.startsWith('/auth/') && path !== '/auth/cambiar-password'
   if (response.status === 401 && tokenUsado && !esRutaDeAcceso && await renovarSesion()) {
     response = await enviar(path, options)
   }
