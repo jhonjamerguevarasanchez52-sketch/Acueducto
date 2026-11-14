@@ -53,7 +53,7 @@ function App() {
   const [sectionErrors, setSectionErrors] = useState({})
   const [loadingSections, setLoadingSections] = useState({})
   const [createUserOpen, setCreateUserOpen] = useState(false)
-  const [newUser, setNewUser] = useState({ nombre: '', apellido: '', correo: '', rol: 'usuario', telefono: '', numero_lote: '', direccion: '', zona: '' })
+  const [newUser, setNewUser] = useState({ nombre: '', apellido: '', correo: '', cedula: '', rol: 'usuario', telefono: '', numero_lote: '', direccion: '', zona: '' })
   const [createUserError, setCreateUserError] = useState('')
   const [createdTemporaryPassword, setCreatedTemporaryPassword] = useState('')
   const [createdUserEmailSent, setCreatedUserEmailSent] = useState(false)
@@ -378,7 +378,7 @@ function App() {
     setCreateUserError('')
     setCreatedTemporaryPassword('')
     setCreatedUserEmailSent(false)
-    setNewUser({ nombre: '', apellido: '', correo: '', rol: 'usuario', telefono: '', numero_lote: '', direccion: '', zona: '' })
+    setNewUser({ nombre: '', apellido: '', correo: '', cedula: '', rol: 'usuario', telefono: '', numero_lote: '', direccion: '', zona: '' })
     setCreateUserOpen(true)
   }
 
@@ -1021,7 +1021,9 @@ function App() {
                 <label>Nombre<input value={newUser.nombre} onChange={(event) => setNewUser({ ...newUser, nombre: event.target.value })} required /></label>
                 <label>Apellido<input value={newUser.apellido} onChange={(event) => setNewUser({ ...newUser, apellido: event.target.value })} required /></label>
                 <label className="form-wide">Correo electrónico<input type="email" autoComplete="email" value={newUser.correo} onChange={(event) => setNewUser({ ...newUser, correo: event.target.value })} required /></label>
-                <label className="form-wide">Rol
+                {/* Opcional: con la cédula la persona también puede iniciar sesión en la app. */}
+                <label>Cédula<input inputMode="numeric" autoComplete="off" placeholder="Solo números" value={newUser.cedula} onChange={(event) => setNewUser({ ...newUser, cedula: event.target.value })} /></label>
+                <label>Rol
                   <select value={newUser.rol} onChange={(event) => setNewUser({ ...newUser, rol: event.target.value })}>
                     <option value="usuario">Usuario</option>
                     <option value="fontanero">Fontanero</option>

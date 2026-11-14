@@ -131,6 +131,21 @@ class AuthProvider extends ChangeNotifier {
     await _abrirSesion(data);
   }
 
+  /// Inicia sesión con la cédula en vez del correo. El backend busca la cuenta
+  /// que tiene esa cédula registrada. Se envían solo los dígitos (sin puntos
+  /// ni espacios).
+  Future<void> loginConCedula(String cedula, String password) async {
+    final data = await _api.post('/auth/login', body: {
+      'cedula': soloDigitosCedula(cedula),
+      'password': password,
+    });
+    await _abrirSesion(data);
+  }
+
+  /// Quita puntos, espacios y guiones de una cédula escrita a mano.
+  static String soloDigitosCedula(String cedula) =>
+      cedula.replaceAll(RegExp(r'[^0-9]'), '');
+
   /// Pide al backend que envíe un código de acceso de 6 dígitos al correo.
   /// La respuesta es la misma exista o no la cuenta.
   Future<void> solicitarCodigoAcceso(String correo) async {
