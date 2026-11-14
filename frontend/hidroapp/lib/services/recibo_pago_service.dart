@@ -9,6 +9,28 @@ class ReciboPagoService {
   /// Abre la galería y envía la imagen al backend, que la guarda en privado.
   /// Devuelve false si el usuario cancela el selector.
   static Future<bool> subir(ApiService api, String facturaId) async {
+    final recibo = await seleccionar();
+    if (recibo == null) return false;
+    await enviar(api, facturaId, recibo);
+    return true;
+  }
+
+  /// Envía al backend un recibo ya elegido con [seleccionar].
+  static Future<void> enviar(
+    ApiService api,
+    String facturaId,
+    ({List<int> bytes, String tipo}) recibo,
+  ) async {
+    await api.postBytes(
+      '/pagos/$facturaId/recibo',
+      bytes: recibo.bytes,
+      contentType: recibo.tipo,
+    );
+  }
+
+  /// Abre la galería y valida la imagen (tamaño y formato real), sin enviarla.
+  /// Devuelve `null` si el usuario cierra el selector.
+  static Future<({List<int> bytes, String tipo})?> seleccionar() async {
     final imagen = await _picker
         .pickImage(
           source: ImageSource.gallery,
@@ -17,7 +39,7 @@ class ReciboPagoService {
           maxHeight: 1600,
         )
         .catchError((_) => throw ApiException('No se pudo abrir la galería.'));
-    if (imagen == null) return false;
+    if (imagen == null) return null;
 
     final List<int> bytes;
     try {
@@ -33,13 +55,7 @@ class ReciboPagoService {
     if (tipo == null) {
       throw ApiException('Selecciona una imagen JPG, PNG o WEBP del recibo.');
     }
-
-    await api.postBytes(
-      '/pagos/$facturaId/recibo',
-      bytes: bytes,
-      contentType: tipo,
-    );
-    return true;
+    return (bytes: bytes, tipo: tipo);
   }
 
   static String? _tipoImagen(List<int> bytes) {

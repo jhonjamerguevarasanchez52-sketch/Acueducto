@@ -18,7 +18,14 @@ class Factura {
     this.fechaUltimoPago,
     this.fechaProximaFacturacion,
     this.observacion,
+    this.tipo = 'servicio',
+    this.numeroFactura,
   });
+
+  /// Tipos de factura que admiten plan mensual, semestral o anual (igual que
+  /// `admitePlan` en el backend). Las cuotas extraordinarias se pagan tal
+  /// como se emitieron.
+  static const tiposConPlan = {'servicio', 'prepago'};
 
   final String id;
   final String periodo;
@@ -35,7 +42,18 @@ class Factura {
   final DateTime? fechaProximaFacturacion;
   final String? observacion;
 
+  /// servicio | prepago | extraordinaria
+  final String tipo;
+
+  /// Consecutivo que aparece en los correos ("Factura N.º 19").
+  final String? numeroFactura;
+
   bool get estaPendiente => estado == 'pendiente' || estado == 'vencida';
+
+  bool get esExtraordinaria => tipo == 'extraordinaria';
+
+  /// `true` si al pagar se puede elegir plan mensual, semestral o anual.
+  bool get admitePlanes => estaPendiente && tiposConPlan.contains(tipo);
 
   /// Meses (`AAAA-MM`) que paga esta factura: uno en la mensual, seis en la
   /// semestral y doce en la anual.
@@ -87,6 +105,12 @@ class Factura {
       observacion: (json['observacion']?.toString().trim().isEmpty ?? true)
           ? null
           : json['observacion'].toString(),
+      tipo: (json['tipo']?.toString().trim().isEmpty ?? true)
+          ? 'servicio'
+          : json['tipo'].toString().trim().toLowerCase(),
+      numeroFactura: (json['numero_factura']?.toString().trim().isEmpty ?? true)
+          ? null
+          : json['numero_factura'].toString().trim(),
     );
   }
 

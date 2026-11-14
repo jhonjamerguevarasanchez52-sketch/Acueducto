@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../models/factura.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
 import '../core/dialogo_centrado.dart';
-import '../core/pagar_sheet.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Nombre comercial del plan según los meses que cubre.
@@ -16,34 +14,10 @@ String nombrePlanPago(int meses) => switch (meses) {
   _ => '$meses meses',
 };
 
-/// Flujo completo de "Pagar": el usuario elige cuántos meses pagar (1, 6 o
-/// 12), luego el medio de pago, y la factura queda configurada con ese plan
-/// en el backend. Devuelve el medio elegido, o `null` si canceló.
-Future<({String metodo, String? referencia})?> elegirPlanYMedioDePago(
-  BuildContext context,
-  ApiService api,
-  Factura factura,
-) async {
-  final plan = await mostrarPlanPagoSheet(context, api, factura.id);
-  if (plan == null || !context.mounted) return null;
-
-  final meses = int.tryParse('${plan['meses']}') ?? 1;
-  final servicio =
-      num.tryParse('${plan['valorServicio']}') ?? factura.valorTotal;
-  final inicio = Formato.periodo(plan['periodoInicio']?.toString());
-  final fin = Formato.periodo(plan['periodoFin']?.toString());
-  final periodo = meses > 1 ? '$inicio – $fin' : inicio;
-  final eleccion = await mostrarPagarSheet(
-    context,
-    subtitulo:
-        '${nombrePlanPago(meses)} · $periodo · ${Formato.pesos(servicio)}',
-  );
-  if (eleccion == null) return null;
-
-  await api.post('/facturas/${factura.id}/plan-pago', body: {'meses': meses});
-  return eleccion;
-}
-
+/// Muestra los planes de pago de una factura y devuelve la opción elegida
+/// (con su desglose de Wompi), o `null` si el usuario cerró la ventana.
+/// No cambia nada en el servidor: el plan se aplica en
+/// `FlujoPagoFactura` cuando el usuario confirma el pago.
 Future<Map<String, dynamic>?> mostrarPlanPagoSheet(
   BuildContext context,
   ApiService api,

@@ -4,10 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/factura.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import '../services/recibo_pago_service.dart';
-import '../services/wompi_checkout_service.dart';
+import '../services/flujo_pago_factura.dart';
 import '../widgets/core/core.dart';
-import '../widgets/facturas/plan_pago_sheet.dart';
 import '../widgets/home/home.dart';
 import 'estado_servicio_screen.dart';
 import 'pagos_screen.dart';
@@ -59,54 +57,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _pagar(Factura factura) async {
     try {
-      final api = context.read<AuthProvider>().api;
-      final eleccion = await elegirPlanYMedioDePago(context, api, factura);
-      if (eleccion == null || !mounted) return;
-
-      if (eleccion.metodo == 'wompi') {
-        final abierto = await WompiCheckoutService.pagar(
-          context,
-          api,
-          factura.id,
-        );
-        if (!abierto) return;
-        if (!mounted) return;
-        AppSnackbar.success(
-          context,
-          'Checkout abierto. El estado se actualizará al volver.',
-        );
-        _refrescar();
-        return;
-      }
-      if (eleccion.metodo == 'fisico') {
-        final subido = await ReciboPagoService.subir(api, factura.id);
-        if (!mounted) return;
-        if (subido) {
-          AppSnackbar.success(
-            context,
-            'Recibo enviado. Pago pendiente de revisión.',
-          );
-          _refrescar();
-        }
-        return;
-      }
-      await api.post(
-        '/pagos',
-        body: {
-          'factura_id': factura.id,
-          'metodo': eleccion.metodo,
-          if (eleccion.referencia != null) 'referencia': eleccion.referencia,
-        },
-      );
-      if (!mounted) return;
-      AppSnackbar.success(
+      final resultado = await FlujoPagoFactura.pagarFactura(
         context,
-        'Pago registrado. Queda pendiente de confirmación.',
+        context.read<AuthProvider>().api,
+        factura,
       );
+      final mensaje = FlujoPagoFactura.mensaje(resultado);
+      if (mensaje == null || !mounted) return;
+      AppSnackbar.success(context, mensaje);
       _refrescar();
     } on ApiException catch (e) {
       if (!mounted) return;
       AppSnackbar.error(context, e.message);
+      // Si el pago falló a mitad de camino, mostrar el estado real.
+      _refrescar();
+    } catch (_) {
+      if (!mounted) return;
+      AppSnackbar.error(context, 'No se pudo completar el pago. Intenta de nuevo.');
+      _refrescar();
     }
   }
 

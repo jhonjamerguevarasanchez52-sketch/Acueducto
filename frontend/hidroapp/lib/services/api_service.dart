@@ -201,11 +201,15 @@ class ApiService {
     throw ApiException(msg, statusCode: res.statusCode, data: data);
   }
 
-  /// Un fallo inesperado al renovar cuenta como "no se pudo": la petición
+  /// Si quien renueva lanza un [ApiException] (falla temporal de red o del
+  /// servidor), ese mensaje es el que ve el usuario: la sesión sigue abierta.
+  /// Cualquier otro fallo inesperado cuenta como "no se pudo" y la petición
   /// original termina con su 401 en vez de con un error confuso.
   Future<bool> _renovar() async {
     try {
       return await onUnauthorized!();
+    } on ApiException {
+      rethrow;
     } catch (e) {
       if (kDebugMode) debugPrint('[ApiService] no se pudo renovar la sesión: $e');
       return false;

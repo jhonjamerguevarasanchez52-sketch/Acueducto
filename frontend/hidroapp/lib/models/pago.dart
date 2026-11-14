@@ -39,7 +39,7 @@ class Pago {
       const {'DECLINED', 'VOIDED', 'ERROR'}.contains(estadoWompi) &&
       !confirmado;
 
-  /// Requiere conciliaciÃ³n; otro intento podrÃ­a cobrar dos veces.
+  /// Requiere conciliación; otro intento podría cobrar dos veces.
   bool get requiereRevision =>
       !confirmado &&
       const {'APPROVED_NO_APLICADO', 'MONTO_INVALIDO'}.contains(estadoWompi);

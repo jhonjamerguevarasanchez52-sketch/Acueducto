@@ -23,6 +23,19 @@ class FacturaCard extends StatelessWidget {
   final VoidCallback onPagar;
   final VoidCallback onVerPagos;
 
+  /// "FACTURA N.º 19 · PLAN ANUAL", "CUOTA EXTRAORDINARIA N.º 20"... El número
+  /// es el mismo que llega en los correos.
+  String get _encabezado {
+    final numero = factura.numeroFactura == null
+        ? ''
+        : ' N.º ${factura.numeroFactura}';
+    if (factura.esExtraordinaria) return 'CUOTA EXTRAORDINARIA$numero';
+    final plan = factura.mesesCubiertos > 1
+        ? ' · PLAN ${nombrePlanPago(factura.mesesCubiertos).toUpperCase()}'
+        : '';
+    return 'FACTURA DE SERVICIO$numero$plan';
+  }
+
   ({String texto, Color color}) _estado(AppColors colores) {
     switch (factura.estado) {
       case 'pagada':
@@ -91,9 +104,7 @@ class FacturaCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  factura.mesesCubiertos > 1
-                      ? 'FACTURA DE SERVICIO · PLAN ${nombrePlanPago(factura.mesesCubiertos).toUpperCase()}'
-                      : 'FACTURA DE SERVICIO',
+                  _encabezado,
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 11,
@@ -231,10 +242,7 @@ class FacturaCard extends StatelessWidget {
                           Expanded(
                             child: FilledButton.icon(
                               onPressed: onPagar,
-                              icon: const Icon(
-                                LucideIcons.banknote,
-                                size: 18,
-                              ),
+                              icon: const Icon(LucideIcons.banknote, size: 18),
                               label: const Text('Pagar'),
                               style: FilledButton.styleFrom(
                                 minimumSize: const Size.fromHeight(44),

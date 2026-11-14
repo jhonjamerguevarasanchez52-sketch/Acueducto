@@ -290,13 +290,24 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (error) {
       final statusCode = error is ApiException ? error.statusCode : null;
-      // Ante una falla temporal (red, servidor caído, límite de peticiones)
-      // se conserva el refresh token para poder reintentar luego.
+      // Falla temporal (sin red, servidor caído o despertando, límite de
+      // peticiones): la sesión sigue siendo válida. No se saca al usuario a
+      // la pantalla de acceso; la petición falla con un mensaje de conexión
+      // y la próxima vuelve a intentar renovar con el mismo refresh token.
       final temporal = statusCode == null ||
           statusCode >= 500 ||
           statusCode == 408 ||
           statusCode == 429;
-      await _sesionExpirada(conservarRefresh: temporal);
+      if (temporal) {
+        throw ApiException(
+          'No se pudo conectar con el servidor para mantener tu sesión. '
+          'Revisa tu conexión e intenta de nuevo.',
+          statusCode: statusCode,
+          data: const {'sesionTemporal': true},
+        );
+      }
+      // El servidor rechazó el refresh token: la sesión terminó de verdad.
+      await _sesionExpirada(conservarRefresh: false);
       return false;
     }
   }

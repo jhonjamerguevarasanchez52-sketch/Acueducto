@@ -35,6 +35,9 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Desplazable: con el teclado abierto en un teléfono pequeño el
+          // contenido no se sale de la pantalla.
+          scrollable: true,
           title: const Text('Aviso para todos'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -184,6 +187,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
         destino = const AveriasScreen();
         break;
       case 'corte':
+      case 'servicio':
         destino = const EstadoServicioScreen();
         break;
     }

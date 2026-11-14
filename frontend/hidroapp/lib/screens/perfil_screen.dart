@@ -5,6 +5,8 @@ import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import 'admin/admin_api.dart';
+import 'admin/admin_pagos_screen.dart';
 import 'cambiar_password_screen.dart';
 import '../widgets/core/core.dart';
 import 'editar_perfil_screen.dart';
@@ -201,6 +203,22 @@ class PerfilScreen extends StatelessWidget {
               style: TextStyle(color: colores.secondaryText, fontSize: 12),
             ),
           ),
+          if (perfil?.rol == 'administrador') ...[
+            const SizedBox(height: 16),
+            // Revisión de los recibos de pago físico que suben los usuarios.
+            FilledButton.tonalIcon(
+              key: const ValueKey('abrir-recibos-por-revisar'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AdminPagosScreen(
+                    api: AdminApi(context.read<AuthProvider>().api),
+                  ),
+                ),
+              ),
+              icon: const Icon(LucideIcons.receiptText),
+              label: const Text('Recibos por revisar'),
+            ),
+          ],
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () => Navigator.of(context).push(
