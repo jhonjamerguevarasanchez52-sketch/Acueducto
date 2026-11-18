@@ -123,33 +123,39 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-
-  Future<void> login(String identificador, String password, {bool conCedula = false}) async {
-    final data = await _api.post('/auth/login', body: {
-      if (conCedula)
-        'cedula': identificador.replaceAll(RegExp(r'\D'), '')
-      else
-        'correo': identificador.trim(),
-      'password': password,
-    });
+  Future<void> login(
+    String identificador,
+    String password, {
+    bool conCedula = false,
+  }) async {
+    final data = await _api.post(
+      '/auth/login',
+      body: {
+        if (conCedula)
+          'cedula': identificador.replaceAll(RegExp(r'\D'), '')
+        else
+          'correo': identificador.trim(),
+        'password': password,
+      },
+    );
     await _abrirSesion(data);
   }
-
 
   /// Pide al backend que envíe un código de acceso de 6 dígitos al correo.
   /// La respuesta es la misma exista o no la cuenta.
   Future<void> solicitarCodigoAcceso(String correo) async {
-    await _api.post('/auth/codigo-acceso', body: {
-      'correo': correo.trim().toLowerCase(),
-    });
+    await _api.post(
+      '/auth/codigo-acceso',
+      body: {'correo': correo.trim().toLowerCase()},
+    );
   }
 
   /// Entra sin contraseña con el código que llegó al correo.
   Future<void> loginConCodigo(String correo, String codigo) async {
-    final data = await _api.post('/auth/ingresar-con-codigo', body: {
-      'correo': correo.trim().toLowerCase(),
-      'codigo': codigo.trim(),
-    });
+    final data = await _api.post(
+      '/auth/ingresar-con-codigo',
+      body: {'correo': correo.trim().toLowerCase(), 'codigo': codigo.trim()},
+    );
     await _abrirSesion(data);
   }
 
@@ -201,7 +207,9 @@ class AuthProvider extends ChangeNotifier {
     if (enabled) {
       final supported = await deviceSupportsBiometrics();
       if (!supported) {
-        throw ApiException('Este dispositivo no tiene huella ni rostro configurados.');
+        throw ApiException(
+          'Este dispositivo no tiene huella ni rostro configurados.',
+        );
       }
       final refreshToken =
           await _storage.read(_refreshTokenKey) ??
@@ -281,10 +289,8 @@ class AuthProvider extends ChangeNotifier {
   /// sesión no se cierre mientras se usa la app. Lo invoca [ApiService] al
   /// recibir un 401; si no se puede renovar, cierra la sesión y vuelve a la
   /// pantalla de acceso en vez de dejar al usuario viendo un error suelto.
-  Future<bool> _renovarSesion() =>
-      _renovacionEnCurso ??= _intentarRenovar().whenComplete(
-        () => _renovacionEnCurso = null,
-      );
+  Future<bool> _renovarSesion() => _renovacionEnCurso ??= _intentarRenovar()
+      .whenComplete(() => _renovacionEnCurso = null);
 
   Future<bool> _intentarRenovar() async {
     final refreshToken = await _leerRefreshToken();
@@ -299,7 +305,8 @@ class AuthProvider extends ChangeNotifier {
       final statusCode = error is ApiException ? error.statusCode : null;
       // Ante una falla temporal (red, servidor caído, límite de peticiones)
       // se conserva el refresh token para poder reintentar luego.
-      final temporal = statusCode == null ||
+      final temporal =
+          statusCode == null ||
           statusCode >= 500 ||
           statusCode == 408 ||
           statusCode == 429;
@@ -433,69 +440,6 @@ class AuthProvider extends ChangeNotifier {
     _status = status;
     notifyListeners();
   }
-
-
-  /// Renueva la sesión después de un 401. ApiService repite la petición con
-  /// el token nuevo; varias peticiones concurrentes comparten esta renovación.
-  Future<bool> _renovarSesion() {
-    final currentRefresh = _refreshInFlight;
-    if (currentRefresh != null) return currentRefresh;
-    final refresh = _renovarSesionInterno().whenComplete(() {
-      _refreshInFlight = null;
-    });
-    _refreshInFlight = refresh;
-    return refresh;
-  }
-
-  Future<bool> _renovarSesionInterno() async {
-    final refreshToken =
-        await _storage.read(_refreshTokenKey) ??
-        await _storage.read(_legacyRefreshTokenKey);
-    if (refreshToken == null || refreshToken.isEmpty) {
-      await _clear();
-      _setStatus(AuthStatus.unauthenticated);
-      return false;
-    }
-
-    try {
-      final data = await _api.renewSession(refreshToken);
-      if (data is! Map || data['session'] is! Map) {
-        throw ApiException(
-          'El servidor no devolvió una sesión renovada válida.',
-        );
-      }
-      final session = data['session'] as Map;
-      final accessToken = session['access_token'];
-      final nextRefreshToken = session['refresh_token'];
-      if (accessToken is! String || accessToken.isEmpty) {
-        throw ApiException(
-          'El servidor no devolvió un token de acceso válido.',
-        );
-      }
-      await _storage.write(_tokenKey, accessToken);
-      _api.authToken = accessToken;
-      if (nextRefreshToken is String && nextRefreshToken.isNotEmpty) {
-        await _storage.write(_refreshTokenKey, nextRefreshToken);
-        await _storage.delete(_legacyRefreshTokenKey);
-      }
-      return true;
-    } catch (error) {
-      final statusCode = error is ApiException ? error.statusCode : null;
-      if (statusCode == null ||
-          statusCode >= 500 ||
-          statusCode == 408 ||
-          statusCode == 429) {
-        // Ante una falla temporal se conserva el refresh token para reintentar.
-        _api.authToken = null;
-        _setStatus(AuthStatus.unauthenticated);
-        return false;
-      }
-      await _clear();
-      _setStatus(AuthStatus.unauthenticated);
-      return false;
-    }
-  }
-
 
   @override
   void dispose() {
