@@ -1,16 +1,26 @@
 const authModel = require('../models/authModel');
 const profileModel = require('../models/profileModel');
+
+
 const breakdownModel = require('../models/breakdownModel');
 const supabaseAdmin = require('../config/supabaseAdminClient');
+
 const { extraerCambiosPerfil } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
 const { enviarCorreo } = require('../config/mailer');
 const { notificar } = require('../utils/notificar');
 const { escaparHtml } = require('../utils/html');
+
+const { eliminarCuenta, listarCuentasEliminadas, reenviarCorreoArchivo } = require('../services/accountDeletionService');
+const { registrarAuditoria } = require('../utils/auditoria');
+const { consultarEstadoCuenta } = require('../services/estadoCuentaService');
+const { generarCertificados, listarCertificados, descargarCertificado, reenviarCertificado } = require('../services/pazYSalvoService');
+
 const { normalizarCorreo } = require('../utils/formato');
 const cacheSesiones = require('../utils/cacheSesiones');
 const { registrarAuditoria } = require('../utils/auditoria');
+
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
 
@@ -75,6 +85,14 @@ async function crearUsuario(req, res) {
       return errorConsulta(res, profileError);
     }
 
+
+    await registrarAuditoria({
+      adminId: req.usuario.id,
+      accion: 'usuario_creado',
+      tabla: 'profiles',
+      registroId: userId,
+      detalle: { subject_user_id: userId, correo, nombre, apellido, rol },
+
     if (rol === 'fontanero') {
       const { data: asignado, error: errorAsignacion } = await profileModel.assignPlumber(userId);
       if (errorAsignacion || !asignado) {
@@ -91,6 +109,7 @@ async function crearUsuario(req, res) {
       tabla: 'profiles',
       registroId: userId,
       detalle: { correo, rol },
+
     });
 
     let correoEnviado = false;
@@ -142,8 +161,16 @@ async function verTodosUsuarios(req, res) {
   try {
     const { data, error } = await profileModel.list({ rol, activo, limit, offset });
     if (error) return errorConsulta(res, error);
-
-    return res.status(200).json(data);
+    const estados = await consultarEstadoCuenta((data || []).map((perfil) => perfil.id));
+    return res.status(200).json((data || []).map((perfil) => {
+      const estado = estados.get(perfil.id) || { saldoPendiente: 0, facturasPendientes: [], estadoCuenta: 'al_dia' };
+      return {
+        ...perfil,
+        estado_cuenta: estado.estadoCuenta,
+        saldo_pendiente: estado.saldoPendiente,
+        facturas_pendientes: estado.facturasPendientes,
+      };
+    }));
   } catch (err) {
     return errorInesperado(res, err);
   }
@@ -201,11 +228,19 @@ async function cambiarRol(req, res) {
     }
 
     await registrarAuditoria({
+
+      adminId: req.usuario.id,
+      accion: 'rol_actualizado',
+      tabla: 'profiles',
+      registroId: userId,
+      detalle: { subject_user_id: userId, nuevo_rol: rol },
+
       adminId: req.usuario?.id,
       accion: 'usuario_rol_cambiado',
       tabla: 'profiles',
       registroId: userId,
       detalle: { antes: anterior?.rol ?? null, despues: rol },
+
     });
 
     return res.status(200).json({ message: `Rol actualizado a "${rol}"`, perfil: data });
@@ -233,11 +268,19 @@ async function editarUsuario(req, res) {
     }
 
     await registrarAuditoria({
+
+      adminId: req.usuario.id,
+      accion: 'perfil_usuario_editado',
+      tabla: 'profiles',
+      registroId: userId,
+      detalle: { subject_user_id: userId, campos: Object.keys(cambios) },
+
       adminId: req.usuario?.id,
       accion: 'usuario_editado',
       tabla: 'profiles',
       registroId: userId,
       detalle: { campos: Object.keys(cambios) },
+
     });
 
     return res.status(200).json({ message: 'Usuario actualizado', perfil: data });
@@ -267,11 +310,19 @@ async function cambiarEstadoUsuario(req, res) {
     }
 
     await registrarAuditoria({
+
+      adminId: req.usuario.id,
+      accion: activo ? 'usuario_activado' : 'usuario_desactivado',
+      tabla: 'profiles',
+      registroId: userId,
+      detalle: { subject_user_id: userId, activo },
+
       adminId: req.usuario?.id,
       accion: activo ? 'usuario_activado' : 'usuario_desactivado',
       tabla: 'profiles',
       registroId: userId,
       detalle: { correo: data.correo ?? null },
+
     });
 
     return res.status(200).json({
@@ -283,20 +334,49 @@ async function cambiarEstadoUsuario(req, res) {
   }
 }
 
-// Eliminar un usuario definitivamente (por ejemplo, una cuenta creada por
-// error). Solo se permite si no tiene facturas ni pagos: la base de datos lo
-// impide con ON DELETE RESTRICT y aquí se revisa antes para dar un mensaje
-// claro. Las averías asignadas al fontanero conservan su historial y quedan
-// sin asignación. Para bloquear el acceso conservando todo, se desactiva
-// (cambiarEstadoUsuario con activo: false).
+
 async function eliminarUsuario(req, res) {
   const { userId } = req.params;
-
-  if (userId === req.usuario.id) {
-    return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta' });
-  }
-
   try {
+    const resultado = await eliminarCuenta({
+      userId,
+      actor: req.usuario,
+      deletionType: 'administrador',
+      exitNote: req.body?.nota,
+    });
+    if (resultado.notFound) return res.status(404).json({ error: 'Usuario no encontrado' });
+    return res.status(200).json({
+      message: resultado.emailSent
+        ? 'Perfil archivado y eliminado. Se envió el correo de confirmación.'
+        : 'Perfil archivado y eliminado; el correo falló y quedó disponible para reintento.',
+      ...resultado,
+    });
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    return errorInesperado(res, err);
+  }
+}
+
+async function verUsuariosEliminados(req, res) {
+  try {
+    const { data, error } = await listarCuentasEliminadas();
+    if (error) return errorConsulta(res, error);
+    return res.status(200).json(data || []);
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+async function reenviarAvisoEliminacion(req, res) {
+  try {
+
+    const resultado = await reenviarCorreoArchivo(req.params.archiveId);
+    return res.status(200).json({ message: `Aviso enviado a ${resultado.email}` });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
     // Las facturas y los pagos son la contabilidad del acueducto: un usuario
     // con historial no se borra, se desactiva (bloquea su acceso y lo saca de
     // la facturación, pero conserva todo). La base de datos también lo impide
@@ -319,7 +399,36 @@ async function eliminarUsuario(req, res) {
     const { error: errorAverias } = await breakdownModel.unassignFromPlumber(userId);
     if (errorAverias) return errorConsulta(res, errorAverias);
 
-    const { error } = await authModel.deleteUser(userId);
+
+async function generarPazYSalvo(req, res) {
+  try {
+    const resultado = await generarCertificados({
+      perfilIds: req.body?.perfil_ids,
+      enviar: req.body?.enviar_correo === true,
+      actor: req.usuario,
+    });
+    return res.status(200).json(resultado);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    return errorInesperado(res, err);
+  }
+}
+
+
+async function verPazYSalvos(req, res) {
+  try {
+    const { data, error } = await listarCertificados();
+    if (error) return errorConsulta(res, error);
+    return res.status(200).json(data || []);
+  } catch (err) {
+    return errorInesperado(res, err);
+  }
+}
+
+async function descargarPazYSalvo(req, res) {
+  try {
+    const resultado = await descargarCertificado(req.params.certificateId);
+    return res.status(200).json(resultado);
 
     if (error) {
       const noExiste = /not found|no rows/i.test(error.message);
@@ -347,8 +456,18 @@ async function eliminarUsuario(req, res) {
       detalle: null,
     });
     return res.status(200).json({ message: 'Usuario eliminado permanentemente' });
+
   } catch (err) {
     return errorInesperado(res, err);
+  }
+}
+
+async function reenviarPazYSalvo(req, res) {
+  try {
+    const resultado = await reenviarCertificado(req.params.certificateId);
+    return res.status(200).json({ message: `Certificado reenviado a ${resultado.email}` });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 }
 
@@ -360,4 +479,10 @@ module.exports = {
   editarUsuario,
   cambiarEstadoUsuario,
   eliminarUsuario,
+  verUsuariosEliminados,
+  reenviarAvisoEliminacion,
+  generarPazYSalvo,
+  verPazYSalvos,
+  descargarPazYSalvo,
+  reenviarPazYSalvo,
 };

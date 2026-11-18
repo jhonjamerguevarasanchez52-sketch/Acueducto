@@ -50,16 +50,20 @@ if (enProduccion) {
   }
 }
 
-// Detrás del proxy de Render para que el rate-limit lea la IP real.
+
 app.set('trust proxy', 1);
 
 app.use(helmet());
 
-// CORS: por defecto abierto; si defines CORS_ORIGIN (lista separada por comas)
-// se restringe a esos orígenes.
+// CORS: conserva CORS_ORIGIN y añade el origen del panel administrativo de Render.
+const origenesConfigurados = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+  : [];
 const origenesPermitidos = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
-  : true;
+  ? [...new Set([...origenesConfigurados, 'https://hidro-admin.onrender.com'])]
+  : enProduccion
+    ? ['https://hidro-admin.onrender.com']
+    : true;
 app.use(cors({ origin: origenesPermitidos }));
 
 app.use(express.json({ limit: '1mb' }));
@@ -74,7 +78,7 @@ app.use(limiteGeneral);
 // llevar groserías ni lenguaje ofensivo o racista.
 app.use(bloquearLenguajeOfensivo);
 
-// Healthcheck para Render, pg_cron (mantener despierto) y monitoreo
+
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
 
 app.get('/', (req, res) => {

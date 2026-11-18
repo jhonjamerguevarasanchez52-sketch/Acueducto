@@ -149,7 +149,7 @@ function App() {
     if (sessionStatus !== 'authenticated' || activeSection !== 'dashboard') return
 
     let cancelled = false
-    Promise.all(Object.entries(resourceEndpointBySection).map(async ([section, endpointName]) => {
+    Promise.all(Object.entries(resourceEndpointBySection).filter(([section]) => !['eliminados', 'paz-y-salvo'].includes(section)).map(async ([section, endpointName]) => {
       try {
         const data = await fetchResource(endpointName)
         return { section, data: Array.isArray(data) ? data : [], error: '' }
@@ -199,7 +199,11 @@ function App() {
     setSearchQuery('')
     loadSection(section)
     if (section === 'facturas' || section === 'pagos') void ensureUsersLoaded()
+
+    if (section === 'paz-y-salvo') void ensureUsersLoaded()
+
     if (section === 'cortes') void loadSection('cortesProgramados')
+
     if (section === 'reportes') {
       void Promise.all(['usuarios', 'facturas', 'pagos'].map((name) => loadSection(name)))
     }
@@ -583,6 +587,27 @@ function App() {
     }
   }
 
+  const handleDeleteOwnAdminAccount = async () => {
+    if (!window.confirm('Se archivará tu historial como administrador, se enviará el resumen de saldos pendientes a tu correo y tu cuenta se eliminará inmediatamente. ¿Continuar?')) return
+    const passwordActual = window.prompt('Confirma tu contraseña actual para eliminar tu cuenta:')
+    if (passwordActual === null) return
+    if (!passwordActual.trim()) {
+      setProfileError('Debes confirmar tu contraseña actual.')
+      return
+    }
+    setProfileError('')
+    try {
+      await apiRequest('/profile/mi-cuenta', {
+        method: 'DELETE',
+        body: { passwordActual },
+      })
+      setProfileOpen(false)
+      handleLogout()
+    } catch (error) {
+      setProfileError(error.message || 'No fue posible eliminar tu cuenta.')
+    }
+  }
+
   const handleChangeProfilePassword = async (event) => {
     event.preventDefault()
     setPasswordError('')
@@ -760,6 +785,8 @@ function App() {
   const sectionTitles = {
     dashboard: 'HIDRO-APP',
     usuarios: 'Usuarios',
+    eliminados: 'Perfiles eliminados',
+    'paz-y-salvo': 'Paz y salvo',
     facturas: 'Facturación',
     pagos: 'Pagos',
     cortes: 'Cortes y reconexiones',
@@ -843,6 +870,7 @@ function App() {
     sectionData,
     sectionErrors,
     loadingSections,
+    loadSection,
     filterRows,
     profile,
     endpoints,
@@ -992,6 +1020,12 @@ function App() {
                 {isChangingProfilePassword ? 'Actualizando...' : 'Cambiar contraseña'}
               </button>
             </form>
+
+            <div className="profile-form">
+              <button type="button" className="link-button danger-link" onClick={handleDeleteOwnAdminAccount}>
+                Eliminar mi cuenta de administrador
+              </button>
+            </div>
           </section>
         </div>
       )}

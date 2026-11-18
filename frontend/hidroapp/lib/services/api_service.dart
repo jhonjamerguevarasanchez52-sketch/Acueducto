@@ -72,6 +72,16 @@ class ApiService {
     if (authToken != null) 'Authorization': 'Bearer $authToken',
   };
 
+
+  Future<dynamic> get(String path) =>
+      _send(() => _client.get(_uri(path), headers: _headers).timeout(_timeout));
+
+  Future<dynamic> post(String path, {Object? body}) => _send(
+    () => _client
+        .post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
+        .timeout(_timeout),
+  );
+
   /// Los GET no cambian nada en el servidor, así que se reintentan una vez
   /// ante un fallo de conexión (típico mientras Render despierta). Tras un
   /// timeout NO se reintenta: el usuario ya esperó el máximo y volver a
@@ -98,23 +108,46 @@ class ApiService {
             .timeout(tiempoMaximo),
       );
 
+
   Future<dynamic> postBytes(
     String path, {
     required List<int> bytes,
     required String contentType,
+
+  }) => _send(
+
     Map<String, String> headers = const {},
   }) => _send(
     path,
+
     () => _client
         .post(
           _uri(path),
           headers: {
+
+
             ...headers,
+
             'Content-Type': contentType,
             if (authToken != null) 'Authorization': 'Bearer $authToken',
           },
           body: bytes,
         )
+
+        .timeout(_timeout),
+  );
+
+  Future<dynamic> put(String path, {Object? body}) => _send(
+    () => _client
+        .put(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
+        .timeout(_timeout),
+  );
+
+  Future<dynamic> delete(String path, {Object? body}) => _send(
+    () => _client
+        .delete(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
+        .timeout(_timeout),
+
         .timeout(tiempoMaximo),
   );
 
@@ -130,6 +163,7 @@ class ApiService {
   Future<dynamic> delete(String path) => _send(
     path,
     () => _client.delete(_uri(path), headers: _headers).timeout(tiempoMaximo),
+
   );
 
   /// Cambia el refresh token por una sesión nueva llamando directamente al
@@ -156,9 +190,25 @@ class ApiService {
   static dynamic _decodificar(http.Response res) {
     if (res.body.isEmpty) return null;
     try {
+
+      res = await request();
+    } on TimeoutException catch (e) {
+      if (kDebugMode) debugPrint('[ApiService] timeout: $e');
+      throw ApiException(
+        'El servidor no respondió a tiempo. Verifica tu conexión.',
+      );
+    } catch (e, st) {
+      // No filtramos el error real al usuario (podría ser un detalle técnico
+      // sin sentido para él), pero sí lo dejamos en el log para poder
+      // diagnosticar problemas reales (DNS, certificado, etc.) en vez de que
+      // todo se vea igual que "sin internet".
+      if (kDebugMode) debugPrint('[ApiService] fallo de red: $e\n$st');
+      throw ApiException('No se pudo conectar con el servidor.');
+
       return jsonDecode(res.body);
     } catch (_) {
       return res.body;
+
     }
   }
 
@@ -176,6 +226,40 @@ class ApiService {
       res = await _ejecutar(request);
     }
 
+
+    if (res.statusCode == 401 && authToken != null && onUnauthorized != null) {
+      var renewed = false;
+      try {
+        renewed = await onUnauthorized!.call();
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[ApiService] no se pudo renovar la sesión: $e');
+        }
+      }
+      if (renewed) {
+        try {
+          res = await request();
+        } on TimeoutException {
+          throw ApiException(
+            'El servidor no respondió a tiempo. Verifica tu conexión.',
+          );
+        } catch (e) {
+          if (e is ApiException) rethrow;
+          if (kDebugMode) {
+            debugPrint('[ApiService] fallo al repetir petición: $e');
+          }
+          throw ApiException('No se pudo conectar con el servidor.');
+        }
+        data = null;
+        if (res.body.isNotEmpty) {
+          try {
+            data = jsonDecode(res.body);
+          } catch (_) {
+            data = res.body;
+          }
+        }
+      }
+
     // El access token de Supabase vence (≈1 h). Antes de dar la sesión por
     // perdida pedimos uno nuevo con el refresh token y repetimos la petición
     // una sola vez. Si otra petición ya lo renovó, basta con reintentar.
@@ -186,6 +270,7 @@ class ApiService {
           authToken != tokenUsado ||
           (onUnauthorized != null && await _renovar());
       if (renovado && authToken != null) res = await _ejecutar(request);
+
     }
 
     final data = _decodificar(res);

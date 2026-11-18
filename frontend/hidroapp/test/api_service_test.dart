@@ -51,7 +51,10 @@ void main() {
       final api = ApiService(client: client)..authToken = 'token-prueba';
       var unauthorizedCalls = 0;
       api.onUnauthorized = () async {
-        unauthorizedCalls++;
+
+        unauthorizedCalls += 1;
+
+    
         return false;
       };
       addTearDown(api.dispose);

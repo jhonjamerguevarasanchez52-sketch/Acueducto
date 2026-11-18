@@ -74,6 +74,8 @@ body {
 .secondary-button:hover, .soft-button:hover { background: #f3fbfa; border-color: #b7dfdc; }
 .link-button { color: #087f82; }
 .danger-link { color: #d64f55; }
+.checkbox-label { display: inline-flex; align-items: center; gap: 8px; color: #52687a; font-size: .9rem; }
+.checkbox-label input { width: 16px; height: 16px; accent-color: #087f82; }
 
 .table-wrap { border: 1px solid #e8eef4; border-radius: 15px; background: #fff; }
 table { min-width: 740px; }
