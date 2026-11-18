@@ -11,6 +11,7 @@ import '../widgets/facturas/plan_pago_sheet.dart';
 import '../widgets/home/home.dart';
 import 'estado_servicio_screen.dart';
 import 'pagos_screen.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Pestaña "Inicio": da la bienvenida al usuario, muestra la factura pendiente
 /// con su cuenta regresiva y botón de pago, y deja atajos a los módulos que no
@@ -135,7 +136,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                6,
+                20,
+                104 + MediaQuery.paddingOf(context).bottom,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -149,12 +155,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                   const SizedBox(height: 12),
                   HomeModuloTile(
-                    icon: Icons.payments_outlined,
+                    icon: LucideIcons.banknote,
                     label: 'Mis pagos',
                     destino: () => const PagosScreen(),
                   ),
                   HomeModuloTile(
-                    icon: Icons.water_drop_outlined,
+                    icon: LucideIcons.droplet,
                     label: 'Estado del servicio',
                     destino: () => const EstadoServicioScreen(),
                   ),

@@ -34,6 +34,28 @@ function findById(id, columns = '*') {
   return supabaseAdmin.from(TABLE).select(columns).eq('id', id).maybeSingle();
 }
 
+// Wompi no avisa cuando el usuario cierra el checkout sin pagar. Un checkout
+// sin transacción y con más de este tiempo se considera abandonado (la misma
+// regla que la función SQL factura_tiene_pago_activo).
+const MINUTOS_CHECKOUT_ABANDONADO = 30;
+
+// Marca como reemplazados (SUPERSEDED) los checkouts de Wompi abandonados de
+// una factura, para que no bloqueen un nuevo pago. La fila NO se borra: si el
+// usuario termina pagando ese checkout más tarde, el webhook todavía la
+// encuentra y el dinero queda registrado.
+function supersedeAbandonedCheckouts(invoiceId, ahora = new Date()) {
+  const limite = new Date(ahora.getTime() - MINUTOS_CHECKOUT_ABANDONADO * 60 * 1000).toISOString();
+  return supabaseAdmin
+    .from(TABLE)
+    .update({ estado_wompi: 'SUPERSEDED' })
+    .eq('factura_id', invoiceId)
+    .eq('confirmado', false)
+    .eq('metodo', 'wompi')
+    .eq('estado_wompi', 'PENDING')
+    .is('transaccion_id', null)
+    .lt('fecha_pago', limite);
+}
+
 // Pago aún sin confirmar de una factura (si lo hay): evita duplicados por doble clic.
 function findPendingByInvoice(invoiceId, db = supabaseAdmin) {
   return db
@@ -84,6 +106,8 @@ module.exports = {
   getById,
   findById,
   findPendingByInvoice,
+  supersedeAbandonedCheckouts,
+  MINUTOS_CHECKOUT_ABANDONADO,
   countByInvoice,
   hasActiveByInvoice,
   create,

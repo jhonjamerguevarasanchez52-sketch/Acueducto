@@ -1,6 +1,9 @@
 const outageModel = require('../models/outageModel');
+const scheduledOutageModel = require('../models/scheduledOutageModel');
 const profileModel = require('../models/profileModel');
+const invoiceModel = require('../models/invoiceModel');
 const { notificar } = require('../utils/notificar');
+const { registrarAuditoria } = require('../utils/auditoria');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 // ---------- USUARIO FINAL ----------
@@ -27,15 +30,24 @@ async function estadoServicio(req, res) {
   const userId = req.usuario.id;
 
   try {
-    const { data, error } = await outageModel.findActiveByProfile(userId, { db: req.db });
+    const [{ data, error }, programados] = await Promise.all([
+      outageModel.findActiveByProfile(userId, { db: req.db }),
+      scheduledOutageModel.listUpcomingForZone(req.usuario.zona, new Date().toISOString()),
+    ]);
 
     if (error) {
       return errorConsulta(res, error);
+    }
+    // Los cortes programados son informativos: si la consulta falla (por
+    // ejemplo, migración sin aplicar), el estado individual igual se muestra.
+    if (programados.error) {
+      console.error('[cortes] no se pudieron leer los cortes programados:', programados.error.message);
     }
 
     return res.status(200).json({
       servicioCortado: !!data,
       corte: data || null,
+      cortesProgramados: programados.data || [],
     });
   } catch (err) {
     return errorInesperado(res, err);
@@ -60,10 +72,14 @@ async function listarCortes(req, res) {
 
 // Registrar un corte de servicio para un usuario
 async function crearCorte(req, res) {
-  const { perfil_id, motivo, factura_id } = req.body;
+  const { perfil_id, factura_id } = req.body;
+  const motivo = typeof req.body.motivo === 'string' ? req.body.motivo.trim() : '';
 
   if (!perfil_id || !motivo) {
     return res.status(400).json({ error: 'perfil_id y motivo son obligatorios' });
+  }
+  if (motivo.length > 300) {
+    return res.status(400).json({ error: 'El motivo admite máximo 300 caracteres.' });
   }
 
   try {
@@ -72,6 +88,14 @@ async function crearCorte(req, res) {
 
     if (perfilError || !perfil) {
       return res.status(404).json({ error: 'El usuario indicado no existe' });
+    }
+
+    // La factura asociada (opcional) debe ser de ese mismo usuario.
+    if (factura_id) {
+      const { data: factura } = await invoiceModel.getOwn(factura_id, perfil_id, { columns: 'id' });
+      if (!factura) {
+        return res.status(400).json({ error: 'La factura indicada no existe o no es de ese usuario.' });
+      }
     }
 
     // No duplicar un corte activo para el mismo usuario
@@ -90,7 +114,7 @@ async function crearCorte(req, res) {
     const { data, error } = await outageModel.create({
       perfil_id,
       motivo,
-      factura_id,
+      factura_id: factura_id || null,
       cortado_por: req.usuario.id,
     });
 
@@ -104,6 +128,14 @@ async function crearCorte(req, res) {
       }
       return errorConsulta(res, error);
     }
+
+    await registrarAuditoria({
+      adminId: req.usuario.id,
+      accion: 'corte_creado',
+      tabla: 'service_outages',
+      registroId: data.id,
+      detalle: { perfil_id, motivo, factura_id: factura_id || null },
+    });
 
     await notificar(
       perfil_id,
@@ -128,6 +160,14 @@ async function reconectar(req, res) {
       return res.status(404).json({ error: 'Corte no encontrado' });
     }
 
+    await registrarAuditoria({
+      adminId: req.usuario.id,
+      accion: 'corte_reconectado',
+      tabla: 'service_outages',
+      registroId: id,
+      detalle: { perfil_id: data.perfil_id },
+    });
+
     await notificar(data.perfil_id, 'Tu servicio de agua fue reconectado.', 'corte');
 
     return res.status(200).json({ message: 'Servicio reconectado', corte: data });
@@ -145,6 +185,19 @@ async function eliminarCorte(req, res) {
 
     if (error || !data) {
       return res.status(404).json({ error: 'Corte no encontrado' });
+    }
+
+    await registrarAuditoria({
+      adminId: req.usuario.id,
+      accion: 'corte_eliminado',
+      tabla: 'service_outages',
+      registroId: id,
+      detalle: { perfil_id: data.perfil_id, estado: data.estado, motivo: data.motivo },
+    });
+
+    // Borrar un corte que seguía activo equivale a devolver el servicio.
+    if (data.estado === 'activo') {
+      await notificar(data.perfil_id, 'Tu servicio de agua fue reconectado.', 'corte');
     }
 
     return res.status(200).json({ message: 'Corte eliminado', corte: data });

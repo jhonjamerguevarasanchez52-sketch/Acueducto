@@ -1,30 +1,7 @@
 const notificationModel = require('../models/notificationModel');
 const profileModel = require('../models/profileModel');
-const { enviarCorreo } = require('../config/mailer');
-const { escaparHtml } = require('../utils/html');
-const { correoAviso } = require('../utils/emailtemplates');
+const { enviarAvisosCorreo } = require('../services/avisosCorreo');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
-
-async function enviarAvisosCorreo(perfiles, mensaje) {
-  const resultados = await Promise.all(perfiles.map(async (perfil) => {
-    if (!perfil.correo) return false;
-    try {
-      const correo = correoAviso(perfil.nombre || '', mensaje);
-      const respuesta = await enviarCorreo({
-        to: perfil.correo,
-        subject: correo.asunto,
-        html: correo.html,
-      });
-      if (!respuesta) throw new Error('El servicio de correo no confirmó el envío.');
-      return true;
-    } catch (errorCorreo) {
-      console.error(`[notificacion] No se pudo enviar correo a ${perfil.correo}:`, errorCorreo.message);
-      return false;
-    }
-  }));
-  const enviados = resultados.filter(Boolean).length;
-  return { enviados, fallidos: resultados.length - enviados };
-}
 
 // ---------- USUARIO FINAL ----------
 
@@ -119,6 +96,10 @@ async function eliminarNotificacion(req, res) {
 
 // ---------- ADMINISTRADOR ----------
 
+// La app agrupa y colorea los avisos por tipo; uno desconocido se vería roto.
+const TIPOS_AVISO = ['general', 'servicio', 'factura', 'corte', 'averia'];
+const MAX_MENSAJE_AVISO = 1000;
+
 // Enviar una notificación a un usuario, o a todos (perfil_id: "todos")
 async function enviarNotificacion(req, res) {
   const { perfil_id = 'todos', mensaje, tipo = 'general', enviar_correo = false } = req.body;
@@ -126,12 +107,13 @@ async function enviarNotificacion(req, res) {
   if (typeof mensaje !== 'string' || !mensaje.trim()) {
     return res.status(400).json({ error: 'El mensaje es obligatorio' });
   }
-  if (req.usuario.rol === 'fontanero' && perfil_id !== 'todos') {
-    return res.status(403).json({ error: 'El fontanero solo puede enviar avisos generales' });
+  if (mensaje.trim().length > MAX_MENSAJE_AVISO) {
+    return res.status(400).json({ error: `El mensaje admite máximo ${MAX_MENSAJE_AVISO} caracteres.` });
   }
-  if (enviar_correo && req.usuario.rol !== 'administrador') {
-    return res.status(403).json({ error: 'Solo un administrador puede enviar avisos por correo' });
+  if (!TIPOS_AVISO.includes(tipo)) {
+    return res.status(400).json({ error: `Tipo de aviso inválido. Usa: ${TIPOS_AVISO.join(', ')}` });
   }
+  // La ruta solo admite administradores (notificacionRoutes).
 
   try {
     if (perfil_id === 'todos') {

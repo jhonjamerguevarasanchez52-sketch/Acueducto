@@ -4,7 +4,30 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/lenguaje_ofensivo.dart';
 import '../core/app_snackbar.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+/// Problemas frecuentes: el usuario toca uno en vez de escribir. El texto del
+/// botón se convierte en el inicio de la descripción que recibe el fontanero.
+const tiposAveria = <(IconData, String)>[
+  (LucideIcons.droplet, 'No llega el agua'),
+  (LucideIcons.wrench, 'Fuga de agua'),
+  (LucideIcons.gauge, 'Baja presión'),
+  (LucideIcons.droplets, 'Agua turbia o con mal olor'),
+  (LucideIcons.timer, 'Daño en el contador'),
+  (LucideIcons.ellipsis, 'Otro problema'),
+];
+
+const _otroProblema = 'Otro problema';
+
+/// Arma la descripción que se envía al backend a partir del tipo elegido y
+/// del detalle opcional. Con "Otro problema" el detalle es la descripción.
+String descripcionAveria(String? tipo, String detalle) {
+  final texto = detalle.trim();
+  if (tipo == null || tipo == _otroProblema) return texto;
+  return texto.isEmpty ? tipo : '$tipo. $texto';
+}
 
 /// Hoja inferior con el formulario para reportar una nueva avería. Devuelve
 /// `true` por `Navigator.pop` cuando el reporte se crea con éxito.
@@ -25,27 +48,24 @@ class FormularioReporteAveria extends StatefulWidget {
 
 class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
   final _formKey = GlobalKey<FormState>();
-  final _descripcionCtrl = TextEditingController();
+  final _detalleCtrl = TextEditingController();
   final _ubicacionCtrl = TextEditingController();
+  String? _tipo;
   bool _enviando = false;
-  bool _ubicacionConfirmada = false;
 
   @override
   void dispose() {
-    _descripcionCtrl.dispose();
+    _detalleCtrl.dispose();
     _ubicacionCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _enviar() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (!_ubicacionConfirmada) {
-      AppSnackbar.error(
-        context,
-        'Confirma que esa es la ubicación de la avería',
-      );
+    if (_tipo == null) {
+      AppSnackbar.error(context, 'Toca el tipo de problema que tienes');
       return;
     }
+    if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
     setState(() => _enviando = true);
     try {
@@ -53,7 +73,9 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
       await api.post(
         '/averias',
         body: {
-          'descripcion': _descripcionCtrl.text.trim(),
+          'descripcion': descripcionAveria(_tipo, _detalleCtrl.text),
+          // La ubicación se muestra encima del botón de envío: enviar es
+          // confirmar que la avería está ahí.
           'ubicacionConfirmada': true,
           if (widget.esAdministrador) 'ubicacion': _ubicacionCtrl.text.trim(),
         },
@@ -82,11 +104,15 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
     final ubicacion = perfil?.ubicacionCuenta;
     final puedeReportar = widget.esAdministrador || ubicacion != null;
     final colores = AppColors.of(context);
+    final esOtro = _tipo == _otroProblema;
     return PopScope(
       canPop: !_enviando,
       child: Padding(
         padding: EdgeInsets.only(bottom: fondo),
         child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.92,
+          ),
           decoration: BoxDecoration(
             color: colores.cardBackground,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -94,174 +120,160 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: SafeArea(
             top: false,
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    height: 28,
-                    child: Stack(
-                      alignment: Alignment.topCenter,
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 4,
-                          margin: const EdgeInsets.only(top: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDCE7EF),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: IconButton(
-                            onPressed: _enviando ? null : widget.onCerrar,
-                            icon: const Icon(Icons.close),
-                            tooltip: 'Cerrar',
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Text(
-                    'Reportar una avería',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Sé específico: indica qué ocurre, desde cuándo y en qué punto de la vivienda.',
-                    style: TextStyle(
-                      color: colores.secondaryText,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (widget.esAdministrador) ...[
-                    TextFormField(
-                      controller: _ubicacionCtrl,
-                      maxLength: 200,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        labelText: 'Ubicación de la avería',
-                        hintText: 'Dirección, zona o número de lote',
-                        prefixIcon: Icon(Icons.location_on_outlined),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Indica dónde está la avería';
-                        }
-                        return null;
-                      },
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    CheckboxListTile(
-                      value: _ubicacionConfirmada,
-                      onChanged: (v) =>
-                          setState(() => _ubicacionConfirmada = v ?? false),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: const Text(
-                        '¿Confirmas que esta es la ubicación de la avería?',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ] else if (ubicacion != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: colores.chipBackground,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            child: SingleChildScrollView(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: 28,
+                      child: Stack(
+                        alignment: Alignment.topCenter,
                         children: [
-                          Icon(Icons.location_on_outlined, color: colores.info),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Ubicación registrada en tu cuenta',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: colores.secondaryText,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  ubicacion,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                          Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(top: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCE7EF),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: IconButton(
+                              onPressed: _enviando ? null : widget.onCerrar,
+                              icon: const Icon(LucideIcons.x),
+                              tooltip: 'Cerrar',
+                              visualDensity: VisualDensity.compact,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    CheckboxListTile(
-                      value: _ubicacionConfirmada,
-                      onChanged: (v) =>
-                          setState(() => _ubicacionConfirmada = v ?? false),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: const Text(
-                        '¿Confirmas que esta es la ubicación de la avería?',
-                        style: TextStyle(fontSize: 13),
+                    const Text(
+                      'Reportar una avería',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '¿Qué está pasando? Toca una opción.',
+                      style: TextStyle(color: colores.secondaryText, fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final (icono, etiqueta) in tiposAveria)
+                          ChoiceChip(
+                            key: ValueKey('tipo-averia-$etiqueta'),
+                            avatar: Icon(icono, size: 18),
+                            label: Text(etiqueta),
+                            selected: _tipo == etiqueta,
+                            onSelected: _enviando
+                                ? null
+                                : (_) => setState(() => _tipo = etiqueta),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _detalleCtrl,
+                      minLines: 2,
+                      maxLines: 5,
+                      maxLength: 500,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        labelText: esOtro ? 'Cuéntanos qué ocurre' : 'Detalle (opcional)',
+                        hintText: 'Ej.: desde esta mañana sale agua por el tubo junto al portón.',
+                        alignLabelWithHint: true,
                       ),
+                      validator: (v) {
+                        final t = v?.trim() ?? '';
+                        if (esOtro && t.length < 10) {
+                          return 'Describe el problema en pocas palabras (mínimo 10 letras)';
+                        }
+                        return validarSinGroserias(t);
+                      },
                     ),
-                  ] else
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        'Tu cuenta no tiene una dirección registrada. Contacta al '
-                        'administrador del acueducto para poder reportar una avería.',
-                        style: TextStyle(color: colores.danger, fontSize: 12.5),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _descripcionCtrl,
-                    minLines: 3,
-                    maxLines: 6,
-                    maxLength: 500,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      hintText:
-                          'Ej.: Desde esta mañana sale agua por la unión del tubo bajo el lavaplatos.',
-                      alignLabelWithHint: true,
-                    ),
-                    validator: (v) {
-                      final t = v?.trim() ?? '';
-                      if (t.isEmpty) return 'Cuéntanos qué ocurre';
-                      if (t.length < 20) {
-                        return 'Describe el problema con más detalle (mínimo 20 caracteres)';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: (_enviando || !puedeReportar) ? null : _enviar,
-                    child: _enviando
-                        ? const SizedBox(
-                            height: 22,
-                            width: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                    const SizedBox(height: 8),
+                    if (widget.esAdministrador)
+                      TextFormField(
+                        controller: _ubicacionCtrl,
+                        maxLength: 200,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          labelText: 'Ubicación de la avería',
+                          hintText: 'Dirección, zona o número de lote',
+                          prefixIcon: Icon(LucideIcons.mapPin),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Indica dónde está la avería';
+                          }
+                          return validarSinGroserias(value);
+                        },
+                      )
+                    else if (ubicacion != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colores.chipBackground,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(LucideIcons.mapPin, color: colores.info),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'El fontanero irá a tu dirección registrada',
+                                    style: TextStyle(fontSize: 12, color: colores.secondaryText),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    ubicacion,
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
                             ),
-                          )
-                        : const Text('Enviar reporte'),
-                  ),
-                ],
+                          ],
+                        ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Tu cuenta no tiene una dirección registrada. Agrégala en '
+                          'Perfil > Editar perfil para poder reportar una avería.',
+                          style: TextStyle(color: colores.danger, fontSize: 12.5),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: (_enviando || !puedeReportar) ? null : _enviar,
+                      icon: _enviando
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(LucideIcons.send),
+                      label: const Text('Avisar al fontanero'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

@@ -1,58 +1,13 @@
 const breakdownModel = require('../models/breakdownModel');
 const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
-const { enviarCorreo } = require('../config/mailer');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
-const { escaparHtml } = require('../utils/html');
+const { notificarNuevaAveria } = require('../services/notificarAveria');
+const audiosAveriaService = require('../services/audiosAveriaService');
 
 const ESTADOS_VALIDOS = ['reportada', 'en_proceso', 'resuelta', 'cancelada'];
-
-// Avisa por correo al/los fontanero(s) activos de una nueva avería reportada.
-// No lanza: si falla el envío, se registra el error y se sigue, para no
-// tumbar el reporte de la avería por un problema de correo.
-async function avisarFontaneroPorCorreo(averia) {
-  try {
-    const [{ data: fontaneros, error }, { data: reportante }] = await Promise.all([
-      supabaseAdmin
-      .from('profiles')
-      .select('id,correo')
-      .eq('rol', 'fontanero')
-      .eq('activo', true),
-      supabaseAdmin
-        .from('profiles')
-        .select('nombre,apellido,correo,telefono,zona,direccion')
-        .eq('id', averia.perfil_id)
-        .maybeSingle(),
-    ]);
-
-    if (error) throw error;
-    if (!fontaneros || fontaneros.length === 0) return;
-
-    const nombre = [reportante?.nombre, reportante?.apellido].filter(Boolean).join(' ') || 'No disponible';
-    const ubicacion = [averia.direccion || reportante?.direccion, averia.zona || reportante?.zona]
-      .filter(Boolean).join(' · ') || 'No registrada';
-    const html = `<p>Se reportó una nueva avería:</p>
-      <p><strong>Reportó:</strong> ${escaparHtml(nombre)}</p>
-      <p><strong>Correo:</strong> ${escaparHtml(reportante?.correo)}</p>
-      <p><strong>Teléfono:</strong> ${escaparHtml(reportante?.telefono)}</p>
-      <p><strong>Ubicación:</strong> ${escaparHtml(ubicacion)}</p>
-      <p><strong>Descripción:</strong> ${escaparHtml(averia.descripcion)}</p>
-      <p><strong>Fecha:</strong> ${new Date(averia.fecha_reporte).toLocaleString('es-CO')}</p>`;
-
-    await Promise.all(
-      fontaneros.flatMap((f) => [
-        enviarCorreo({
-          to: f.correo,
-          subject: 'Nueva avería reportada - Acueducto Campo Amor',
-          html,
-        }),
-        notificar(f.id, `Nueva avería de ${nombre}, en ${ubicacion}. ${averia.descripcion}`, 'averia'),
-      ])
-    );
-  } catch (err) {
-    console.error('Error avisando al fontanero por correo:', err.message);
-  }
-}
+// "Fuga · Baja presión" ya basta para que el fontanero sepa qué pasa.
+const MIN_DESCRIPCION = 10;
 
 // ---------- USUARIO FINAL ----------
 
@@ -64,8 +19,8 @@ async function reportarAveria(req, res) {
     const direccionUsuario = req.usuario.direccion;
     const { descripcion, ubicacionConfirmada, ubicacion } = req.body;
 
-    if (typeof descripcion !== 'string' || descripcion.trim().length < 20) {
-      return res.status(400).json({ error: 'Describe el problema con más detalle (mínimo 20 caracteres).' });
+    if (typeof descripcion !== 'string' || descripcion.trim().length < MIN_DESCRIPCION) {
+      return res.status(400).json({ error: `Describe el problema con más detalle (mínimo ${MIN_DESCRIPCION} caracteres).` });
     }
 
     let zonaReporte = zonaUsuario;
@@ -96,7 +51,7 @@ async function reportarAveria(req, res) {
     // El reporte ya quedó guardado. Correo y aviso al fontanero son tareas
     // secundarias: no dejamos al usuario esperando ni convertimos un fallo de
     // correo en un falso error de reporte.
-    void avisarFontaneroPorCorreo(data);
+    void notificarNuevaAveria(data);
 
     res.status(201).json({ data });
   } catch (err) {
@@ -138,9 +93,20 @@ async function listarAverias(req, res) {
       : { data: [], error: null };
     if (perfilesError) return errorConsulta(res, perfilesError);
     const porId = new Map((perfiles || []).map((perfil) => [perfil.id, perfil]));
+
+    // Sin audios la lista sigue sirviendo: un fallo aquí no debe dejar al
+    // fontanero sin ver las averías.
+    let audiosPorAveria = new Map();
+    try {
+      audiosPorAveria = await audiosAveriaService.audiosDeAverias((data || []).map((averia) => averia.id));
+    } catch (errorAudios) {
+      console.error('[averias] no se pudieron cargar los audios:', errorAudios.message);
+    }
+
     const conReportante = (data || []).map((averia) => ({
       ...averia,
       reportante: porId.get(averia.perfil_id) || null,
+      audios: audiosPorAveria.get(averia.id) || [],
     }));
 
     res.status(200).json({ data: conReportante });
@@ -197,6 +163,14 @@ async function actualizarAveria(req, res) {
     }
     if (error) return errorConsulta(res, error);
 
+    if (estado === 'resuelta' || estado === 'cancelada') {
+      try {
+        await audiosAveriaService.acortarPorCierre(id);
+      } catch (errorAudios) {
+        console.error('[averias] no se pudo adelantar el borrado de audios:', errorAudios.message);
+      }
+    }
+
     const resumenAveria = (data.descripcion || '').trim();
     const notaFontanero = (data.nota_fontanero || '').trim();
     const mensajes = {
@@ -228,8 +202,36 @@ async function actualizarAveria(req, res) {
   }
 }
 
-// DELETE /:id - el fontanero o el administrador borran un reporte
-// erróneo o duplicado.
+// GET /:id/audios/:audioId - enlace temporal (5 min) para escuchar el audio
+// que el usuario le envió a GOTA. Solo la escucha del fontanero cuenta para
+// borrarlo a las 72 horas; la del administrador no.
+async function escucharAudio(req, res) {
+  try {
+    const { id, audioId } = req.params;
+    const resultado = await audiosAveriaService.crearUrlEscucha({
+      audioId,
+      averiaId: id,
+      marcarEscuchado: req.usuario.rol === 'fontanero',
+    });
+
+    if (resultado.estado === 'no_encontrado') {
+      return res.status(404).json({ error: 'Audio no encontrado' });
+    }
+    if (resultado.estado === 'borrado') {
+      return res.status(410).json({
+        error: 'Este audio ya se borró. La transcripción sigue guardada en la avería.',
+        audio: resultado.audio,
+      });
+    }
+    return res.status(200).json({ url: resultado.url, audio: resultado.audio });
+  } catch (err) {
+    // 22P02: el id no es un uuid válido.
+    if (err?.code === '22P02') return res.status(404).json({ error: 'Audio no encontrado' });
+    return errorInesperado(res, err);
+  }
+}
+
+// DELETE /:id - el administrador borra un reporte erróneo o duplicado.
 async function eliminarAveria(req, res) {
   try {
     const { id } = req.params;
@@ -246,4 +248,4 @@ async function eliminarAveria(req, res) {
   }
 }
 
-module.exports = { reportarAveria, misAverias, listarAverias, actualizarAveria, eliminarAveria };
+module.exports = { reportarAveria, misAverias, listarAverias, actualizarAveria, escucharAudio, eliminarAveria };

@@ -1,44 +1,14 @@
 const { randomUUID } = require('crypto');
 const supabaseAdmin = require('../config/supabaseAdminClient');
+const { crearBucketPrivado } = require('../utils/bucketPrivado');
 
 const BUCKET = 'payment-receipts';
 const MAX_BYTES = 5 * 1024 * 1024;
 const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-let bucketReady;
-
-async function asegurarBucketPrivado() {
-  if (!bucketReady) {
-    bucketReady = (async () => {
-      const storage = supabaseAdmin.storage;
-      const opciones = {
-        public: false,
-        fileSizeLimit: MAX_BYTES,
-        allowedMimeTypes: MIME_TYPES,
-      };
-      const { data: existente, error: errorConsulta } = await storage.getBucket(BUCKET);
-
-      if (existente) {
-        const { error } = await storage.updateBucket(BUCKET, opciones);
-        if (error) throw error;
-        return;
-      }
-
-      if (errorConsulta && errorConsulta.statusCode !== '404') throw errorConsulta;
-      const { error } = await storage.createBucket(BUCKET, opciones);
-      if (error) {
-        if (!/already exists|duplicate/i.test(error.message || '')) throw error;
-        const { data: carrera, error: errorCarrera } = await storage.getBucket(BUCKET);
-        if (!carrera || errorCarrera) throw errorCarrera || error;
-        const { error: errorActualizacion } = await storage.updateBucket(BUCKET, opciones);
-        if (errorActualizacion) throw errorActualizacion;
-      }
-    })().catch((error) => {
-      bucketReady = null;
-      throw error;
-    });
-  }
-  return bucketReady;
-}
+const asegurarBucketPrivado = crearBucketPrivado(BUCKET, {
+  fileSizeLimit: MAX_BYTES,
+  allowedMimeTypes: MIME_TYPES,
+});
 
 async function subirRecibo({ perfilId, facturaId, bytes, contentType }) {
   await asegurarBucketPrivado();
@@ -51,14 +21,28 @@ async function subirRecibo({ perfilId, facturaId, bytes, contentType }) {
   return { path: data?.path || path, error };
 }
 
-async function crearUrlRecibo(path) {
-  if (!path) return null;
+// Enlaces temporales para muchos recibos a la vez: una llamada a Storage por
+// cada bloque de 100 en vez de una por recibo. Devuelve un Map ruta → enlace;
+// una ruta que falla queda con null.
+const LOTE_ENLACES = 100;
+
+async function crearUrlsRecibos(paths = []) {
+  const unicos = [...new Set(paths.filter(Boolean))];
+  const enlaces = new Map();
+  if (unicos.length === 0) return enlaces;
+
   await asegurarBucketPrivado();
-  const { data, error } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .createSignedUrl(path, 10 * 60);
-  if (error) throw error;
-  return data.signedUrl;
+  for (let i = 0; i < unicos.length; i += LOTE_ENLACES) {
+    const lote = unicos.slice(i, i + LOTE_ENLACES);
+    const { data, error } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .createSignedUrls(lote, 10 * 60);
+    if (error) throw error;
+    for (const item of data || []) {
+      enlaces.set(item.path, item.error ? null : item.signedUrl || null);
+    }
+  }
+  return enlaces;
 }
 
 async function eliminarRecibo(path) {
@@ -67,4 +51,11 @@ async function eliminarRecibo(path) {
   if (error) console.error('[pagos] no se pudo limpiar un recibo sin pago asociado:', error.message);
 }
 
-module.exports = { BUCKET, MAX_BYTES, MIME_TYPES, subirRecibo, crearUrlRecibo, eliminarRecibo };
+module.exports = {
+  BUCKET,
+  MAX_BYTES,
+  MIME_TYPES,
+  subirRecibo,
+  crearUrlsRecibos,
+  eliminarRecibo,
+};

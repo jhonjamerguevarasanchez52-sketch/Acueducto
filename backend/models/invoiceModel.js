@@ -66,4 +66,35 @@ function create({ perfil_id, periodo, valor_total, fecha_vencimiento, observacio
     .single();
 }
 
-module.exports = { listByProfile, getOwn, listCoveredPeriods, latestByProfile, list, create, ...crudBase(TABLE) };
+// Estado y datos editables de una factura (cualquier titular), para comparar
+// antes de editarla. data es null si no existe.
+function getState(id) {
+  return supabaseAdmin
+    .from(TABLE)
+    .select('id, estado, perfil_id, valor_total, fecha_vencimiento, observacion')
+    .eq('id', id)
+    .maybeSingle();
+}
+
+// Facturas pendientes que vencen exactamente en `fecha` (AAAA-MM-DD) y aún
+// no recibieron recordatorio, con los datos de contacto del titular.
+function listDueForReminder(fecha) {
+  return supabaseAdmin
+    .from(TABLE)
+    .select('id, perfil_id, numero_factura, periodo, valor_total, fecha_vencimiento, profiles!inner(nombre, correo, activo)')
+    .eq('estado', 'pendiente')
+    .eq('fecha_vencimiento', fecha)
+    .is('recordatorio_enviado_at', null);
+}
+
+module.exports = {
+  listByProfile,
+  getOwn,
+  getState,
+  listDueForReminder,
+  listCoveredPeriods,
+  latestByProfile,
+  list,
+  create,
+  ...crudBase(TABLE),
+};

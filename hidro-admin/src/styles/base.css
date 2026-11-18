@@ -789,9 +789,14 @@ th {
     linear-gradient(135deg, #f1f7ff, #f7fbff 56%, #effaf7);
 }
 
-.auth-shell:has(.auth-loading) {
+.auth-shell:has(.auth-loading),
+.auth-shell-single {
   grid-template-columns: 1fr;
   place-items: center;
+}
+
+.auth-shell-single .auth-panel {
+  width: min(100%, 460px);
 }
 
 .auth-showcase {

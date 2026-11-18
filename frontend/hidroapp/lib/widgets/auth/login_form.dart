@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
@@ -8,6 +9,7 @@ import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../core/app_snackbar.dart';
 import 'auth_style.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Tarjeta blanca con el formulario de inicio de sesión: correo, contraseña y
 /// el botón de entrar. Conserva su propio estado (controllers, validación y la
@@ -26,9 +28,22 @@ class _LoginFormState extends State<LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _correoCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  bool _ingresarConCedula = false;
   bool _cargando = false;
   bool _verPassword = false;
-  bool _habilitarBiometria = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Si el usuario activó la huella o el rostro en Ajustes, se pide al abrir
+    // la app; si la cancela, entra con correo y contraseña.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (context.read<AuthProvider>().tomarBiometriaAlIniciar()) {
+        _ingresarBiometria();
+      }
+    });
+  }
 
   Future<void> _ingresarBiometria() async {
     setState(() => _cargando = true);
@@ -57,12 +72,11 @@ class _LoginFormState extends State<LoginForm> {
     setState(() => _cargando = true);
     try {
       await auth.login(
-            _correoCtrl.text,
-            _passwordCtrl.text,
-          );
-      if (_habilitarBiometria) {
-        await auth.setBiometricEnabled(true);
-      }
+        _correoCtrl.text,
+        _passwordCtrl.text,
+        conCedula: _ingresarConCedula,
+      );
+      // La huella o el rostro se activan después, desde Ajustes en Perfil.
       // AuthGate observa el AuthProvider y esta misma ruta se reconstruye
       // como HomeScreen al quedar autenticado: no hay nada que "pop-ear".
     } on ApiException catch (e) {
@@ -71,7 +85,9 @@ class _LoginFormState extends State<LoginForm> {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => VerificarCuentaScreen(
-              correo: _correoCtrl.text.trim(),
+              correo: e.data is Map
+                  ? (e.data as Map)['correo']?.toString() ?? _correoCtrl.text.trim()
+                  : _correoCtrl.text.trim(),
               password: _passwordCtrl.text,
             ),
           ),
@@ -84,14 +100,16 @@ class _LoginFormState extends State<LoginForm> {
     }
   }
 
-  void _recuperarPassword() {
+  // Solo se prellena el correo si lo que escribieron parece un correo.
+  String get _correoEscrito {
     final correo = _correoCtrl.text.trim();
+    return _correoValido.hasMatch(correo) ? correo : '';
+  }
+
+  void _recuperarPassword() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OlvidePasswordScreen(
-          // Solo se prellena si lo que escribieron parece un correo.
-          correoInicial: _correoValido.hasMatch(correo) ? correo : '',
-        ),
+        builder: (_) => OlvidePasswordScreen(correoInicial: _correoEscrito),
       ),
     );
   }
@@ -99,7 +117,6 @@ class _LoginFormState extends State<LoginForm> {
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final auth = context.watch<AuthProvider>();
 
     return AuthCard(
       child: Form(
@@ -117,29 +134,55 @@ class _LoginFormState extends State<LoginForm> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Ingresa con tu correo y contraseña',
+              'Ingresa con tu ${_ingresarConCedula ? 'cédula' : 'correo'} y contraseña',
               style: TextStyle(fontSize: 13.5, color: authMutedDe(context)),
             ),
             const SizedBox(height: 22),
-            authFieldLabel(context, 'CORREO ELECTRÓNICO'),
+            Row(
+              children: [
+                Expanded(
+                  child: ChoiceChip(
+                    label: const Text('Correo'),
+                    selected: !_ingresarConCedula,
+                    onSelected: _cargando ? null : (_) => setState(() => _ingresarConCedula = false),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ChoiceChip(
+                    label: const Text('Cédula'),
+                    selected: _ingresarConCedula,
+                    onSelected: _cargando ? null : (_) => setState(() => _ingresarConCedula = true),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            authFieldLabel(context, _ingresarConCedula ? 'CÉDULA' : 'CORREO ELECTRÓNICO'),
             TextFormField(
               controller: _correoCtrl,
-              keyboardType: TextInputType.emailAddress,
+              keyboardType: _ingresarConCedula ? TextInputType.number : TextInputType.emailAddress,
+              inputFormatters: _ingresarConCedula
+                  ? [FilteringTextInputFormatter.digitsOnly]
+                  : const [],
               autocorrect: false,
               textInputAction: TextInputAction.next,
               decoration: authInputDecoration(
                 context,
-                hint: 'tucorreo@ejemplo.com',
-                icon: Icons.mail_outline,
+                hint: _ingresarConCedula ? 'Número de cédula' : 'tucorreo@ejemplo.com',
+                icon: _ingresarConCedula ? Icons.badge_outlined : LucideIcons.mail,
               ),
               validator: (v) {
                 final t = v?.trim() ?? '';
-                if (t.isEmpty) return 'Ingresa tu correo';
-                if (!_correoValido.hasMatch(t)) {
+                if (t.isEmpty) return _ingresarConCedula ? 'Ingresa tu cédula' : 'Ingresa tu correo';
+                if (_ingresarConCedula && (t.length < 5 || t.length > 15)) {
+                  return 'Ingresa una cédula válida';
+                }
+                if (!_ingresarConCedula && !_correoValido.hasMatch(t)) {
                   return 'Correo no válido';
                 }
                 return null;
-              },
+ git add lib/widgets/auth/login_form.dart             },
             ),
             const SizedBox(height: 16),
             authFieldLabel(context, 'CONTRASEÑA'),
@@ -151,13 +194,13 @@ class _LoginFormState extends State<LoginForm> {
               decoration: authInputDecoration(
                 context,
                 hint: '••••••••',
-                icon: Icons.lock_outline,
+                icon: LucideIcons.lock,
                 suffix: IconButton(
                   splashRadius: 20,
                   icon: Icon(
                     _verPassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
+                        ? LucideIcons.eyeOff
+                        : LucideIcons.eye,
                     color: authMutedDe(context),
                     size: 20,
                   ),
@@ -196,40 +239,6 @@ class _LoginFormState extends State<LoginForm> {
                     )
                   : const Text('Ingresar al sistema'),
             ),
-            if (auth.biometricEnabled) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _cargando ? null : _ingresarBiometria,
-                icon: const Icon(Icons.fingerprint),
-                label: const Text('Ingresar con huella o rostro'),
-              ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: _cargando
-                      ? null
-                      : () => auth.setBiometricEnabled(false),
-                  child: const Text('Desactivar acceso biométrico'),
-                ),
-              ),
-            ] else ...[
-              FutureBuilder<bool>(
-                future: auth.deviceSupportsBiometrics(),
-                builder: (context, snapshot) {
-                  if (snapshot.data != true) return const SizedBox.shrink();
-                  return CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    value: _habilitarBiometria,
-                    onChanged: _cargando
-                        ? null
-                        : (value) => setState(() => _habilitarBiometria = value ?? false),
-                    title: const Text('Habilitar ingreso con huella o rostro'),
-                    dense: true,
-                  );
-                },
-              ),
-            ],
           ],
         ),
       ),

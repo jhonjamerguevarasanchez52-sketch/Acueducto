@@ -54,7 +54,15 @@ test('perfil: solo acepta texto, recorta y no deja vaciar nombre ni apellido', (
 test('actualizar factura distingue no encontrada, conflicto y valor inválido', async (t) => {
   silenciar(t);
   const original = invoiceModel.update;
-  t.after(() => { invoiceModel.update = original; });
+  const originalEstado = invoiceModel.getState;
+  const originalActivo = paymentModel.hasActiveByInvoice;
+  t.after(() => {
+    invoiceModel.update = original;
+    invoiceModel.getState = originalEstado;
+    paymentModel.hasActiveByInvoice = originalActivo;
+  });
+  invoiceModel.getState = async () => ({ data: { id: 'f1', estado: 'pendiente' }, error: null });
+  paymentModel.hasActiveByInvoice = async () => ({ data: false, error: null });
   const req = (body) => ({ params: { id: 'f1' }, body });
 
   let res = respuesta();
@@ -76,6 +84,42 @@ test('actualizar factura distingue no encontrada, conflicto y valor inválido', 
   res = respuesta();
   await actualizarFactura(req({ estado: 'anulada' }), res);
   assert.equal(res.statusCode, 400);
+});
+
+test('una factura no se marca pagada a mano ni se reabre si ya está pagada', async (t) => {
+  silenciar(t);
+  const original = invoiceModel.update;
+  const originalEstado = invoiceModel.getState;
+  t.after(() => { invoiceModel.update = original; invoiceModel.getState = originalEstado; });
+  const req = (body) => ({ params: { id: 'f1' }, body });
+  let actualizaciones = 0;
+  invoiceModel.update = async (id, cambios) => {
+    actualizaciones += 1;
+    return { data: { id, ...cambios }, error: null };
+  };
+
+  // Marcar pagada sin pago: se rechaza sin tocar la base de datos.
+  invoiceModel.getState = async () => ({ data: { id: 'f1', estado: 'pendiente' }, error: null });
+  let res = respuesta();
+  await actualizarFactura(req({ estado: 'pagada' }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error, /registra el pago/i);
+
+  // Una factura pagada no se anula ni cambia de valor...
+  invoiceModel.getState = async () => ({ data: { id: 'f1', estado: 'pagada' }, error: null });
+  res = respuesta();
+  await actualizarFactura(req({ estado: 'anulada' }), res);
+  assert.equal(res.statusCode, 409);
+  res = respuesta();
+  await actualizarFactura(req({ valor_total: 5000 }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(actualizaciones, 0);
+
+  // ...pero sí admite una observación.
+  res = respuesta();
+  await actualizarFactura(req({ observacion: 'Pagó en la oficina' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(actualizaciones, 1);
 });
 
 test('el recibo de pago físico se guarda con el cliente del servidor', async (t) => {
@@ -121,4 +165,59 @@ test('solo el fontanero puede cambiar el estado de una avería', () => {
   assert.ok(ruta, 'existe PUT /averias/:id');
   assert.match(ruta, /verificarToken, verificarRol\('fontanero'\), actualizarAveria/);
   assert.doesNotMatch(ruta, /administrador|usuario/);
+});
+
+test('fechas de los correos en hora de Colombia, sin correrse un día', () => {
+  const { fechaLarga, fechaHoraColombia } = require('../utils/fechas');
+  assert.equal(fechaLarga('2026-10-15'), '15 de octubre de 2026');
+  assert.equal(fechaLarga('2027-01-01T00:00:00Z'), '1 de enero de 2027');
+  assert.equal(fechaLarga(null), '');
+  assert.equal(fechaLarga('no es fecha'), '');
+  // 11:30 p. m. del 28 en Colombia = 4:30 a. m. del 29 en UTC.
+  assert.match(fechaHoraColombia('2026-10-29T04:30:00Z'), /28 de octubre de 2026.*11:30/);
+  assert.equal(fechaHoraColombia(undefined), '');
+});
+
+test('el aviso al fontanero usa la hora de Colombia y no se corta si falla un correo', async (t) => {
+  const supabaseAdmin = require('../config/supabaseAdminClient');
+  const mailer = require('../config/mailer');
+  const notificarModulo = require('../utils/notificar');
+  const originales = { from: supabaseAdmin.from, enviarCorreo: mailer.enviarCorreo, notificar: notificarModulo.notificar };
+  t.after(() => { supabaseAdmin.from = originales.from; mailer.enviarCorreo = originales.enviarCorreo; notificarModulo.notificar = originales.notificar; });
+  silenciar(t);
+
+  const consulta = (data) => {
+    const q = { select: () => q, eq: () => q, maybeSingle: () => Promise.resolve({ data, error: null }), then: (ok) => Promise.resolve({ data, error: null }).then(ok) };
+    return q;
+  };
+  // 1.ª consulta: fontaneros activos; 2.ª: datos de quien reportó.
+  let llamada = 0;
+  supabaseAdmin.from = () => {
+    llamada += 1;
+    return llamada === 1
+      ? consulta([{ id: 'f1', correo: 'fontanero@gmail.com' }])
+      : consulta({ nombre: 'Ana', apellido: 'Paz', correo: 'ana@gmail.com', telefono: '300', zona: 'Centro', direccion: 'Calle 1' });
+  };
+  const correos = [];
+  mailer.enviarCorreo = async (c) => { correos.push(c); throw new Error('Brevo caído'); };
+  const avisos = [];
+  notificarModulo.notificar = async (...a) => { avisos.push(a); return true; };
+
+  delete require.cache[require.resolve('../services/notificarAveria')];
+  const { notificarNuevaAveria } = require('../services/notificarAveria');
+  await notificarNuevaAveria({ perfil_id: 'u1', descripcion: 'Fuga', fecha_reporte: '2026-10-29T04:30:00Z' });
+
+  assert.equal(correos.length, 1);
+  assert.match(correos[0].html, /11:30.*hora de Colombia/);
+  assert.equal(avisos.length, 1, 'el aviso en la app se crea aunque falle el correo');
+  delete require.cache[require.resolve('../services/notificarAveria')];
+});
+
+test('la plantilla del correo no anida un documento que ya es HTML completo', () => {
+  const { construirCorreoHtml } = require('../config/mailer');
+  const simple = construirCorreoHtml({ subject: 'Hola <b>', html: '<p>texto</p>' });
+  assert.equal((simple.match(/<html/gi) || []).length, 1);
+  assert.ok(simple.includes('Hola &lt;b&gt;'), 'el asunto se escapa');
+  const completo = '<!doctype html><html><body>factura</body></html>';
+  assert.equal(construirCorreoHtml({ subject: 'x', html: completo }), completo);
 });

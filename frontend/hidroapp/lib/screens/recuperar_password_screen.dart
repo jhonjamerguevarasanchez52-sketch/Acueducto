@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../widgets/auth/auth_style.dart';
 import '../widgets/auth/recuperar_password_form.dart';
 import '../widgets/core/hidro_logo.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Pantalla de recuperación de contraseña, abierta desde el login con
 /// "¿Olvidaste tu contraseña?". Primero pide el correo para enviar un código
@@ -52,7 +53,7 @@ class _Encabezado extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: IconButton(
             onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
             tooltip: 'Volver',
           ),
         ),

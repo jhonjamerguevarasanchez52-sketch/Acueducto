@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/core/app_snackbar.dart';
 import '../widgets/core/hidro_logo.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Pantalla de cambio de contraseña obligatorio.
 ///
@@ -187,13 +188,13 @@ class _CambiarPasswordObligatorioScreenState
               textInputAction: TextInputAction.next,
               decoration: _decoration(
                 hint: 'La que recibiste por correo',
-                icon: Icons.lock_clock_outlined,
+                icon: LucideIcons.lockKeyhole,
                 suffix: IconButton(
                   splashRadius: 20,
                   icon: Icon(
                     _verActual
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
+                        ? LucideIcons.eyeOff
+                        : LucideIcons.eye,
                     color: _muted,
                     size: 20,
                   ),
@@ -211,13 +212,13 @@ class _CambiarPasswordObligatorioScreenState
               textInputAction: TextInputAction.next,
               decoration: _decoration(
                 hint: 'Mínimo 8 caracteres',
-                icon: Icons.lock_outline,
+                icon: LucideIcons.lock,
                 suffix: IconButton(
                   splashRadius: 20,
                   icon: Icon(
                     _verNueva
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
+                        ? LucideIcons.eyeOff
+                        : LucideIcons.eye,
                     color: _muted,
                     size: 20,
                   ),
@@ -242,7 +243,7 @@ class _CambiarPasswordObligatorioScreenState
               onFieldSubmitted: (_) => _guardando ? null : _guardar(),
               decoration: _decoration(
                 hint: 'Repite la nueva contraseña',
-                icon: Icons.lock_outline,
+                icon: LucideIcons.lock,
               ),
               validator: (v) =>
                   v != _nuevaCtrl.text ? 'Las contraseñas no coinciden' : null,

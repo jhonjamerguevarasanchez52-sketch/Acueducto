@@ -1,4 +1,46 @@
+# Despliegue en Render (Blueprint). Define los dos servicios del proyecto:
+#   - hidro-app:   API REST (backend/), la que usan la app móvil y el panel.
+#   - hidro-admin: panel administrativo (sitio estático).
+# Los secretos se configuran en el panel de Render (sync: false = no se
+# guardan en el repositorio). Ver backend/.env.example.
 services:
+  - type: web
+    name: hidro-app
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: CORS_ORIGIN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: WOMPI_AMBIENTE
+        sync: false
+      - key: WOMPI_PUBLIC_KEY
+        sync: false
+      - key: WOMPI_INTEGRITY_KEY
+        sync: false
+      - key: WOMPI_EVENTS_SECRET
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+
   - type: web
     name: hidro-admin
     runtime: static
@@ -12,3 +54,23 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+    # Cabeceras de seguridad del panel. La sesión vive en localStorage, así que
+    # la defensa principal es impedir que se ejecute JavaScript ajeno (XSS):
+    # solo se aceptan scripts del propio sitio y solo se habla con la API.
+    # Si la API cambia de URL, actualiza connect-src junto con VITE_API_URL.
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' https://hidro-app.onrender.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: "camera=(), microphone=(), geolocation=()"

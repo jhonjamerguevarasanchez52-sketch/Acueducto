@@ -10,7 +10,7 @@ const recibosPagoService = require('../services/recibosPagoService');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 
 const WOMPI_CURRENCY = process.env.WOMPI_CURRENCY || 'COP';
-const ESTADOS_WOMPI_REINTENTABLES = new Set(['DECLINED', 'VOIDED', 'ERROR']);
+const ESTADOS_WOMPI_RECHAZADOS = new Set(['DECLINED', 'VOIDED', 'ERROR']);
 
 // Métodos que un administrador puede usar al cargar un pago a nombre de alguien
 const METODOS_ADMIN = ['efectivo', 'transferencia', 'otro'];
@@ -19,16 +19,44 @@ const METODOS_ADMIN = ['efectivo', 'transferencia', 'otro'];
 // Son errores esperados del negocio (no fallos del servidor).
 const RECHAZO_TRIGGER = /ya fue pagada|anulada|no coincide|no corresponde|no existe/i;
 
+// Intentos de Wompi que terminaron sin cobro: se pueden borrar sin riesgo.
+const ESTADOS_WOMPI_SIN_COBRO = new Set(['DECLINED', 'VOIDED', 'ERROR']);
+// Wompi cobró pero el pago no se aplicó a la factura: requiere devolución.
+const ESTADOS_WOMPI_POR_DEVOLVER = new Set(['APPROVED_NO_APLICADO', 'MONTO_INVALIDO']);
+
+// Libera los checkouts de Wompi abandonados de una factura antes de crear un
+// pago nuevo. Si falla, no se corta la operación: la revisión de pagos
+// pendientes que viene después sigue protegiendo contra duplicados.
+async function liberarCheckoutsAbandonados(facturaId) {
+  try {
+    const { error } = await paymentModel.supersedeAbandonedCheckouts(facturaId);
+    if (error) console.error('[pagos] no se pudieron liberar checkouts abandonados:', error.message);
+  } catch (err) {
+    console.error('[pagos] no se pudieron liberar checkouts abandonados:', err.message);
+  }
+}
+
+function checkoutAbandonado(pago, ahora = Date.now()) {
+  return pago.metodo === 'wompi' && pago.estado_wompi === 'PENDING' && !pago.transaccion_id
+    && ahora - new Date(pago.fecha_pago).getTime() > paymentModel.MINUTOS_CHECKOUT_ABANDONADO * 60 * 1000;
+}
+
+// Agrega a cada pago físico el enlace temporal de su recibo. Los enlaces se
+// piden en lote (una llamada a Storage por cada 100 recibos), no uno por uno.
 async function agregarUrlsRecibos(pagos = []) {
-  return Promise.all(pagos.map(async (pago) => {
-    if (pago.metodo !== 'fisico' || !pago.referencia) return pago;
-    try {
-      return { ...pago, recibo_url: await recibosPagoService.crearUrlRecibo(pago.referencia) };
-    } catch (err) {
-      console.error('[pagos] no se pudo generar enlace temporal del recibo:', err.message);
-      return { ...pago, recibo_url: null };
-    }
-  }));
+  const conRecibo = (pago) => pago.metodo === 'fisico' && pago.referencia;
+  const rutas = pagos.filter(conRecibo).map((pago) => pago.referencia);
+  if (rutas.length === 0) return pagos;
+
+  let enlaces = new Map();
+  try {
+    enlaces = await recibosPagoService.crearUrlsRecibos(rutas);
+  } catch (err) {
+    console.error('[pagos] no se pudieron generar los enlaces temporales de los recibos:', err.message);
+  }
+  return pagos.map((pago) => (
+    conRecibo(pago) ? { ...pago, recibo_url: enlaces.get(pago.referencia) ?? null } : pago
+  ));
 }
 
 // ---------- USUARIO FINAL ----------
@@ -74,15 +102,14 @@ async function registrarPago(req, res) {
     return res.status(400).json({ error: 'Faltan campos obligatorios: factura_id, metodo' });
   }
 
+  // Por esta ruta solo entra Wompi; el pago físico usa /:facturaId/recibo.
   if (metodo !== 'wompi') {
     return res.status(400).json({ error: 'Para pagar físicamente debes adjuntar el recibo.' });
   }
 
-  if (metodo === 'wompi') {
-    const problemaConfiguracion = obtenerProblemaConfiguracion();
-    if (problemaConfiguracion) {
-      return res.status(503).json({ error: problemaConfiguracion });
-    }
+  const problemaConfiguracion = obtenerProblemaConfiguracion();
+  if (problemaConfiguracion) {
+    return res.status(503).json({ error: problemaConfiguracion });
   }
 
   try {
@@ -107,6 +134,9 @@ async function registrarPago(req, res) {
     const monto = Number(factura.valor_total);
     const cotizacion = cotizarWompi(monto);
 
+    // Un checkout abandonado hace más de 30 minutos no bloquea uno nuevo.
+    await liberarCheckoutsAbandonados(factura_id);
+
     // Evita ensuciar el panel de pagos pendientes con duplicados por doble
     // clic o reintentos del frontend: solo un pago sin confirmar a la vez
     // por factura.
@@ -119,27 +149,28 @@ async function registrarPago(req, res) {
       return errorConsulta(res, errorPendiente);
     }
 
+    // Un intento rechazado (DECLINED, VOIDED, ERROR) nunca bloquea uno nuevo.
+    // findPendingByInvoice ya los excluye; esta revisión es una segunda
+    // barrera por si esa consulta cambia.
     let pago = null;
-    if (pagoPendiente) {
-      const puedeReanudarCheckout = metodo === 'wompi' &&
-        pagoPendiente.metodo === 'wompi' &&
+    const pendienteRechazado = pagoPendiente?.metodo === 'wompi' &&
+      ESTADOS_WOMPI_RECHAZADOS.has(pagoPendiente.estado_wompi);
+    if (pagoPendiente && !pendienteRechazado) {
+      const puedeReanudarCheckout = pagoPendiente.metodo === 'wompi' &&
         [null, undefined, 'PENDING'].includes(pagoPendiente.estado_wompi);
-      const wompiRechazado = pagoPendiente.metodo === 'wompi' &&
-        ESTADOS_WOMPI_REINTENTABLES.has(pagoPendiente.estado_wompi);
 
-      if (puedeReanudarCheckout) {
-        if (Number(pagoPendiente.monto) !== monto ||
-            Number(pagoPendiente.cargo_wompi || 0) !== cotizacion.cargoWompi) {
-          return res.status(409).json({
-            error: 'El valor de la factura cambió. Actualiza la factura antes de iniciar otro pago.',
-          });
-        }
-        pago = pagoPendiente;
-      } else if (!wompiRechazado) {
+      if (!puedeReanudarCheckout) {
         return res.status(409).json({
           error: 'Ya existe un pago pendiente de confirmación para esta factura',
         });
       }
+      if (Number(pagoPendiente.monto) !== monto ||
+          Number(pagoPendiente.cargo_wompi || 0) !== cotizacion.cargoWompi) {
+        return res.status(409).json({
+          error: 'El valor de la factura cambió. Actualiza la factura antes de iniciar otro pago.',
+        });
+      }
+      pago = pagoPendiente;
     }
 
     if (!pago) {
@@ -166,8 +197,7 @@ async function registrarPago(req, res) {
           if (errorConcurrente) return errorConsulta(res, errorConcurrente);
           if (!pagoConcurrente) return errorConsulta(res, error);
 
-          const esMismoCheckout = metodo === 'wompi' &&
-            pagoConcurrente.metodo === 'wompi' &&
+          const esMismoCheckout = pagoConcurrente.metodo === 'wompi' &&
             [null, undefined, 'PENDING'].includes(pagoConcurrente.estado_wompi) &&
             Number(pagoConcurrente.monto) === monto &&
             Number(pagoConcurrente.cargo_wompi || 0) === cotizacion.cargoWompi;
@@ -191,28 +221,26 @@ async function registrarPago(req, res) {
       pago,
     };
 
-    // Wompi signs the persisted payment ID and invoice amount server-side.
-    if (metodo === 'wompi') {
-      try {
-        const amountInCents = Math.round(cotizacion.totalCobrar * 100);
-        respuesta.wompi = {
-          publicKey: process.env.WOMPI_PUBLIC_KEY,
+    // El backend firma el id del pago y el total; el cliente nunca ve la llave.
+    try {
+      const amountInCents = Math.round(cotizacion.totalCobrar * 100);
+      respuesta.wompi = {
+        publicKey: process.env.WOMPI_PUBLIC_KEY,
+        reference: pago.id,
+        amountInCents,
+        valorServicio: cotizacion.valorServicio,
+        cargoWompi: cotizacion.cargoWompi,
+        totalCobrar: cotizacion.totalCobrar,
+        currency: WOMPI_CURRENCY,
+        signature: calcularFirmaIntegridad({
           reference: pago.id,
           amountInCents,
-          valorServicio: cotizacion.valorServicio,
-          cargoWompi: cotizacion.cargoWompi,
-          totalCobrar: cotizacion.totalCobrar,
           currency: WOMPI_CURRENCY,
-          signature: calcularFirmaIntegridad({
-            reference: pago.id,
-            amountInCents,
-            currency: WOMPI_CURRENCY,
-          }),
-        };
-      } catch (firmaErr) {
-        console.error('[pagos] no se pudo calcular la firma de integridad de Wompi:', firmaErr.message);
-        return res.status(503).json({ error: 'No se pudo preparar el pago con Wompi.' });
-      }
+        }),
+      };
+    } catch (firmaErr) {
+      console.error('[pagos] no se pudo calcular la firma de integridad de Wompi:', firmaErr.message);
+      return res.status(503).json({ error: 'No se pudo preparar el pago con Wompi.' });
     }
 
     return res.status(201).json(respuesta);
@@ -259,10 +287,16 @@ async function registrarPagoFisicoConRecibo(req, res) {
     if (factura.estado === 'pagada') return res.status(400).json({ error: 'Esta factura ya fue pagada.' });
     if (factura.estado === 'anulada') return res.status(400).json({ error: 'Esta factura está anulada.' });
 
+    // Quien abrió Wompi y lo cerró sin pagar debe poder enviar su recibo.
+    await liberarCheckoutsAbandonados(facturaId);
+
     const { data: pendiente, error: errorPendiente } = await paymentModel.findPendingByInvoice(facturaId, req.db);
     if (errorPendiente) return errorConsulta(res, errorPendiente);
     if (pendiente) {
-      return res.status(409).json({ error: 'Ya existe un pago pendiente de revisión para esta factura.' });
+      const error = pendiente.metodo === 'wompi'
+        ? 'Tienes un pago en línea en curso para esta factura. Si cerraste Wompi sin pagar, en 30 minutos podrás enviar el recibo.'
+        : 'Ya existe un pago pendiente de revisión para esta factura.';
+      return res.status(409).json({ error });
     }
 
     const { path, error: errorSubida } = await recibosPagoService.subirRecibo({
@@ -329,6 +363,9 @@ async function listarPagosWompi(req, res) {
       .from('payments')
       .select('*')
       .or('transaccion_id.not.is.null,estado_wompi.not.is.null')
+      // Sin orden explícito la paginación puede repetir u omitir pagos.
+      .order('fecha_pago', { ascending: false })
+      .order('id', { ascending: true })
       .range(offset, offset + limit - 1);
 
     if (estado_wompi) consulta = consulta.eq('estado_wompi', estado_wompi);
@@ -343,13 +380,29 @@ async function listarPagosWompi(req, res) {
   }
 }
 
-// Confirmar un pago manualmente (efectivo, transferencia, etc.).
-// La factura, la notificación y la reconexión del servicio las hace el
-// trigger de la base de datos al pasar el pago a confirmado.
+// Confirmar manualmente un pago físico después de revisar el recibo.
+// Los pagos de Wompi NO se confirman a mano: solo el webhook firmado de Wompi
+// prueba que el dinero llegó. La factura, la notificación y la reconexión del
+// servicio las hace el trigger de la base de datos al confirmar el pago.
 async function confirmarPagoManual(req, res) {
   const { id } = req.params;
 
   try {
+    const { data: pagoActual, error: errorBusqueda } = await paymentModel.findById(
+      id,
+      'id, confirmado, metodo, estado_wompi'
+    );
+    if (errorBusqueda) return errorConsulta(res, errorBusqueda);
+    if (!pagoActual) return res.status(404).json({ error: 'Pago no encontrado' });
+    if (pagoActual.metodo === 'wompi') {
+      return res.status(409).json({
+        error: 'Los pagos en línea se confirman solos cuando Wompi avisa que el dinero llegó. No se pueden confirmar a mano.',
+      });
+    }
+    if (!pagoActual.confirmado && pagoActual.estado_wompi) {
+      return res.status(409).json({ error: 'Este pago ya no está pendiente de revisión.' });
+    }
+
     const resultado = await confirmarPago(id, { metodo_confirmacion: 'manual' });
 
     if (!resultado.ok) {
@@ -410,6 +463,26 @@ async function registrarPagoAdmin(req, res) {
       return res.status(409).json({ error: 'Esta factura está anulada' });
     }
 
+    // Un checkout de Wompi abandonado no debe impedir registrar el efectivo.
+    await liberarCheckoutsAbandonados(factura_id);
+
+    // Solo puede haber un pago sin confirmar por factura (índice único). Sin
+    // esta revisión el administrador recibiría un "registro duplicado" sin
+    // saber qué hacer.
+    const { data: pendiente, error: errorPendiente } = await paymentModel.findPendingByInvoice(factura_id);
+    if (errorPendiente) return errorConsulta(res, errorPendiente);
+    if (pendiente) {
+      let detalle;
+      if (ESTADOS_WOMPI_POR_DEVOLVER.has(pendiente.estado_wompi)) {
+        detalle = 'un pago en línea que Wompi cobró pero no se pudo aplicar. Revísalo en "Pagos": si devuelves el dinero, márcalo como devuelto y luego registra este pago.';
+      } else if (pendiente.metodo === 'wompi') {
+        detalle = 'un pago en línea (Wompi) en curso. Si el usuario no lo termina, se libera solo a los 30 minutos de haberlo iniciado; vuelve a intentarlo entonces.';
+      } else {
+        detalle = 'un recibo físico pendiente de revisión. Confírmalo o elimínalo en "Pagos".';
+      }
+      return res.status(409).json({ error: `Esta factura ya tiene ${detalle}`, pagoPendienteId: pendiente.id });
+    }
+
     // El trigger trg_forzar_pago_no_confirmado obliga a que todo pago nazca
     // sin confirmar, así que se crea primero y se confirma justo después.
     const { data: pago, error: errorPago } = await supabaseAdmin
@@ -459,16 +532,41 @@ async function registrarPagoAdmin(req, res) {
   }
 }
 
-// Eliminar un pago registrado por error. Si ya fue confirmado, no se
-// permite borrarlo porque la factura asociada ya quedó marcada como pagada
-// con base en él.
+// Cambia el estado de un pago de Wompi sin borrarlo y deja la auditoría.
+async function marcarPagoWompi(req, res, pago, { estado, accion, message }) {
+  const { data, error } = await paymentModel.update(pago.id, { estado_wompi: estado });
+  if (error) return errorConsulta(res, error);
+  await registrarAuditoria({
+    adminId: req.usuario.id,
+    accion,
+    tabla: 'payments',
+    registroId: pago.id,
+    detalle: {
+      perfil_id: pago.perfil_id,
+      factura_id: pago.factura_id,
+      monto_total: pago.monto_total,
+      estado_anterior: pago.estado_wompi,
+      transaccion_id: pago.transaccion_id || null,
+    },
+  });
+  return res.status(200).json({ message, pago: data });
+}
+
+// Quitar un pago sin confirmar de la lista de pendientes.
+// - Recibo físico: se borra junto con la imagen del recibo.
+// - Wompi rechazado: se borra (no hubo cobro).
+// - Wompi abandonado: se marca reemplazado, NO se borra; si el usuario llega
+//   a pagarlo, el webhook todavía lo encuentra y el dinero queda registrado.
+// - Wompi cobrado sin aplicar: solo se cierra cuando el administrador indica
+//   que ya devolvió el dinero (body { reembolsado: true }).
+// Un pago confirmado nunca se borra: la factura quedó pagada con base en él.
 async function eliminarPago(req, res) {
   const { id } = req.params;
 
   try {
     const { data: pago, error: errorBusqueda } = await paymentModel.getById(
       id,
-      'id, confirmado, perfil_id, factura_id, monto, metodo, referencia'
+      'id, confirmado, perfil_id, factura_id, monto, monto_total, metodo, referencia, estado_wompi, transaccion_id, fecha_pago'
     );
 
     if (errorBusqueda || !pago) {
@@ -478,6 +576,34 @@ async function eliminarPago(req, res) {
     if (pago.confirmado) {
       return res.status(409).json({
         error: 'No se puede eliminar un pago ya confirmado, porque la factura quedó marcada como pagada con base en él.',
+      });
+    }
+
+    if (pago.metodo === 'wompi' && !ESTADOS_WOMPI_SIN_COBRO.has(pago.estado_wompi)) {
+      if (ESTADOS_WOMPI_POR_DEVOLVER.has(pago.estado_wompi)) {
+        if (req.body?.reembolsado !== true) {
+          return res.status(409).json({
+            error: 'Wompi ya le cobró este pago al usuario, pero no se aplicó a la factura. Devuélvele el dinero desde el panel de Wompi y luego márcalo como devuelto.',
+            requiereReembolso: true,
+          });
+        }
+        return marcarPagoWompi(req, res, pago, {
+          estado: 'REEMBOLSADO',
+          accion: 'pago_wompi_reembolsado',
+          message: 'Pago marcado como devuelto al usuario.',
+        });
+      }
+      if (checkoutAbandonado(pago)) {
+        return marcarPagoWompi(req, res, pago, {
+          estado: 'SUPERSEDED',
+          accion: 'pago_wompi_liberado',
+          message: 'Checkout abandonado liberado. Si el usuario llega a pagarlo, el pago se registrará igual.',
+        });
+      }
+      return res.status(409).json({
+        error: pago.estado_wompi === 'SUPERSEDED' || pago.estado_wompi === 'REEMBOLSADO'
+          ? 'Este intento de pago en línea ya está cerrado y se conserva como historial.'
+          : 'Este pago en línea sigue en curso en Wompi y podría completarse. Si el usuario no lo termina, se libera solo a los 30 minutos.',
       });
     }
 
@@ -508,6 +634,7 @@ async function eliminarPago(req, res) {
 }
 
 module.exports = {
+  checkoutAbandonado,
   cotizacionWompi,
   misPagos,
   registrarPago,

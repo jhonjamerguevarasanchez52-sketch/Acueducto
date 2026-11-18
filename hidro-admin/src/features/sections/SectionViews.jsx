@@ -1,12 +1,14 @@
 import { lazy, Suspense, useState } from 'react'
 import { apiRequest } from '../../services/api.js'
 import {
+  Banknote,
   BellRing,
   CheckCircle2,
   ChevronRight,
   Clock3,
   Download,
   Eye,
+  Megaphone,
   Plus,
   ShieldCheck,
   Trash2,
@@ -14,6 +16,8 @@ import {
   Upload,
 } from 'lucide-react'
 import StatCard from '../../components/StatCard.jsx'
+import { formatDateTime } from '../../utils/formatters.js'
+import { accionesPago, estadoPago } from '../../utils/pagos.js'
 
 // Las gráficas (recharts) se cargan bajo demanda para que el panel abra más rápido.
 const AnalyticsCharts = lazy(() => import('../../components/AnalyticsCharts.jsx'))
@@ -43,14 +47,14 @@ export default function SectionViews({ activeSection, context }) {
     formatDate,
     users,
     invoices,
-    payments,
     handleNavigate,
     confirmedPayments,
     activeUsers,
     activeCuts,
-    reportPayments,
     reportInvoices,
     reportConfirmedPayments,
+    reportPendingPayments,
+    pendingPayments,
     reportRevenue,
     reportPendingRevenue,
     reportFrom,
@@ -284,11 +288,15 @@ export default function SectionViews({ activeSection, context }) {
                       <option value="fontanero">Fontanero</option>
                       <option value="administrador">Administrador</option>
                     </select>
+
                     <button type="button" className="link-button danger-link" onClick={() => {
                       const nota = user.rol === 'fontanero' ? window.prompt('Escribe la nota requerida para archivar la salida del fontanero:') : undefined
                       if (user.rol === 'fontanero' && !nota?.trim()) return
                       void performAction('usuarios', `${endpoints.adminUsers}/${user.id}`, 'DELETE', { nota }, 'Se archivará el historial, se notificará el correo del perfil y luego se eliminará la cuenta. ¿Continuar?')
                     }}><Trash2 size={14} />Eliminar</button>
+
+                    <button type="button" className="link-button danger-link" onClick={() => performAction('usuarios', `${endpoints.adminUsers}/${user.id}`, 'DELETE', undefined, 'Solo se pueden eliminar cuentas sin facturas ni pagos (por ejemplo, creadas por error). Si tiene historial, te ofreceremos desactivarla. ¿Continuar?')}><Trash2 size={14} />Eliminar</button>
+
                   </>}
                 </td>
               </tr>
@@ -425,6 +433,14 @@ export default function SectionViews({ activeSection, context }) {
           <h3>Facturas y vencimientos</h3>
         </div>
         <div className="hero-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            title="Factura el mes anterior (días 1 a 5), marca vencidas y envía recordatorios. Se ejecuta solo cada día a las 6 a. m."
+            onClick={() => performAction('facturas', endpoints.tareasDiarias, 'POST', undefined, '¿Ejecutar ahora las tareas del día (facturación de los días 1 a 5, vencimientos y recordatorios)? Normalmente se ejecutan solas a las 6 a. m.')}
+          >
+            Ejecutar tareas del día
+          </button>
           <button type="button" className="secondary-button" onClick={() => openOperation('facturacionMensual')}>Generar para todos</button>
           <button type="button" className="secondary-button" onClick={() => openOperation('facturaExtraordinaria')}>Factura extraordinaria</button>
           <button type="button" className="primary-button" onClick={() => openOperation('factura')}><Plus size={16} />Nueva factura</button>
@@ -470,8 +486,15 @@ export default function SectionViews({ activeSection, context }) {
                       <td><span className={`status-badge ${invoice.estado}`}>{invoice.estado}</span></td>
                       <td className="row-actions">
                         <button type="button" className="link-button" onClick={() => openInvoicePreview(invoice)}><Eye size={14} />Ver</button>
-                        <button type="button" className="link-button" onClick={() => openOperation('editarFactura', invoice)}>Editar</button>
-                        <button type="button" className="link-button danger-link" onClick={() => performAction('facturas', `${endpoints.facturas}/${invoice.id}`, 'DELETE', undefined, '¿Eliminar esta factura? Si ya tiene pagos, el backend rechazará la operación; anúlala en ese caso.')}>Eliminar</button>
+                        {['pendiente', 'vencida'].includes(invoice.estado) && (
+                          <button type="button" className="link-button" onClick={() => openOperation('registrarPago', invoice)}><Banknote size={14} />Registrar pago</button>
+                        )}
+                        {invoice.estado !== 'pagada' && (
+                          <button type="button" className="link-button" onClick={() => openOperation('editarFactura', invoice)}>Editar</button>
+                        )}
+                        {invoice.estado !== 'pagada' && (
+                          <button type="button" className="link-button danger-link" onClick={() => performAction('facturas', `${endpoints.facturas}/${invoice.id}`, 'DELETE', undefined, '¿Eliminar esta factura? Si ya tiene pagos, el sistema lo impedirá; anúlala en ese caso.')}>Eliminar</button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -528,13 +551,70 @@ export default function SectionViews({ activeSection, context }) {
                       <td>{formatMoney(payment.monto)}</td>
                       <td>{payment.metodo === 'fisico' ? 'Pago físico' : payment.metodo === 'wompi' ? 'Wompi' : payment.metodo || '—'}</td>
                       <td>{formatDate(payment.fecha_pago)}</td>
-                      <td>{payment.confirmado ? 'Confirmado' : 'Pendiente'}</td>
+                      <td>
+                        <span className={`payment-status payment-status-${estadoPago(payment).tono}`}>{estadoPago(payment).etiqueta}</span>
+                        {payment.transaccion_id && <small className="payment-trx">Wompi {payment.transaccion_id}</small>}
+                      </td>
                       <td className="row-actions">
                         {payment.recibo_url && <a className="link-button" href={payment.recibo_url} target="_blank" rel="noreferrer">Ver recibo</a>}
-                        {!payment.confirmado && <>
-                          <button type="button" className="link-button" onClick={() => performAction('pagos', `${endpoints.pagosBase}/${payment.id}/confirmar`, 'PUT')}>Confirmar</button>
-                          <button type="button" className="link-button danger-link" onClick={() => performAction('pagos', `${endpoints.pagosBase}/${payment.id}`, 'DELETE', undefined, '¿Eliminar este pago pendiente?')}>Eliminar</button>
-                        </>}
+                        {accionesPago(payment).includes('confirmar') && (
+                          <button type="button" className="link-button" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}/confirmar`, 'PUT', undefined, `¿Confirmar el pago de ${formatMoney(payment.monto)}? Revisa antes que el recibo sea válido: la factura quedará pagada.`)}>Confirmar</button>
+                        )}
+                        {accionesPago(payment).includes('eliminar') && (
+                          <button type="button" className="link-button danger-link" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}`, 'DELETE', undefined, payment.metodo === 'wompi' ? '¿Quitar este intento rechazado de la lista?' : '¿Eliminar este recibo pendiente? El usuario podrá enviar otro.')}>Eliminar</button>
+                        )}
+                        {accionesPago(payment).includes('liberar') && (
+                          <button type="button" className="link-button" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}`, 'DELETE', undefined, '¿Liberar este checkout abandonado? Se conserva en el historial y, si el usuario llega a pagarlo, el pago se registra igual.')}>Liberar</button>
+                        )}
+                        {accionesPago(payment).includes('devolver') && (
+                          <button type="button" className="link-button danger-link" onClick={() => performAction('pagos', `${endpoints.pago}/${payment.id}`, 'DELETE', { reembolsado: true }, `Wompi cobró ${formatMoney(payment.monto_total ?? payment.monto)} pero el pago no se aplicó a la factura. ¿Ya le devolviste el dinero al usuario desde el panel de Wompi?`)}>Marcar devuelto</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+
+  const renderCortesProgramados = () => (
+    <div className="panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Servicio</p>
+          <h3>Cortes programados por zona</h3>
+        </div>
+        <button type="button" className="primary-button" onClick={() => openOperation('corteProgramado')}><Megaphone size={16} />Anunciar corte</button>
+      </div>
+
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Zona</th>
+              <th>Motivo</th>
+              <th>Inicia</th>
+              <th>Termina</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sectionErrors.cortesProgramados ? <tr><td colSpan="6" className="table-message error-text">{sectionErrors.cortesProgramados}</td></tr>
+              : loadingSections.cortesProgramados ? <tr><td colSpan="6" className="table-message">Cargando cortes programados...</td></tr>
+                : (sectionData.cortesProgramados || []).length === 0 ? <tr><td colSpan="6" className="table-message">No hay cortes programados próximos.</td></tr>
+                  : sectionData.cortesProgramados.map((corte) => (
+                    <tr key={corte.id}>
+                      <td>{corte.zona || 'Todo el acueducto'}</td>
+                      <td>{corte.motivo}</td>
+                      <td>{formatDateTime(corte.inicio)}</td>
+                      <td>{formatDateTime(corte.fin)}</td>
+                      <td><span className={`status-badge ${corte.cancelado ? 'anulada' : 'pendiente'}`}>{corte.cancelado ? 'cancelado' : 'programado'}</span></td>
+                      <td className="row-actions">
+                        {!corte.cancelado && (
+                          <button type="button" className="link-button danger-link" onClick={() => performAction('cortesProgramados', `${endpoints.cortesProgramados}/${corte.id}/cancelar`, 'PUT', undefined, '¿Cancelar este corte? Se avisará a los usuarios de la zona que el servicio sigue normal.')}>Cancelar</button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -545,13 +625,15 @@ export default function SectionViews({ activeSection, context }) {
   )
 
   const renderCortes = () => (
+    <>
+    {renderCortesProgramados()}
     <div className="panel">
       <div className="panel-header">
         <div>
           <p className="eyebrow">Servicio</p>
-          <h3>Cortes y reconexiones</h3>
+          <h3>Suspensiones por usuario</h3>
         </div>
-        <button type="button" className="primary-button" onClick={() => openOperation('corte')}><Plus size={16} />Programar corte</button>
+        <button type="button" className="primary-button" onClick={() => openOperation('corte')}><Plus size={16} />Suspender a un usuario</button>
       </div>
 
       <div className="table-wrap">
@@ -589,6 +671,7 @@ export default function SectionViews({ activeSection, context }) {
         </table>
       </div>
     </div>
+    </>
   )
 
   const renderNotificaciones = () => (
@@ -691,7 +774,7 @@ export default function SectionViews({ activeSection, context }) {
         </div>
         <div className="treasury-kpis">
           <div><span>Ingresos recaudados</span><strong>{sectionErrors.pagos ? '—' : formatMoney(reportRevenue)}</strong><small>{reportConfirmedPayments.length} pagos confirmados</small></div>
-          <div><span>Pagos por confirmar</span><strong>{sectionErrors.pagos ? '—' : formatMoney(reportPendingRevenue)}</strong><small>{reportPayments.filter((payment) => !payment.confirmado).length} transacciones</small></div>
+          <div><span>Pagos pendientes</span><strong>{sectionErrors.pagos ? '—' : formatMoney(reportPendingRevenue)}</strong><small>{reportPendingPayments.length} recibos por revisar o pagos en curso</small></div>
           <div><span>Facturas emitidas</span><strong>{sectionErrors.facturas ? '—' : formatMoney(reportInvoices.reduce((sum, invoice) => sum + Number(invoice.valor_total || 0), 0))}</strong><small>{reportInvoices.length} facturas del periodo</small></div>
           <div><span>Facturas pendientes</span><strong>{sectionErrors.facturas ? '—' : reportInvoices.filter((invoice) => ['pendiente', 'vencida'].includes(invoice.estado)).length}</strong><small>Incluye vencidas</small></div>
         </div>
@@ -735,8 +818,8 @@ export default function SectionViews({ activeSection, context }) {
             <div className="overview-item">
               <div className="overview-icon blue"><Clock3 size={16} /></div>
               <div>
-                <strong>{metricValue('pagos', payments.filter((payment) => !payment.confirmado).length)}</strong>
-                <span>Pagos por confirmar</span>
+                <strong>{metricValue('pagos', pendingPayments.length)}</strong>
+                <span>Pagos pendientes</span>
               </div>
             </div>
             <div className="overview-item">

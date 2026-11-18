@@ -3,4 +3,5 @@
 library;
 
 export 'corte_card.dart';
+export 'corte_programado_card.dart';
 export 'tarjeta_estado.dart';

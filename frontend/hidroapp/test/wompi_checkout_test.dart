@@ -1,9 +1,9 @@
-import 'package:acueducto_app/services/pago_checkout_service.dart';
+import 'package:acueducto_app/services/wompi_checkout_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('crea el Web Checkout oficial con los datos firmados', () {
-    final uri = PagoCheckoutService.crearUrlCheckout(
+    final uri = WompiCheckoutService.crearUrlCheckout(
       publicKey: 'pub_test_example',
       currency: 'COP',
       amountInCents: 1250000,

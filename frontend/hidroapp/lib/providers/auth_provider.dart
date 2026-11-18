@@ -32,9 +32,13 @@ class FlutterAuthSessionStorage implements AuthSessionStorage {
 
 /// Maneja la sesión del usuario: token de Supabase, perfil y llamadas de auth.
 class AuthProvider extends ChangeNotifier {
-  AuthProvider({ApiService? api, AuthSessionStorage? storage})
-    : _api = api ?? ApiService(),
-      _storage = storage ?? FlutterAuthSessionStorage() {
+  AuthProvider({
+    ApiService? api,
+    AuthSessionStorage? storage,
+    LocalAuthentication? localAuth,
+  }) : _api = api ?? ApiService(),
+       _storage = storage ?? FlutterAuthSessionStorage(),
+       _localAuth = localAuth ?? LocalAuthentication() {
     _api.onUnauthorized = _renovarSesion;
   }
 
@@ -42,35 +46,42 @@ class AuthProvider extends ChangeNotifier {
   final AuthSessionStorage _storage;
 
   static const _tokenKey = 'access_token';
+  // Se conserva el nombre histórico de la clave para no perder las sesiones
+  // ya guardadas; hoy guarda el refresh token de cualquier sesión.
   static const _refreshTokenKey = 'biometric_refresh_token';
   static const _legacyRefreshTokenKey = 'refresh_token';
   static const _biometricEnabledKey = 'biometric_enabled';
 
   AuthStatus _status = AuthStatus.unknown;
   Profile? _profile;
-  Future<bool>? _refreshInFlight;
 
   AuthStatus get status => _status;
   Profile? get profile => _profile;
   ApiService get api => _api;
   bool get biometricEnabled => _biometricEnabled;
   bool _biometricEnabled = false;
-  final LocalAuthentication _localAuth = LocalAuthentication();
+  final LocalAuthentication _localAuth;
+
+  /// Renovación del access token en curso, compartida por todas las
+  /// peticiones que reciban 401 a la vez (el refresh token es de un solo uso).
+  Future<bool>? _renovacionEnCurso;
+
+  bool _biometriaAlIniciar = false;
+
+  /// Devuelve `true` una sola vez tras abrir la app con biometría activa, para
+  /// que el login lance la huella automáticamente sin esperar a que se toque
+  /// el botón. Tras un cierre de sesión manual ya no se lanza sola.
+  bool tomarBiometriaAlIniciar() {
+    final pendiente = _biometriaAlIniciar;
+    _biometriaAlIniciar = false;
+    return pendiente && _biometricEnabled;
+  }
 
   /// `true` cuando la cuenta tiene pendiente cambiar una contraseña temporal
   /// (generada por un administrador al crearla). Mientras sea `true`,
   /// [AuthGate] debe mostrar la pantalla de cambio obligatorio en vez de la
   /// app normal.
   bool get debeCambiarPassword => _profile?.debeCambiarPassword ?? false;
-
-  /// Comprueba que el correo esté asociado a un administrador. Lo usa el
-  /// panel administrativo; los suscriptores inician sesión directamente.
-  Future<void> verificarCorreoAdministrador(String correo) async {
-    await _api.post(
-      '/auth/verificar-administrador',
-      body: {'correo': correo.trim().toLowerCase()},
-    );
-  }
 
   /// Se llama al arrancar la app: intenta restaurar la sesión guardada.
   Future<void> bootstrap() async {
@@ -80,6 +91,7 @@ class AuthProvider extends ChangeNotifier {
       // confirmación antes de restaurar la sesión guardada.
       await _storage.delete(_tokenKey);
       _api.authToken = null;
+      _biometriaAlIniciar = true;
       _setStatus(AuthStatus.unauthenticated);
       return;
     }
@@ -111,12 +123,45 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+
   Future<void> login(String correo, String password) async {
     final data = await _api.post(
       '/auth/login',
       body: {'correo': correo.trim(), 'password': password},
     );
 
+  Future<void> login(String identificador, String password, {bool conCedula = false}) async {
+    final data = await _api.post('/auth/login', body: {
+      if (conCedula)
+        'cedula': identificador.replaceAll(RegExp(r'\D'), '')
+      else
+        'correo': identificador.trim(),
+      'password': password,
+    });
+    await _abrirSesion(data);
+  }
+
+
+  /// Pide al backend que envíe un código de acceso de 6 dígitos al correo.
+  /// La respuesta es la misma exista o no la cuenta.
+  Future<void> solicitarCodigoAcceso(String correo) async {
+    await _api.post('/auth/codigo-acceso', body: {
+      'correo': correo.trim().toLowerCase(),
+    });
+  }
+
+  /// Entra sin contraseña con el código que llegó al correo.
+  Future<void> loginConCodigo(String correo, String codigo) async {
+    final data = await _api.post('/auth/ingresar-con-codigo', body: {
+      'correo': correo.trim().toLowerCase(),
+      'codigo': codigo.trim(),
+    });
+    await _abrirSesion(data);
+  }
+
+  /// Guarda la sesión que devolvió el backend (login con contraseña o con
+  /// código) y carga el perfil.
+  Future<void> _abrirSesion(dynamic data) async {
     String? token;
     try {
       if (data is Map && data['session'] is Map) {
@@ -155,26 +200,37 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> setBiometricEnabled(bool enabled) async {
+  /// Activa o desactiva el ingreso con huella o rostro desde Ajustes.
+  /// Al activarlo se pide la biometría una vez para confirmar que el dueño
+  /// del dispositivo es quien lo hace. Devuelve `false` si la cancela.
+  Future<bool> setBiometricEnabled(bool enabled) async {
     if (enabled) {
       final supported = await deviceSupportsBiometrics();
       if (!supported) {
-        throw ApiException('Este dispositivo no tiene biometría configurada.');
+        throw ApiException('Este dispositivo no tiene huella ni rostro configurados.');
       }
       final refreshToken =
           await _storage.read(_refreshTokenKey) ??
           await _storage.read(_legacyRefreshTokenKey);
       if (refreshToken == null || refreshToken.isEmpty) {
         throw ApiException(
-          'Inicia sesión nuevamente para habilitar el acceso biométrico.',
+          'Cierra sesión y vuelve a ingresar con tu contraseña para activarlo.',
         );
       }
+      final confirmado = await _localAuth.authenticate(
+        localizedReason: 'Confirma para activar el ingreso con huella o rostro',
+        options: const AuthenticationOptions(biometricOnly: true),
+      );
+      if (!confirmado) return false;
       await _storage.write(_biometricEnabledKey, 'true');
     } else {
+      // El refresh token se conserva: la app lo usa para renovar la sesión
+      // en silencio aunque no haya biometría.
       await _storage.delete(_biometricEnabledKey);
     }
     _biometricEnabled = enabled;
     notifyListeners();
+    return true;
   }
 
   Future<void> loginWithBiometrics() async {
@@ -194,6 +250,19 @@ class AuthProvider extends ChangeNotifier {
       options: const AuthenticationOptions(biometricOnly: true),
     );
     if (!ok) return;
+    await _pedirNuevaSesion(refreshToken);
+    await _loadProfile();
+    _setStatus(AuthStatus.authenticated);
+  }
+
+  Future<String?> _leerRefreshToken() async =>
+      await _storage.read(_refreshTokenKey) ??
+      await _storage.read(_legacyRefreshTokenKey);
+
+  /// Cambia el refresh token por una sesión nueva y la guarda. Supabase rota
+  /// el refresh token en cada uso, así que siempre guardamos el nuevo: si se
+  /// conservara el viejo, la siguiente renovación fallaría.
+  Future<void> _pedirNuevaSesion(String refreshToken) async {
     final data = await _api.renewSession(refreshToken);
     if (data is! Map || data['session'] is! Map) {
       throw ApiException(
@@ -212,8 +281,50 @@ class AuthProvider extends ChangeNotifier {
       await _storage.delete(_legacyRefreshTokenKey);
     }
     _api.authToken = token;
-    await _loadProfile();
-    _setStatus(AuthStatus.authenticated);
+  }
+
+  /// Renueva en silencio el access token vencido (dura ≈1 h) para que la
+  /// sesión no se cierre mientras se usa la app. Lo invoca [ApiService] al
+  /// recibir un 401; si no se puede renovar, cierra la sesión y vuelve a la
+  /// pantalla de acceso en vez de dejar al usuario viendo un error suelto.
+  Future<bool> _renovarSesion() =>
+      _renovacionEnCurso ??= _intentarRenovar().whenComplete(
+        () => _renovacionEnCurso = null,
+      );
+
+  Future<bool> _intentarRenovar() async {
+    final refreshToken = await _leerRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await _sesionExpirada(conservarRefresh: false);
+      return false;
+    }
+    try {
+      await _pedirNuevaSesion(refreshToken);
+      return true;
+    } catch (error) {
+      final statusCode = error is ApiException ? error.statusCode : null;
+      // Ante una falla temporal (red, servidor caído, límite de peticiones)
+      // se conserva el refresh token para poder reintentar luego.
+      final temporal = statusCode == null ||
+          statusCode >= 500 ||
+          statusCode == 408 ||
+          statusCode == 429;
+      await _sesionExpirada(conservarRefresh: temporal);
+      return false;
+    }
+  }
+
+  Future<void> _sesionExpirada({required bool conservarRefresh}) async {
+    if (conservarRefresh) {
+      await _storage.delete(_tokenKey);
+      _api.authToken = null;
+      _profile = null;
+    } else {
+      await _clear();
+    }
+    if (_status == AuthStatus.authenticated) {
+      _setStatus(AuthStatus.unauthenticated);
+    }
   }
 
   // No hay auto-registro: las cuentas las crea el administrador del acueducto.
@@ -329,6 +440,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+
   /// Renueva la sesión después de un 401. ApiService repite la petición con
   /// el token nuevo; varias peticiones concurrentes comparten esta renovación.
   Future<bool> _renovarSesion() {
@@ -389,6 +501,7 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
+
 
   @override
   void dispose() {

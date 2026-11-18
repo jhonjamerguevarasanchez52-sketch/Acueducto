@@ -7,6 +7,7 @@ import '../core/fila_detalle.dart';
 import '../core/hidro_logo.dart';
 import '../core/mensaje_estado.dart';
 import 'plan_pago_sheet.dart' show nombrePlanPago;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Tarjeta de una factura: periodo, valor, fechas y observación. Si está
 /// pendiente muestra los botones "Pagar" y "Mis pagos".
@@ -153,12 +154,12 @@ class FacturaCard extends StatelessWidget {
                     Divider(color: colores.cardBorder, height: 1),
                     const SizedBox(height: 10),
                     FilaDetalle(
-                      icono: Icons.event_available_outlined,
+                      icono: LucideIcons.calendarCheck,
                       texto: 'Emitida: ${Formato.fecha(factura.fechaEmision)}',
                     ),
                     if (factura.mesesCubiertos > 1)
                       FilaDetalle(
-                        icono: Icons.calendar_month_outlined,
+                        icono: LucideIcons.calendarDays,
                         texto:
                             '${factura.mesesCubiertos} mensualidades de '
                             '${Formato.pesos(factura.valorTotal / factura.mesesCubiertos)}: '
@@ -166,59 +167,59 @@ class FacturaCard extends StatelessWidget {
                       ),
                     if (factura.fechaVencimiento != null)
                       FilaDetalle(
-                        icono: Icons.schedule_outlined,
+                        icono: LucideIcons.clock,
                         texto:
                             'Vence: ${Formato.fecha(factura.fechaVencimiento)}',
                       ),
                     if (factura.observacion != null)
                       FilaDetalle(
-                        icono: Icons.sticky_note_2_outlined,
+                        icono: LucideIcons.stickyNote,
                         texto: factura.observacion!,
                       ),
                     if (factura.fechaUltimoPago != null)
                       FilaDetalle(
-                        icono: Icons.verified_outlined,
+                        icono: LucideIcons.badgeCheck,
                         texto:
                             'Pagada: ${Formato.fechaHora(factura.fechaUltimoPago)}',
                       ),
                     if (factura.fechaProximaFacturacion != null)
                       FilaDetalle(
-                        icono: Icons.event_repeat_outlined,
+                        icono: LucideIcons.calendarSync,
                         texto:
                             'Próxima facturación: ${Formato.fecha(factura.fechaProximaFacturacion)}',
                       ),
                     for (final pago in factura.pagosConfirmados) ...[
                       const SizedBox(height: 6),
                       FilaDetalle(
-                        icono: Icons.receipt_long_outlined,
+                        icono: LucideIcons.receiptText,
                         texto:
                             'Pago confirmado: ${Formato.fechaHora(pago.fechaConfirmacion ?? pago.fechaPago)}',
                       ),
                       FilaDetalle(
-                        icono: Icons.water_drop_outlined,
+                        icono: LucideIcons.droplet,
                         texto:
                             'Servicio del acueducto: ${Formato.pesos(pago.monto)}',
                       ),
                       if (pago.cargoWompi > 0)
                         FilaDetalle(
-                          icono: Icons.account_balance_wallet_outlined,
+                          icono: LucideIcons.wallet,
                           texto:
                               'Comisión Wompi: ${Formato.pesos(pago.cargoWompi)}',
                         ),
                       if (pago.montoTotal != null)
                         FilaDetalle(
-                          icono: Icons.payments_outlined,
+                          icono: LucideIcons.banknote,
                           texto:
                               'Total cobrado: ${Formato.pesos(pago.montoTotal)}',
                         ),
                       if (pago.transaccionId != null)
                         FilaDetalle(
-                          icono: Icons.tag,
+                          icono: LucideIcons.hash,
                           texto: 'Transacción: ${pago.transaccionId}',
                         ),
                       if (pago.medioPagoWompi != null)
                         FilaDetalle(
-                          icono: Icons.credit_card_outlined,
+                          icono: LucideIcons.creditCard,
                           texto:
                               'Medio de pago: ${Formato.etiqueta(pago.medioPagoWompi)}',
                         ),
@@ -231,7 +232,7 @@ class FacturaCard extends StatelessWidget {
                             child: FilledButton.icon(
                               onPressed: onPagar,
                               icon: const Icon(
-                                Icons.payments_outlined,
+                                LucideIcons.banknote,
                                 size: 18,
                               ),
                               label: const Text('Pagar'),

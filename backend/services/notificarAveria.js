@@ -2,6 +2,7 @@ const supabaseAdmin = require('../config/supabaseAdminClient');
 const { notificar } = require('../utils/notificar');
 const { enviarCorreo } = require('../config/mailer');
 const { escaparHtml } = require('../utils/html');
+const { fechaHoraColombia } = require('../utils/fechas');
 
 // Notifica a los fontaneros activos sin convertir un fallo de correo en un
 // falso error del reporte que ya quedó guardado.
@@ -35,9 +36,10 @@ async function notificarNuevaAveria(averia) {
       <p><strong>Teléfono:</strong> ${escaparHtml(reportante?.telefono)}</p>
       <p><strong>Ubicación:</strong> ${escaparHtml(ubicacion)}</p>
       <p><strong>Descripción:</strong> ${escaparHtml(averia.descripcion)}</p>
-      <p><strong>Fecha:</strong> ${new Date(averia.fecha_reporte).toLocaleString('es-CO')}</p>`;
+      <p><strong>Fecha:</strong> ${escaparHtml(fechaHoraColombia(averia.fecha_reporte))} (hora de Colombia)</p>`;
 
-    await Promise.all(fontaneros.flatMap((fontanero) => [
+    // allSettled: si falla un correo, igual se crean los avisos dentro de la app.
+    const resultados = await Promise.allSettled(fontaneros.flatMap((fontanero) => [
       enviarCorreo({
         to: fontanero.correo,
         subject: 'Nueva avería reportada - Acueducto Campo Amor',
@@ -45,6 +47,9 @@ async function notificarNuevaAveria(averia) {
       }),
       notificar(fontanero.id, `Nueva avería de ${nombre}, en ${ubicacion}. ${averia.descripcion}`, 'averia'),
     ]));
+    for (const r of resultados) {
+      if (r.status === 'rejected') console.error('Error avisando al fontanero:', r.reason?.message);
+    }
   } catch (error) {
     console.error('Error avisando al fontanero por correo:', error.message);
   }

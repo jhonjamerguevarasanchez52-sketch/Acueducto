@@ -2,5 +2,6 @@
 /// importar cada archivo por separado desde las pantallas.
 library;
 
+export 'averia_audio_tile.dart';
 export 'averia_card.dart';
 export 'formulario_reporte.dart';

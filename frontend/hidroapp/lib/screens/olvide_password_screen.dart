@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/core/core.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Recuperación de contraseña en dos pasos:
 /// 1) el usuario pide un código con su correo,
@@ -139,8 +140,8 @@ class _OlvidePasswordScreenState extends State<OlvidePasswordScreen> {
             children: [
               Icon(
                 _codigoEnviado
-                    ? Icons.mark_email_read_outlined
-                    : Icons.lock_reset,
+                    ? LucideIcons.mailCheck
+                    : LucideIcons.rotateCcwKey,
                 size: 48,
                 color: tema.colorScheme.primary,
               ),
@@ -186,7 +187,7 @@ class _OlvidePasswordScreenState extends State<OlvidePasswordScreen> {
             decoration: const InputDecoration(
               labelText: 'Correo electrónico',
               hintText: 'tucorreo@ejemplo.com',
-              prefixIcon: Icon(Icons.email_outlined),
+              prefixIcon: Icon(LucideIcons.mail),
             ),
             validator: (v) {
               final valor = (v ?? '').trim();
@@ -224,7 +225,7 @@ class _OlvidePasswordScreenState extends State<OlvidePasswordScreen> {
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: const InputDecoration(
               labelText: 'Código de verificación',
-              prefixIcon: Icon(Icons.pin_outlined),
+              prefixIcon: Icon(LucideIcons.rectangleEllipsis),
               counterText: '',
             ),
             validator: (v) {
@@ -241,11 +242,11 @@ class _OlvidePasswordScreenState extends State<OlvidePasswordScreen> {
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: 'Nueva contraseña',
-              prefixIcon: const Icon(Icons.lock_outline),
+              prefixIcon: const Icon(LucideIcons.lock),
               suffixIcon: IconButton(
                 tooltip: _ocultarPassword ? 'Mostrar' : 'Ocultar',
                 icon: Icon(
-                  _ocultarPassword ? Icons.visibility : Icons.visibility_off,
+                  _ocultarPassword ? LucideIcons.eye : LucideIcons.eyeOff,
                 ),
                 onPressed: () =>
                     setState(() => _ocultarPassword = !_ocultarPassword),
@@ -266,7 +267,7 @@ class _OlvidePasswordScreenState extends State<OlvidePasswordScreen> {
             onFieldSubmitted: (_) => _restablecer(),
             decoration: const InputDecoration(
               labelText: 'Confirmar contraseña',
-              prefixIcon: Icon(Icons.lock_outline),
+              prefixIcon: Icon(LucideIcons.lock),
             ),
             validator: (v) =>
                 v != _password.text ? 'Las contraseñas no coinciden' : null,

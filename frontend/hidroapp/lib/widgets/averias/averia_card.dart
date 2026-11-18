@@ -4,9 +4,12 @@ import '../../models/averia.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
 import '../core/mensaje_estado.dart';
+import 'averia_audio_tile.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Tarjeta de una avería reportada: fecha, estado, descripción y, si el
-/// fontanero la dejó, su nota y la fecha de resolución.
+/// fontanero la dejó, su nota y la fecha de resolución. Si el usuario la
+/// reportó por audio, el fontanero y la administración pueden escucharlo.
 ///
 /// La administración puede ver los datos del reportante; los usuarios ven
 /// únicamente el estado y la descripción de sus propios reportes.
@@ -16,10 +19,14 @@ class AveriaCard extends StatelessWidget {
     required this.averia,
     this.mostrarDetallesOperativos = false,
     this.onCambiarEstado,
+    this.onObtenerUrlAudio,
   });
 
   final Averia averia;
   final bool mostrarDetallesOperativos;
+
+  /// Sin esto no se muestran los audios (los usuarios no los ven).
+  final ObtenerUrlAudio? onObtenerUrlAudio;
 
   /// Solo se pasa para el fontanero: muestra los botones para tomar,
   /// resolver o cancelar la avería mientras no esté cerrada.
@@ -68,26 +75,33 @@ class AveriaCard extends StatelessWidget {
               averia.descripcion,
               style: const TextStyle(fontSize: 15, height: 1.35),
             ),
+            if (onObtenerUrlAudio != null)
+              for (final audio in averia.audios)
+                AveriaAudioTile(
+                  key: ValueKey(audio.id),
+                  audio: audio,
+                  onObtenerUrl: onObtenerUrlAudio!,
+                ),
             if (mostrarDetallesOperativos) ...[
               const SizedBox(height: 12),
               _DatoAveria(
-                icono: Icons.person_outline,
+                icono: LucideIcons.user,
                 texto: averia.reportanteNombre ?? 'Reportante no disponible',
               ),
               if (averia.reportanteTelefono?.isNotEmpty == true)
                 _DatoAveria(
-                  icono: Icons.phone_outlined,
+                  icono: LucideIcons.phone,
                   texto: averia.reportanteTelefono!,
                 ),
               if (averia.reportanteCorreo?.isNotEmpty == true)
                 _DatoAveria(
-                  icono: Icons.email_outlined,
+                  icono: LucideIcons.mail,
                   texto: averia.reportanteCorreo!,
                 ),
               if (averia.direccion?.isNotEmpty == true ||
                   averia.zona?.isNotEmpty == true)
                 _DatoAveria(
-                  icono: Icons.location_on_outlined,
+                  icono: LucideIcons.mapPin,
                   texto: [
                     averia.direccion,
                     averia.zona,
@@ -128,7 +142,7 @@ class AveriaCard extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    Icons.check_circle_outline,
+                    LucideIcons.circleCheck,
                     size: 15,
                     color: colores.secondaryText,
                   ),
@@ -154,8 +168,8 @@ class AveriaCard extends StatelessWidget {
                       ),
                       icon: Icon(
                         averia.estado == 'en_proceso'
-                            ? Icons.check_circle_outline
-                            : Icons.handyman_outlined,
+                            ? LucideIcons.circleCheck
+                            : LucideIcons.hammer,
                         size: 18,
                       ),
                       label: Text(

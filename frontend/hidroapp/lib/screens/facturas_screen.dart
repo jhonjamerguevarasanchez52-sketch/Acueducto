@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/core/core.dart';
 import '../widgets/facturas/facturas.dart';
 import 'pagos_screen.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Módulo "Mis facturas": lista las facturas del usuario, de la más reciente
 /// a la más antigua, con su estado y su valor. Cada factura pendiente trae un
@@ -147,7 +148,7 @@ class _FacturasScreenState extends State<FacturasScreen>
               return ListView(
                 children: const [
                   MensajeEstado(
-                    icono: Icons.receipt_long_outlined,
+                    icono: LucideIcons.receiptText,
                     titulo: 'Sin facturas',
                     detalle: 'Todavía no tienes facturas emitidas.',
                   ),
@@ -162,7 +163,14 @@ class _FacturasScreenState extends State<FacturasScreen>
             );
 
             return ListView.builder(
-              padding: const EdgeInsets.all(16),
+              // Espacio extra abajo: la barra de botones de Android y la gota
+              // flotante no deben tapar el botón Pagar de la última tarjeta.
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                104 + MediaQuery.paddingOf(context).bottom,
+              ),
               itemCount: facturas.length + 1,
               itemBuilder: (context, i) {
                 if (i == 0) {

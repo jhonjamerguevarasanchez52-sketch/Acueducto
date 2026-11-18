@@ -4,6 +4,7 @@ import '../../models/corte.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
 import '../core/fila_detalle.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Tarjeta principal del módulo "Estado del servicio": en verde si el agua
 /// está activa, en rojo si está suspendida, con el motivo y la fecha del corte
@@ -35,7 +36,7 @@ class TarjetaEstadoServicio extends StatelessWidget {
           Row(
             children: [
               Icon(
-                cortado ? Icons.water_drop_outlined : Icons.water_drop,
+                cortado ? LucideIcons.droplet : LucideIcons.droplet,
                 color: color,
                 size: 28,
               ),
@@ -62,11 +63,11 @@ class TarjetaEstadoServicio extends StatelessWidget {
           if (cortado && corteActivo != null) ...[
             const SizedBox(height: 12),
             FilaDetalle(
-              icono: Icons.info_outline,
+              icono: LucideIcons.info,
               texto: 'Motivo: ${corteActivo!.motivo}',
             ),
             FilaDetalle(
-              icono: Icons.event_busy_outlined,
+              icono: LucideIcons.calendarX,
               texto: 'Desde: ${Formato.fechaHora(corteActivo!.fechaCorte)}',
             ),
           ],

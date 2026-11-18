@@ -1,33 +1,36 @@
 const express = require('express');
 const router = express.Router();
-
 const {
   iniciarSesion,
+  solicitarCodigoAcceso,
+  ingresarConCodigo,
   renovarSesion,
-  verificarCorreoAdministrador,
   verificarCuenta,
   reenviarCodigoVerificacion,
   cambiarPasswordPropio,
   solicitarRecuperacion,
   resetearPassword,
 } = require('../controller/authController');
-const { limiteAuth } = require('../middleware/rateLimit');
+const { limiteAuth, limiteAuthIp } = require('../middleware/rateLimit');
 const { verificarToken } = require('../middleware/authMiddleware');
 
-// Todas las rutas de autenticación pasan por el límite estricto de intentos.
-router.use(limiteAuth);
-
-// No hay auto-registro: las cuentas las crea el administrador con
-// `scripts/crearUsuario.js`. Por eso no se expone ninguna ruta de registro.
-router.post('/login', iniciarSesion);
+// Renovar la sesión no adivina nada (el refresh token es largo y aleatorio) y
+// la app y el panel lo hacen cada hora: queda fuera del límite estricto para
+// no bloquear a todos los que comparten la IP. Sigue bajo el límite general.
 router.post('/renovar-sesion', renovarSesion);
-router.post('/verificar-administrador', verificarCorreoAdministrador);
 
-// TODO: login con Google pendiente de reimplementar con Supabase
-// (signInWithIdToken). El controlador anterior (controller/google.js)
-// dependía de Mongoose y jsonwebtoken, que ya no forman parte del proyecto.
+// El resto de rutas de autenticación pasan por el límite estricto de intentos
+// (por IP + correo) y por un techo por IP.
+router.use(limiteAuthIp, limiteAuth);
 
-// Verificación de cuenta
+// No hay auto-registro: las cuentas las crea el administrador desde el panel.
+router.post('/login', iniciarSesion);
+
+// Ingreso sin contraseña: código de 6 dígitos enviado al correo.
+router.post('/codigo-acceso', solicitarCodigoAcceso);
+router.post('/ingresar-con-codigo', ingresarConCodigo);
+
+// Verificación de cuenta (solo para cuentas antiguas sin verificar).
 router.post('/verificar', verificarCuenta);
 router.post('/reenviar-codigo', reenviarCodigoVerificacion);
 
@@ -40,4 +43,3 @@ router.post('/solicitar-recuperacion', solicitarRecuperacion);
 router.post('/resetear-password', resetearPassword);
 
 module.exports = router;
-

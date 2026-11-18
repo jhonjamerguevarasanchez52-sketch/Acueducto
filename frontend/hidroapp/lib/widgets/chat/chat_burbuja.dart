@@ -2,15 +2,24 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
 import 'chat_mensaje.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Burbuja de un mensaje del chat. Alineada a la derecha y en azul si es del
 /// usuario; a la izquierda, blanca (o roja si es un error) si es del asistente.
-/// Los mensajes de error muestran un enlace "Reintentar".
+/// Los mensajes de error muestran un enlace "Reintentar"; los dictados por
+/// audio, un micrófono; y si GOTA propone avisar al fontanero, el botón para
+/// confirmarlo ([onConfirmarAveria]).
 class ChatBurbuja extends StatelessWidget {
-  const ChatBurbuja({super.key, required this.mensaje, this.onReintentar});
+  const ChatBurbuja({
+    super.key,
+    required this.mensaje,
+    this.onReintentar,
+    this.onConfirmarAveria,
+  });
 
   final ChatMensaje mensaje;
   final VoidCallback? onReintentar;
+  final VoidCallback? onConfirmarAveria;
 
   @override
   Widget build(BuildContext context) {
@@ -59,10 +68,41 @@ class ChatBurbuja extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (mensaje.deAudio)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.mic, size: 14, color: texto.withValues(alpha: 0.8)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Audio',
+                      style: TextStyle(
+                        color: texto.withValues(alpha: 0.8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Text(
               mensaje.texto,
               style: TextStyle(color: texto, fontSize: 15, height: 1.35),
             ),
+            if (onConfirmarAveria != null) ...[
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                onPressed: onConfirmarAveria,
+                icon: const Icon(LucideIcons.hammer, size: 18),
+                label: const Text('Sí, avisar al fontanero'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
             if (onReintentar != null) ...[
               const SizedBox(height: 6),
               GestureDetector(
@@ -70,7 +110,7 @@ class ChatBurbuja extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.refresh, size: 16, color: colores.danger),
+                    Icon(LucideIcons.refreshCw, size: 16, color: colores.danger),
                     const SizedBox(width: 4),
                     Text(
                       'Reintentar',

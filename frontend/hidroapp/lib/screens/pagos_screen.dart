@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../utils/formato.dart';
 import '../widgets/core/core.dart';
 import '../widgets/pagos/pagos.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Módulo "Mis pagos": historial de los pagos registrados por el usuario,
 /// con su método y si ya fueron confirmados por el acueducto o Wompi.
@@ -142,7 +143,7 @@ class _PagosScreenState extends State<PagosScreen> with WidgetsBindingObserver {
               return ListView(
                 children: const [
                   MensajeEstado(
-                    icono: Icons.payments_outlined,
+                    icono: LucideIcons.banknote,
                     titulo: 'Sin pagos',
                     detalle: 'Aquí verás los pagos que registres.',
                   ),
@@ -151,7 +152,14 @@ class _PagosScreenState extends State<PagosScreen> with WidgetsBindingObserver {
             }
 
             return ListView.builder(
-              padding: const EdgeInsets.all(16),
+              // Espacio extra abajo: la barra de botones de Android y la gota
+              // flotante no deben tapar el botón Pagar de la última tarjeta.
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                104 + MediaQuery.paddingOf(context).bottom,
+              ),
               itemCount: pagos.length,
               itemBuilder: (context, i) => EntradaAnimada(
                 retraso: AppTheme.motionEscalon * i,

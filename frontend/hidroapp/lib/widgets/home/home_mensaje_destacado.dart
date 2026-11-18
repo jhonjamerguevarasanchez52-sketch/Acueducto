@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Mensaje que resalta en la pestaña "Inicio": banda con acento de color,
 /// ícono y texto de bienvenida.
@@ -22,7 +23,7 @@ class HomeMensajeDestacado extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, color: colores.info),
+          Icon(LucideIcons.info, color: colores.info),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

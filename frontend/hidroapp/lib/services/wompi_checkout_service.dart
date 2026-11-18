@@ -6,6 +6,23 @@ import '../utils/formato.dart';
 
 /// Registra el pago en el servidor y abre el checkout hospedado de Wompi.
 class WompiCheckoutService {
+  /// URL del Web Checkout oficial de Wompi con los datos que firmó el backend.
+  static Uri crearUrlCheckout({
+    required String publicKey,
+    required String currency,
+    required int amountInCents,
+    required String reference,
+    required String integrity,
+  }) {
+    return Uri.https('checkout.wompi.co', '/p/', {
+      'public-key': publicKey,
+      'currency': currency,
+      'amount-in-cents': amountInCents.toString(),
+      'reference': reference,
+      'signature:integrity': integrity,
+    });
+  }
+
   static Future<bool> pagar(BuildContext context, ApiService api, String facturaId) async {
     final cotizacionRespuesta = await api.get('/pagos/cotizacion-wompi/$facturaId');
     if (cotizacionRespuesta is! Map) {
@@ -17,6 +34,7 @@ class WompiCheckoutService {
     final aceptar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: const Text('Detalle del pago en línea'),
         content: Text(
           'Servicio del acueducto: ${formato(cotizacion['valorServicio'])}\n'
@@ -41,20 +59,29 @@ class WompiCheckoutService {
     }
 
     final datos = Map<String, dynamic>.from(respuesta['wompi'] as Map);
-    final params = <String, String>{
-      'public-key': '${datos['publicKey'] ?? ''}',
-      'currency': '${datos['currency'] ?? ''}',
-      'amount-in-cents': '${datos['amountInCents'] ?? ''}',
-      'reference': '${datos['reference'] ?? ''}',
-      'signature:integrity': '${datos['signature'] ?? ''}',
-    };
-    if (params.values.any((v) => v.trim().isEmpty)) {
+    final publicKey = '${datos['publicKey'] ?? ''}'.trim();
+    final currency = '${datos['currency'] ?? ''}'.trim();
+    final reference = '${datos['reference'] ?? ''}'.trim();
+    final integrity = '${datos['signature'] ?? ''}'.trim();
+    final amountInCents = datos['amountInCents'];
+    if (publicKey.isEmpty ||
+        currency.isEmpty ||
+        reference.isEmpty ||
+        integrity.isEmpty ||
+        amountInCents is! num ||
+        amountInCents <= 0) {
       throw ApiException(
         'El servidor no tiene completa la configuración de Wompi.',
       );
     }
 
-    final checkout = Uri.https('checkout.wompi.co', '/p/', params);
+    final checkout = crearUrlCheckout(
+      publicKey: publicKey,
+      currency: currency,
+      amountInCents: amountInCents.toInt(),
+      reference: reference,
+      integrity: integrity,
+    );
     try {
       if (!await launchUrl(checkout, mode: LaunchMode.externalApplication)) {
         throw ApiException('No se pudo abrir el checkout de Wompi.');

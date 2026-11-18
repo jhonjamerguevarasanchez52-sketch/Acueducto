@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../theme/app_theme.dart';
+import 'dialogo_centrado.dart';
 
-/// Hoja inferior para elegir cómo se paga una factura. Devuelve por
+/// Ventana centrada para elegir cómo se paga una factura. Devuelve por
 /// `Navigator.pop` el método elegido y una referencia opcional; quien la
 /// invoca es el que registra el pago contra `POST /api/pagos`.
 ///
 /// Se usa tanto desde "Mis facturas" (pagar una factura pendiente) como desde
 /// "Mis pagos" (reintentar un pago pendiente o rechazado).
+///
+/// Es una ventana centrada (no una hoja inferior) para que el botón de pagar
+/// nunca quede detrás de la barra de botones de Android.
 Future<({String metodo, String? referencia})?> mostrarPagarSheet(
   BuildContext context, {
   required String subtitulo,
 }) {
-  return showModalBottomSheet<({String metodo, String? referencia})>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return mostrarDialogoCentrado<({String metodo, String? referencia})>(
+    context,
     builder: (_) => _PagarSheet(subtitulo: subtitulo),
   );
 }
@@ -31,8 +34,8 @@ class _PagarSheet extends StatefulWidget {
 
 class _PagarSheetState extends State<_PagarSheet> {
   static const _metodos = <({String id, String nombre, IconData icono})>[
-    (id: 'wompi', nombre: 'Pagar en línea con Wompi', icono: Icons.lock_outline),
-    (id: 'fisico', nombre: 'Pago físico', icono: Icons.receipt_long_outlined),
+    (id: 'wompi', nombre: 'Pagar en línea con Wompi', icono: LucideIcons.lock),
+    (id: 'fisico', nombre: 'Pago físico', icono: LucideIcons.receiptText),
   ];
 
   String _metodo = 'wompi';
@@ -44,24 +47,13 @@ class _PagarSheetState extends State<_PagarSheet> {
   @override
   Widget build(BuildContext context) {
     final secundario = AppColors.of(context).secondaryText;
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 4,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: Column(
+    return DialogoCentrado(
+      titulo: 'Pagar factura',
+      subtitulo: widget.subtitulo,
+      contenido: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Pagar factura',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 2),
-          Text(widget.subtitulo, style: TextStyle(color: secundario)),
-          const SizedBox(height: 14),
           for (final metodo in _metodos)
             _MetodoTile(
               nombre: metodo.nombre,
@@ -69,20 +61,23 @@ class _PagarSheetState extends State<_PagarSheet> {
               seleccionado: _metodo == metodo.id,
               onTap: () => setState(() => _metodo = metodo.id),
             ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 6),
           Text(
             _metodo == 'wompi'
                 ? 'Se abrirá el checkout seguro de Wompi para completar el pago.'
                 : 'Selecciona una foto del comprobante para enviarla al acueducto.',
             style: TextStyle(fontSize: 12, color: secundario),
           ),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: _confirmar,
-            child: Text(_metodo == 'wompi' ? 'Continuar con Wompi' : 'Subir recibo'),
-          ),
         ],
       ),
+      acciones: [
+        FilledButton(
+          onPressed: _confirmar,
+          child: Text(
+            _metodo == 'wompi' ? 'Continuar con Wompi' : 'Subir recibo',
+          ),
+        ),
+      ],
     );
   }
 }
@@ -134,9 +129,7 @@ class _MetodoTile extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  seleccionado
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_off,
+                  seleccionado ? LucideIcons.circleDot : LucideIcons.circle,
                   size: 20,
                   color: seleccionado
                       ? AppTheme.primary

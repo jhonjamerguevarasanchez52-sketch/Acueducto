@@ -1,12 +1,3 @@
-/// Días que el backend exige entre una edición de perfil y la siguiente
-/// (ver `DIAS_LIMITE_EDICION_PERFIL` en el backend).
-const int diasLimiteEdicionPerfil = 30;
-
-/// Correos exentos del límite mensual de edición (debe reflejar
-/// `CORREOS_SIN_LIMITE_EDICION` en el backend). Excepción puntual pedida por
-/// el propio dueño de la cuenta.
-const List<String> _correosSinLimiteEdicion = ['tovardeimer71@gmail.com'];
-
 /// Perfil del usuario tal como lo devuelve `GET /api/profile/mi-perfil`.
 class Profile {
   Profile({
@@ -56,20 +47,14 @@ class Profile {
     return partes.isEmpty ? null : partes.join(' · ');
   }
 
-  /// Fecha desde la que el usuario podrá volver a editar su perfil, o `null`
-  /// si puede hacerlo ahora mismo.
-  DateTime? get proximaEdicionDisponible {
-    if (!perfilCompleto) return null;
-    if (updatedAt == null) return null;
-    if (_correosSinLimiteEdicion.contains(correo.toLowerCase())) return null;
-    final limite = updatedAt!.add(const Duration(days: diasLimiteEdicionPerfil));
-    return limite.isAfter(DateTime.now()) ? limite : null;
-  }
-
   bool get perfilCompleto => [telefono, numeroLote, direccion, zona]
       .every((valor) => valor != null && valor.trim().isNotEmpty);
 
-  bool get puedeEditarPerfil => proximaEdicionDisponible == null;
+  /// Dirección, zona y lote identifican el servicio. El usuario solo puede
+  /// llenarlos si están vacíos; después los cambia el administrador (el
+  /// backend aplica la misma regla en `editarPerfil`).
+  bool ubicacionBloqueada(String? valor) =>
+      rol != 'administrador' && valor != null && valor.trim().isNotEmpty;
 
   factory Profile.fromJson(Map<String, dynamic> json) {
     return Profile(

@@ -6,7 +6,11 @@ const assert = require('node:assert/strict');
 const invoiceModel = require('../models/invoiceModel');
 const paymentModel = require('../models/paymentModel');
 const supabaseAdmin = require('../config/supabaseAdminClient');
+const tarifaServicio = require('../services/tarifaServicio');
 const { obtenerOpcionesPlanPago, configurarPlanPago } = require('./facturaController');
+
+// Tarifa fija en las pruebas: la real sale de la tabla `rates`.
+tarifaServicio.valorMensualDePeriodo = async () => ({ valor: 12000, origen: 'tarifa', tarifaId: null });
 const { calcularPeriodosPlan } = require('../services/planPagoServicio');
 const { cotizarWompi } = require('../utils/wompiTarifa');
 

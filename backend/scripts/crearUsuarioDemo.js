@@ -235,13 +235,14 @@ async function sembrarDatos(perfilId, { cortado }) {
     },
   ]);
 
-  // Un trigger de la BD rechaza pagos confirmados sobre facturas ya pagadas,
-  // así que las marcamos como pagadas después de registrar el pago.
+  // Todo pago nace sin confirmar (trigger trg_forzar_pago_no_confirmado) y una
+  // factura solo puede quedar pagada al confirmar su pago. Confirmamos los dos
+  // pagos y el trigger procesar_pago_confirmado marca sus facturas como pagadas.
   const { error: pagadaError } = await supabaseAdmin
-    .from('invoices')
-    .update({ estado: 'pagada' })
-    .in('id', [fPagadaEfectivo.id, fPagadaWompi.id]);
-  if (pagadaError) throw new Error(`No pude marcar facturas como pagadas: ${pagadaError.message}`);
+    .from('payments')
+    .update({ confirmado: true })
+    .in('factura_id', [fPagadaEfectivo.id, fPagadaWompi.id]);
+  if (pagadaError) throw new Error(`No pude confirmar los pagos de demostración: ${pagadaError.message}`);
 
   console.log('Pagos creados: 2 confirmados, 1 por confirmar.');
 

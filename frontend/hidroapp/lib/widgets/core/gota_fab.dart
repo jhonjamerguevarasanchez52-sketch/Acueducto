@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Frases cortas que GOTA muestra de vez en cuando en su burbuja de texto,
 /// para darle personalidad al asistente sin ser invasivo.
@@ -183,7 +184,7 @@ class _GotaFabState extends State<GotaFab> with SingleTickerProviderStateMixin {
                     'assets/images/gota_mascota.png',
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => const Icon(
-                      Icons.water_drop,
+                      LucideIcons.droplet,
                       color: AppTheme.primary,
                       size: 34,
                     ),

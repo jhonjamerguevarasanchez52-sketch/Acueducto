@@ -36,7 +36,7 @@ demostración y no son requisitos de HidroApp.
 
 En el entorno local, configura `backend/.env`. En producción, agrega las mismas
 variables en el panel del servicio donde está desplegado el backend (por ejemplo,
-Railway). Usa los valores reales del dashboard; no copies llaves a Flutter.
+Render). Usa los valores reales del dashboard; no copies llaves a Flutter.
 
 ```env
 WOMPI_AMBIENTE=test
