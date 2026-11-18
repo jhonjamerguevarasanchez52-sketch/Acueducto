@@ -257,6 +257,7 @@ export default function SectionViews({ activeSection, context }) {
             <tr>
               <th>Usuario</th>
               <th>Correo</th>
+              <th>Cédula</th>
               <th>Rol</th>
               <th>Estado</th>
               <th>Estado de cuenta</th>
@@ -274,6 +275,7 @@ export default function SectionViews({ activeSection, context }) {
               <tr key={user.id}>
                 <td>{[user.nombre, user.apellido].filter(Boolean).join(' ') || 'Sin nombre'}</td>
                 <td>{user.correo || '—'}</td>
+                <td>{user.cedula || '—'}</td>
                 <td>{user.rol || '—'}</td>
                 <td><span className={`status-badge ${user.activo ? 'activo' : 'inactivo'}`}>{user.activo ? 'Activo' : 'Inactivo'}</span></td>
                 <td><span className={`status-badge ${user.estado_cuenta === 'al_dia' ? 'activo' : 'inactivo'}`}>{user.estado_cuenta === 'al_dia' ? 'Al día' : `Pendiente · ${formatMoney(user.saldo_pendiente || 0)}`}</span></td>

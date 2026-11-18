@@ -182,7 +182,7 @@ class _LoginFormState extends State<LoginForm> {
                   return 'Correo no válido';
                 }
                 return null;
- git add lib/widgets/auth/login_form.dart             },
+              },
             ),
             const SizedBox(height: 16),
             authFieldLabel(context, 'CONTRASEÑA'),

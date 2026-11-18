@@ -125,6 +125,7 @@ export const operationDefinitions = {
     fields: [
       { name: 'nombre', label: 'Nombre' },
       { name: 'apellido', label: 'Apellido' },
+      { name: 'cedula', label: 'Cédula' },
       { name: 'telefono', label: 'Teléfono' },
       { name: 'numero_lote', label: 'Número de lote' },
       { name: 'direccion', label: 'Dirección' },

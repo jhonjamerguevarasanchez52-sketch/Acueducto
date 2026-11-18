@@ -61,3 +61,15 @@ test('marca correos repetidos y roles no permitidos en la fila correspondiente',
   assert.match(rows[1].error, /repetido/)
   assert.match(rows[1].error, /rol debe ser usuario, fontanero o administrador/)
 })
+
+test('normaliza la cédula de carga masiva y marca números repetidos', () => {
+  const rows = parseUsersRows([
+    { values: ['nombre', 'apellido', 'correo', 'cedula'], line: 1 },
+    { values: ['Ana', 'Pérez', 'ana@example.com', '1.234.567.890'], line: 2 },
+    { values: ['Luis', 'Díaz', 'luis@example.com', '1234567890'], line: 3 },
+  ])
+
+  assert.equal(rows[0].cedula, '1234567890')
+  assert.equal(rows[0].error, '')
+  assert.match(rows[1].error, /cédula está repetida/)
+})

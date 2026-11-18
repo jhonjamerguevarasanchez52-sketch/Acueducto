@@ -35,6 +35,10 @@ async function editarPerfil(req, res) {
   const { cambios: datosActualizar, error: errorCampos } = extraerCambiosPerfil(req.body);
   if (errorCampos) return res.status(400).json({ error: errorCampos });
 
+  if ('cedula' in datosActualizar && req.usuario.rol !== 'administrador') {
+    return res.status(403).json({ error: 'Solo un administrador puede actualizar la cédula.' });
+  }
+
   if (Object.keys(datosActualizar).length === 0) {
     return res.status(400).json({ error: 'No hay campos válidos para actualizar' });
   }
@@ -71,7 +75,7 @@ async function editarPerfil(req, res) {
     const { data, error } = await profileModel.update(
       userId,
       datosActualizar,
-      tocaUbicacion ? undefined : req.db,
+      tocaUbicacion || (esAdministrador && 'cedula' in datosActualizar) ? undefined : req.db,
     );
 
     if (error) {

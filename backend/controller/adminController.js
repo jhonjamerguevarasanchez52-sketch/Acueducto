@@ -2,9 +2,6 @@ const authModel = require('../models/authModel');
 const profileModel = require('../models/profileModel');
 
 
-const breakdownModel = require('../models/breakdownModel');
-const supabaseAdmin = require('../config/supabaseAdminClient');
-
 const { extraerCambiosPerfil } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
@@ -18,8 +15,6 @@ const { consultarEstadoCuenta } = require('../services/estadoCuentaService');
 const { generarCertificados, listarCertificados, descargarCertificado, reenviarCertificado } = require('../services/pazYSalvoService');
 
 const { normalizarCorreo } = require('../utils/formato');
-const cacheSesiones = require('../utils/cacheSesiones');
-const { registrarAuditoria } = require('../utils/auditoria');
 
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
@@ -82,17 +77,11 @@ async function crearUsuario(req, res) {
     if (profileError) {
       // Evitamos dejar un usuario huérfano en auth.users sin perfil asociado.
       await authModel.deleteUser(userId).catch(() => {});
+      if (profileError.code === '23505') {
+        return res.status(409).json({ error: 'Esa cédula ya está asociada a otra cuenta.' });
+      }
       return errorConsulta(res, profileError);
     }
-
-
-    await registrarAuditoria({
-      adminId: req.usuario.id,
-      accion: 'usuario_creado',
-      tabla: 'profiles',
-      registroId: userId,
-      detalle: { subject_user_id: userId, correo, nombre, apellido, rol },
-
     if (rol === 'fontanero') {
       const { data: asignado, error: errorAsignacion } = await profileModel.assignPlumber(userId);
       if (errorAsignacion || !asignado) {
@@ -108,8 +97,7 @@ async function crearUsuario(req, res) {
       accion: 'usuario_creado',
       tabla: 'profiles',
       registroId: userId,
-      detalle: { correo, rol },
-
+      detalle: { subject_user_id: userId, correo, nombre: String(nombre).trim(), apellido: String(apellido).trim(), rol },
     });
 
     let correoEnviado = false;
@@ -228,19 +216,11 @@ async function cambiarRol(req, res) {
     }
 
     await registrarAuditoria({
-
       adminId: req.usuario.id,
-      accion: 'rol_actualizado',
-      tabla: 'profiles',
-      registroId: userId,
-      detalle: { subject_user_id: userId, nuevo_rol: rol },
-
-      adminId: req.usuario?.id,
       accion: 'usuario_rol_cambiado',
       tabla: 'profiles',
       registroId: userId,
-      detalle: { antes: anterior?.rol ?? null, despues: rol },
-
+      detalle: { subject_user_id: userId, antes: anterior?.rol ?? null, despues: rol },
     });
 
     return res.status(200).json({ message: `Rol actualizado a "${rol}"`, perfil: data });
@@ -268,19 +248,11 @@ async function editarUsuario(req, res) {
     }
 
     await registrarAuditoria({
-
       adminId: req.usuario.id,
-      accion: 'perfil_usuario_editado',
-      tabla: 'profiles',
-      registroId: userId,
-      detalle: { subject_user_id: userId, campos: Object.keys(cambios) },
-
-      adminId: req.usuario?.id,
       accion: 'usuario_editado',
       tabla: 'profiles',
       registroId: userId,
-      detalle: { campos: Object.keys(cambios) },
-
+      detalle: { subject_user_id: userId, campos: Object.keys(cambios) },
     });
 
     return res.status(200).json({ message: 'Usuario actualizado', perfil: data });
@@ -310,19 +282,11 @@ async function cambiarEstadoUsuario(req, res) {
     }
 
     await registrarAuditoria({
-
       adminId: req.usuario.id,
       accion: activo ? 'usuario_activado' : 'usuario_desactivado',
       tabla: 'profiles',
       registroId: userId,
       detalle: { subject_user_id: userId, activo },
-
-      adminId: req.usuario?.id,
-      accion: activo ? 'usuario_activado' : 'usuario_desactivado',
-      tabla: 'profiles',
-      registroId: userId,
-      detalle: { correo: data.correo ?? null },
-
     });
 
     return res.status(200).json({
@@ -377,29 +341,6 @@ async function reenviarAvisoEliminacion(req, res) {
   }
 }
 
-    // Las facturas y los pagos son la contabilidad del acueducto: un usuario
-    // con historial no se borra, se desactiva (bloquea su acceso y lo saca de
-    // la facturación, pero conserva todo). La base de datos también lo impide
-    // con ON DELETE RESTRICT (migración 20261030_mejoras_integrales.sql).
-    const [facturas, pagos] = await Promise.all([
-      supabaseAdmin.from('invoices').select('id', { count: 'exact', head: true }).eq('perfil_id', userId),
-      supabaseAdmin.from('payments').select('id', { count: 'exact', head: true }).eq('perfil_id', userId),
-    ]);
-    if (facturas.error) return errorConsulta(res, facturas.error);
-    if (pagos.error) return errorConsulta(res, pagos.error);
-    if ((facturas.count || 0) + (pagos.count || 0) > 0) {
-      return res.status(409).json({
-        error: `Este usuario tiene ${facturas.count || 0} factura(s) y ${pagos.count || 0} pago(s) registrados. Para no perder la contabilidad no se puede eliminar: desactívalo en su lugar.`,
-        puedeDesactivar: true,
-      });
-    }
-
-    // Quita primero la asignación activa para que la eliminación también
-    // funcione en bases antiguas cuya FK aún no tiene ON DELETE SET NULL.
-    const { error: errorAverias } = await breakdownModel.unassignFromPlumber(userId);
-    if (errorAverias) return errorConsulta(res, errorAverias);
-
-
 async function generarPazYSalvo(req, res) {
   try {
     const resultado = await generarCertificados({
@@ -429,34 +370,6 @@ async function descargarPazYSalvo(req, res) {
   try {
     const resultado = await descargarCertificado(req.params.certificateId);
     return res.status(200).json(resultado);
-
-    if (error) {
-      const noExiste = /not found|no rows/i.test(error.message);
-      if (noExiste) {
-        return res.status(404).json({ error: 'Usuario no encontrado' });
-      }
-      const bloqueoPorRelacion = error.code === '23503'
-        || /foreign key|violates.*constraint|database error deleting user/i.test(error.message || '');
-      if (bloqueoPorRelacion) {
-        return res.status(409).json({
-          error: 'Este usuario tiene registros asociados que no se pueden borrar. Desactívalo en su lugar.',
-          puedeDesactivar: true,
-        });
-      }
-      return errorConsulta(res, error);
-    }
-
-    // Su sesión en caché no debe seguir abriendo puertas tras borrarlo.
-    cacheSesiones.invalidarUsuario(userId);
-    await registrarAuditoria({
-      adminId: req.usuario?.id,
-      accion: 'usuario_eliminado',
-      tabla: 'profiles',
-      registroId: userId,
-      detalle: null,
-    });
-    return res.status(200).json({ message: 'Usuario eliminado permanentemente' });
-
   } catch (err) {
     return errorInesperado(res, err);
   }

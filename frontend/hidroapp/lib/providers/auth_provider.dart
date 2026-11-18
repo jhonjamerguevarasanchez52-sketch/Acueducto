@@ -124,12 +124,6 @@ class AuthProvider extends ChangeNotifier {
   }
 
 
-  Future<void> login(String correo, String password) async {
-    final data = await _api.post(
-      '/auth/login',
-      body: {'correo': correo.trim(), 'password': password},
-    );
-
   Future<void> login(String identificador, String password, {bool conCedula = false}) async {
     final data = await _api.post('/auth/login', body: {
       if (conCedula)

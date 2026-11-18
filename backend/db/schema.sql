@@ -19,6 +19,7 @@ create table if not exists public.profiles (
   nombre                         text not null,
   apellido                       text not null,
   correo                         text unique not null,
+  cedula                         text,
   rol                            text not null default 'usuario'
                                    check (rol in ('administrador', 'usuario', 'fontanero')),
   activo                         boolean not null default true,
@@ -43,6 +44,10 @@ create table if not exists public.profiles (
   -- limitar la edición del perfil a una vez cada 30 días.
   updated_at                     timestamptz
 );
+
+create unique index if not exists idx_profiles_cedula_unica
+  on public.profiles (cedula)
+  where cedula is not null and cedula <> '';
 
 -- Solo puede existir una cuenta con acceso global a las averías.
 create unique index if not exists idx_profiles_un_solo_fontanero
@@ -461,7 +466,7 @@ create unique index idx_invoices_servicio_perfil_periodo
 revoke select on table public.profiles from public, anon, authenticated;
 grant select (
   id, nombre, apellido, correo, rol, activo, is_verified,
-  debe_cambiar_password, telefono, numero_lote, direccion, ocupacion, zona,
+  debe_cambiar_password, cedula, telefono, numero_lote, direccion, ocupacion, zona,
   created_at, updated_at
 ) on table public.profiles to authenticated;
 

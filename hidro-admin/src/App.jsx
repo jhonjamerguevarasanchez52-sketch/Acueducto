@@ -53,7 +53,7 @@ function App() {
   const [sectionErrors, setSectionErrors] = useState({})
   const [loadingSections, setLoadingSections] = useState({})
   const [createUserOpen, setCreateUserOpen] = useState(false)
-  const [newUser, setNewUser] = useState({ nombre: '', apellido: '', correo: '', rol: 'usuario', telefono: '', numero_lote: '', direccion: '', zona: '' })
+  const [newUser, setNewUser] = useState({ nombre: '', apellido: '', correo: '', cedula: '', rol: 'usuario', telefono: '', numero_lote: '', direccion: '', zona: '' })
   const [createUserError, setCreateUserError] = useState('')
   const [createdTemporaryPassword, setCreatedTemporaryPassword] = useState('')
   const [createdUserEmailSent, setCreatedUserEmailSent] = useState(false)
@@ -280,8 +280,8 @@ function App() {
       return `"${safeText.replaceAll('"', '""')}"`
     }
     const lines = [
-      ['nombre', 'apellido', 'correo', 'rol', 'error'],
-      ...errors.map((user) => [user.nombre, user.apellido, user.correo, user.rol, user.error || user.message]),
+      ['nombre', 'apellido', 'correo', 'cedula', 'rol', 'error'],
+      ...errors.map((user) => [user.nombre, user.apellido, user.correo, user.cedula, user.rol, user.error || user.message]),
     ]
     const csv = lines.map((line) => line.map(quote).join(',')).join('\r\n')
     const file = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
@@ -317,6 +317,7 @@ function App() {
             nombre: user.nombre,
             apellido: user.apellido,
             correo: user.correo,
+            cedula: user.cedula,
             rol: user.rol,
           },
         })
@@ -361,15 +362,16 @@ function App() {
           { header: 'nombre', key: 'nombre', width: 20 },
           { header: 'apellido', key: 'apellido', width: 20 },
           { header: 'correo', key: 'correo', width: 32 },
+          { header: 'cedula', key: 'cedula', width: 18 },
           { header: 'rol', key: 'rol', width: 18 },
         ]
-        sheet.addRow({ nombre: 'Ana', apellido: 'Lopez', correo: 'ana@ejemplo.com', rol: 'usuario' })
+        sheet.addRow({ nombre: 'Ana', apellido: 'Lopez', correo: 'ana@ejemplo.com', cedula: '1234567890', rol: 'usuario' })
         sheet.views = [{ state: 'frozen', ySplit: 1 }]
-        sheet.autoFilter = 'A1:D1'
+        sheet.autoFilter = 'A1:E1'
         const buffer = await workbook.xlsx.writeBuffer()
         downloadFile(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'plantilla-usuarios.xlsx')
       } else {
-        const content = '\uFEFFnombre,apellido,correo,rol\r\nAna,Lopez,ana@ejemplo.com,usuario\r\n'
+        const content = '\uFEFFnombre,apellido,correo,cedula,rol\r\nAna,Lopez,ana@ejemplo.com,1234567890,usuario\r\n'
         downloadFile(new Blob([content], { type: 'text/csv;charset=utf-8' }), 'plantilla-usuarios.csv')
       }
       setBulkUserError('')
@@ -382,7 +384,7 @@ function App() {
     setCreateUserError('')
     setCreatedTemporaryPassword('')
     setCreatedUserEmailSent(false)
-    setNewUser({ nombre: '', apellido: '', correo: '', rol: 'usuario', telefono: '', numero_lote: '', direccion: '', zona: '' })
+    setNewUser({ nombre: '', apellido: '', correo: '', cedula: '', rol: 'usuario', telefono: '', numero_lote: '', direccion: '', zona: '' })
     setCreateUserOpen(true)
   }
 
@@ -1055,6 +1057,7 @@ function App() {
                 <label>Nombre<input value={newUser.nombre} onChange={(event) => setNewUser({ ...newUser, nombre: event.target.value })} required /></label>
                 <label>Apellido<input value={newUser.apellido} onChange={(event) => setNewUser({ ...newUser, apellido: event.target.value })} required /></label>
                 <label className="form-wide">Correo electrónico<input type="email" autoComplete="email" value={newUser.correo} onChange={(event) => setNewUser({ ...newUser, correo: event.target.value })} required /></label>
+                <label className="form-wide">Cédula<input inputMode="numeric" pattern="[0-9. -]{5,20}" value={newUser.cedula} onChange={(event) => setNewUser({ ...newUser, cedula: event.target.value })} required /></label>
                 <label className="form-wide">Rol
                   <select value={newUser.rol} onChange={(event) => setNewUser({ ...newUser, rol: event.target.value })}>
                     <option value="usuario">Usuario</option>
@@ -1087,8 +1090,8 @@ function App() {
               <button type="button" className="soft-button" onClick={() => setBulkUserOpen(false)} disabled={isImportingUsers}>Cerrar</button>
             </div>
             <p className="bulk-help">
-              Sube un archivo CSV UTF-8 o Excel (.xlsx) con las columnas <strong>nombre, apellido, correo</strong> y, opcionalmente, <strong>rol</strong>.
-              Si omites el rol, se asignará “usuario�?. Máximo {MAX_BULK_USERS} usuarios y 5 MB por archivo.
+              Sube un archivo CSV UTF-8 o Excel (.xlsx) con las columnas <strong>nombre, apellido, correo</strong> y, opcionalmente, <strong>cédula y rol</strong>.
+              Si omites el rol, se asignará “usuario”. Máximo {MAX_BULK_USERS} usuarios y 5 MB por archivo.
             </p>
             <div className="bulk-template-actions">
               <button type="button" className="link-button bulk-template-button" onClick={() => handleDownloadUsersTemplate('xlsx')}>

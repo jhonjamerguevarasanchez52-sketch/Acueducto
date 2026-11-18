@@ -138,15 +138,40 @@ async function validarPerfilParaIngresar(userId) {
 // desde el panel (o con `scripts/crearUsuario.js`).
 
 async function iniciarSesion(req, res) {
-  const correo = normalizarCorreo(req.body.correo);
+  const seEnvioCedula = req.body.cedula !== undefined && req.body.cedula !== null;
+  const cedula = seEnvioCedula ? String(req.body.cedula).replace(/\D/g, '') : '';
+  let correo = normalizarCorreo(req.body.correo);
   const { password } = req.body;
+  let identificador = seEnvioCedula ? cedula : correo;
 
-  if (!correo || !password) {
-    return res.status(400).json({ error: 'Correo y contraseña son obligatorios' });
+  if (!identificador || !password) {
+    return res.status(400).json({ error: 'Cédula o correo y contraseña son obligatorios' });
+  }
+  if (seEnvioCedula && (cedula.length < 5 || cedula.length > 15)) {
+    return res.status(400).json({ error: 'La cédula debe tener entre 5 y 15 dígitos.' });
   }
 
-  const bloqueo = await segundosDeBloqueo('login', correo);
+  const bloqueo = await segundosDeBloqueo('login', identificador);
   if (bloqueo) return respuestaBloqueo(res, bloqueo);
+
+  if (seEnvioCedula) {
+    try {
+      const { data: perfil, error } = await profileModel.findByCedula(cedula, 'correo');
+      if (error && error.code !== 'PGRST116') return errorConsulta(res, error);
+      correo = normalizarCorreo(perfil?.correo);
+    } catch (err) {
+      return errorInesperado(res, err);
+    }
+
+    // No revela si la cédula está registrada.
+    if (!correo) {
+      await registrarFallo('login', identificador);
+      return res.status(401).json({ error: mensajeErrorLogin({ message: 'Invalid login credentials' }) });
+    }
+    identificador = correo;
+    const bloqueoCuenta = await segundosDeBloqueo('login', identificador);
+    if (bloqueoCuenta) return respuestaBloqueo(res, bloqueoCuenta);
+  }
 
   try {
     const { data, error } = await iniciarSesionSupabase(correo, password);
