@@ -1,4 +1,5 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
+import { apiRequest } from '../../services/api.js'
 import {
   BellRing,
   CheckCircle2,
@@ -18,10 +19,16 @@ import StatCard from '../../components/StatCard.jsx'
 const AnalyticsCharts = lazy(() => import('../../components/AnalyticsCharts.jsx'))
 
 export default function SectionViews({ activeSection, context }) {
+  const [pazSeleccionados, setPazSeleccionados] = useState([])
+  const [pazEnviarCorreo, setPazEnviarCorreo] = useState(false)
+  const [pazOcupado, setPazOcupado] = useState(false)
+  const [pazMensaje, setPazMensaje] = useState('')
+  const [pazError, setPazError] = useState('')
   const {
     sectionData,
     sectionErrors,
     loadingSections,
+    loadSection,
     filterRows,
     profile,
     endpoints,
@@ -58,6 +65,51 @@ export default function SectionViews({ activeSection, context }) {
     reportSummary,
     metricValue,
   } = context
+
+  const descargarPdfBase64 = (pdfBase64, filename) => {
+    if (!pdfBase64) return
+    const bytes = Uint8Array.from(atob(pdfBase64), (character) => character.charCodeAt(0))
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename || 'paz-y-salvo.pdf'
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  const emitirPazYSalvo = async (profileIds, enviarCorreo = pazEnviarCorreo) => {
+    if (!profileIds.length) return
+    setPazOcupado(true)
+    setPazError('')
+    setPazMensaje('')
+    try {
+      const result = await apiRequest(endpoints.pazYSalvo, {
+        method: 'POST',
+        body: { perfil_ids: profileIds, enviar_correo: enviarCorreo },
+      })
+      const omitidos = (result.resultados || []).filter((item) => item.estado === 'no_emitido')
+      setPazMensaje(`${result.emitidos} certificado(s) generado(s); ${omitidos.length} perfil(es) omitido(s) por saldo pendiente.${enviarCorreo ? ' Se intentó el envío por correo.' : ''}`)
+      setPazSeleccionados([])
+      descargarPdfBase64(result.pdfBase64, result.filename)
+      await Promise.all([loadSection('paz-y-salvo'), loadSection('usuarios')])
+      if (omitidos.length) {
+        setPazError(omitidos.map((item) => `${item.nombre}: saldo ${formatMoney(item.saldo_pendiente)}`).join(' · '))
+      }
+    } catch (error) {
+      setPazError(error.message || 'No fue posible generar los paz y salvo.')
+    } finally {
+      setPazOcupado(false)
+    }
+  }
+
+  const descargarPazYSalvoGuardado = async (id) => {
+    try {
+      const result = await apiRequest(`${endpoints.pazYSalvo}/${id}/descargar`)
+      descargarPdfBase64(result.pdfBase64, result.filename)
+    } catch (error) {
+      setPazError(error.message || 'No fue posible descargar el certificado.')
+    }
+  }
 
   const renderDashboard = () => (
     <>
@@ -203,22 +255,24 @@ export default function SectionViews({ activeSection, context }) {
               <th>Correo</th>
               <th>Rol</th>
               <th>Estado</th>
+              <th>Estado de cuenta</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {sectionErrors.usuarios ? (
-              <tr><td colSpan="5" className="table-message error-text">{sectionErrors.usuarios}</td></tr>
+              <tr><td colSpan="6" className="table-message error-text">{sectionErrors.usuarios}</td></tr>
             ) : loadingSections.usuarios ? (
-              <tr><td colSpan="5" className="table-message">Cargando usuarios...</td></tr>
+              <tr><td colSpan="6" className="table-message">Cargando usuarios...</td></tr>
             ) : filterRows(sectionData.usuarios || []).length === 0 ? (
-              <tr><td colSpan="5" className="table-message">No hay resultados.</td></tr>
+              <tr><td colSpan="6" className="table-message">No hay resultados.</td></tr>
             ) : filterRows(sectionData.usuarios).map((user) => (
               <tr key={user.id}>
                 <td>{[user.nombre, user.apellido].filter(Boolean).join(' ') || 'Sin nombre'}</td>
                 <td>{user.correo || '—'}</td>
                 <td>{user.rol || '—'}</td>
                 <td><span className={`status-badge ${user.activo ? 'activo' : 'inactivo'}`}>{user.activo ? 'Activo' : 'Inactivo'}</span></td>
+                <td><span className={`status-badge ${user.estado_cuenta === 'al_dia' ? 'activo' : 'inactivo'}`}>{user.estado_cuenta === 'al_dia' ? 'Al día' : `Pendiente · ${formatMoney(user.saldo_pendiente || 0)}`}</span></td>
                 <td className="row-actions">
                   <button type="button" className="link-button" onClick={() => openOperation('editarUsuario', user)}>Editar</button>
                   {user.id !== profile?.id && <>
@@ -230,7 +284,11 @@ export default function SectionViews({ activeSection, context }) {
                       <option value="fontanero">Fontanero</option>
                       <option value="administrador">Administrador</option>
                     </select>
-                    <button type="button" className="link-button danger-link" onClick={() => performAction('usuarios', `${endpoints.adminUsers}/${user.id}`, 'DELETE', undefined, 'La eliminación es permanente y borra el historial asociado a esta cuenta. No se puede deshacer. ¿Continuar?')}><Trash2 size={14} />Eliminar</button>
+                    <button type="button" className="link-button danger-link" onClick={() => {
+                      const nota = user.rol === 'fontanero' ? window.prompt('Escribe la nota requerida para archivar la salida del fontanero:') : undefined
+                      if (user.rol === 'fontanero' && !nota?.trim()) return
+                      void performAction('usuarios', `${endpoints.adminUsers}/${user.id}`, 'DELETE', { nota }, 'Se archivará el historial, se notificará el correo del perfil y luego se eliminará la cuenta. ¿Continuar?')
+                    }}><Trash2 size={14} />Eliminar</button>
                   </>}
                 </td>
               </tr>
@@ -240,6 +298,124 @@ export default function SectionViews({ activeSection, context }) {
       </div>
     </div>
   )
+
+  const downloadDeletedUsers = () => {
+    const rows = sectionData.eliminados || []
+    const headers = ['Nombre', 'Correo', 'Rol', 'Eliminado el', 'Tipo de eliminacion', 'Actor', 'Nota de salida', 'Total pendiente', 'Facturas pendientes', 'Estado del correo', 'Historial completo']
+    const cell = (value) => {
+      const text = typeof value === 'string' ? value : JSON.stringify(value ?? '')
+      const safe = /^[=+\-@]/.test(text) ? `'${text}` : text
+      return `"${safe.replaceAll('"', '""')}"`
+    }
+    const lines = [headers, ...rows.map((row) => [
+      row.full_name, row.email, row.role, row.deleted_at || row.requested_at,
+      row.deletion_type, row.deleted_by_snapshot, row.exit_note,
+      row.pending_total, row.pending_invoices, row.email_status, row.history_snapshot,
+    ])].map((row) => row.map(cell).join(',')).join('\r\n')
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(new Blob(['\uFEFF', lines], { type: 'text/csv;charset=utf-8' }))
+    link.download = `perfiles-eliminados-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
+
+  const downloadDeletedUsersJson = () => {
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(new Blob([JSON.stringify(sectionData.eliminados || [], null, 2)], { type: 'application/json;charset=utf-8' }))
+    link.download = `historial-perfiles-eliminados-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
+
+  const renderDeletedUsers = () => {
+    const rows = sectionData.eliminados || []
+    return <div className="panel">
+      <div className="panel-header">
+        <div><p className="eyebrow">Archivo e historial</p><h3>Perfiles eliminados</h3></div>
+        <div className="hero-actions">
+          <button type="button" className="secondary-button" onClick={downloadDeletedUsers} disabled={!rows.length}><Download size={16} />Resumen CSV</button>
+          <button type="button" className="secondary-button" onClick={downloadDeletedUsersJson} disabled={!rows.length}><Download size={16} />Historial completo JSON</button>
+        </div>
+      </div>
+      <div className="table-wrap"><table><thead><tr><th>Perfil</th><th>Rol</th><th>Eliminado por</th><th>Fecha</th><th>Saldo pendiente</th><th>Correo</th></tr></thead>
+        <tbody>
+          {sectionErrors.eliminados ? <tr><td colSpan="6" className="table-message error-text">{sectionErrors.eliminados}</td></tr>
+            : loadingSections.eliminados ? <tr><td colSpan="6" className="table-message">Cargando historial...</td></tr>
+              : rows.length === 0 ? <tr><td colSpan="6" className="table-message">Aún no hay perfiles eliminados.</td></tr>
+                : rows.map((row) => <tr key={row.id}>
+                  <td>{row.full_name}<small>{row.email}</small></td><td>{row.role}</td>
+                  <td>{row.deletion_type === 'administrador' ? `Administrador: ${row.deleted_by_snapshot?.nombre || row.deleted_by_snapshot?.correo || 'registrado'}` : 'El propio perfil'}</td>
+                  <td>{formatDate(row.deleted_at || row.requested_at)}</td>
+                  <td>{formatMoney(row.pending_total || 0)}<small>{row.pending_invoices?.length || 0} facturas</small></td>
+                  <td>{row.email_status === 'sent' ? 'Enviado' : row.email_status === 'failed' ? <><span>Falló</span><button type="button" className="link-button" onClick={() => performAction('eliminados', `${endpoints.deletedUsers}/${row.id}/reintentar-correo`, 'POST', {})}>Reintentar</button></> : 'Pendiente'}</td>
+                </tr>)}
+        </tbody>
+      </table></div>
+      <p className="table-message">El CSV incluye facturas pendientes, averías, pagos y acciones administrativas archivadas.</p>
+    </div>
+  }
+
+  const renderPazYSalvo = () => {
+    const alDia = users.filter((user) => user.estado_cuenta === 'al_dia')
+    const certificados = sectionData['paz-y-salvo'] || []
+    const alternarSeleccion = (id) => setPazSeleccionados((actual) => (
+      actual.includes(id) ? actual.filter((value) => value !== id) : [...actual, id]
+    ))
+    return <div className="content-grid">
+      <section className="panel">
+        <div className="panel-header">
+          <div><p className="eyebrow">Constancias financieras</p><h3>Generar paz y salvo</h3></div>
+          <div className="hero-actions">
+            <label className="checkbox-label"><input type="checkbox" checked={pazEnviarCorreo} onChange={(event) => setPazEnviarCorreo(event.target.checked)} />Enviar por correo</label>
+            <button type="button" className="primary-button" disabled={!pazSeleccionados.length || pazOcupado} onClick={() => emitirPazYSalvo(pazSeleccionados)}>
+              <Download size={16} />{pazOcupado ? 'Generando...' : `Generar ${pazSeleccionados.length} seleccionado(s)`}
+            </button>
+          </div>
+        </div>
+        <p className="report-caption">Solo se expiden certificados a perfiles sin facturas pendientes ni vencidas. Puedes seleccionar uno o varios perfiles; el PDF se descargará y, si activas el envío, cada persona recibirá su certificado adjunto.</p>
+        {pazMensaje && <p className="action-feedback" role="status">{pazMensaje}</p>}
+        {pazError && <p className="auth-error" role="alert">{pazError}</p>}
+        <div className="table-wrap"><table><thead><tr><th><input type="checkbox" aria-label="Seleccionar todos los perfiles al día" checked={alDia.length > 0 && alDia.every((user) => pazSeleccionados.includes(user.id))} disabled={!alDia.length || pazOcupado} onChange={(event) => setPazSeleccionados(event.target.checked ? alDia.map((user) => user.id) : [])} /></th><th>Perfil</th><th>Rol</th><th>Estado de cuenta</th><th>Saldo</th><th>Acción</th></tr></thead>
+          <tbody>
+            {sectionErrors.usuarios ? <tr><td colSpan="6" className="table-message error-text">{sectionErrors.usuarios}</td></tr>
+              : loadingSections.usuarios ? <tr><td colSpan="6" className="table-message">Cargando perfiles...</td></tr>
+                : users.length === 0 ? <tr><td colSpan="6" className="table-message">No hay perfiles.</td></tr>
+                  : users.map((user) => {
+                    const estaAlDia = user.estado_cuenta === 'al_dia'
+                    return <tr key={user.id}>
+                      <td><input type="checkbox" aria-label={`Seleccionar ${user.correo}`} disabled={!estaAlDia || pazOcupado} checked={pazSeleccionados.includes(user.id)} onChange={() => alternarSeleccion(user.id)} /></td>
+                      <td>{[user.nombre, user.apellido].filter(Boolean).join(' ')}<small>{user.correo}</small></td>
+                      <td>{user.rol}</td>
+                      <td><span className={`status-badge ${estaAlDia ? 'activo' : 'inactivo'}`}>{estaAlDia ? 'Al día' : 'Saldo pendiente'}</span></td>
+                      <td>{formatMoney(user.saldo_pendiente || 0)}</td>
+                      <td>{estaAlDia
+                        ? <button type="button" className="link-button" disabled={pazOcupado} onClick={() => emitirPazYSalvo([user.id])}>Generar individual</button>
+                        : <span>{user.facturas_pendientes?.length || 0} factura(s) pendiente(s)</span>}</td>
+                    </tr>
+                  })}
+          </tbody>
+        </table></div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Registro de expedición</p><h3>Certificados generados</h3></div></div>
+        <div className="table-wrap"><table><thead><tr><th>Número</th><th>Perfil</th><th>Expedido</th><th>Correo</th><th>PDF</th></tr></thead>
+          <tbody>
+            {sectionErrors['paz-y-salvo'] ? <tr><td colSpan="5" className="table-message error-text">{sectionErrors['paz-y-salvo']}</td></tr>
+              : loadingSections['paz-y-salvo'] ? <tr><td colSpan="5" className="table-message">Cargando certificados...</td></tr>
+                : certificados.length === 0 ? <tr><td colSpan="5" className="table-message">Aún no hay certificados emitidos.</td></tr>
+                  : certificados.map((cert) => <tr key={cert.id}>
+                    <td>{cert.certificate_number}</td>
+                    <td>{[cert.profile_snapshot?.nombre, cert.profile_snapshot?.apellido].filter(Boolean).join(' ')}<small>{cert.profile_snapshot?.correo}</small></td>
+                    <td>{formatDate(cert.generated_at)}</td>
+                    <td>{cert.email_status === 'sent' ? 'Enviado' : cert.email_status === 'failed' ? <><span>Falló</span><button type="button" className="link-button" onClick={() => performAction('paz-y-salvo', `${endpoints.pazYSalvo}/${cert.id}/reintentar-correo`, 'POST', {})}>Reintentar</button></> : 'No solicitado'}</td>
+                    <td><button type="button" className="link-button" onClick={() => descargarPazYSalvoGuardado(cert.id)}><Download size={14} />Descargar</button></td>
+                  </tr>)}
+          </tbody>
+        </table></div>
+      </section>
+    </div>
+  }
 
   const renderFacturas = () => (
     <div className="panel">
@@ -579,6 +755,8 @@ export default function SectionViews({ activeSection, context }) {
   const sectionMap = {
     dashboard: renderDashboard(),
     usuarios: renderUsers(),
+    eliminados: renderDeletedUsers(),
+    'paz-y-salvo': renderPazYSalvo(),
     facturas: renderFacturas(),
     pagos: renderPagos(),
     cortes: renderCortes(),

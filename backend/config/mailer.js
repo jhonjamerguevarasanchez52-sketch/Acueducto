@@ -67,7 +67,7 @@ const brevo = new BrevoClient({ apiKey });
  *
  * @param {{ to: string, subject: string, html: string }} opciones
  */
-async function enviarCorreo({ to, subject, html }) {
+async function enviarCorreo({ to, subject, html, attachments }) {
   if (!apiKey || !remitenteCorreo) {
     console.warn('[mailer] Correo no enviado: falta BREVO_API_KEY o EMAIL_USER.');
     return null;
@@ -77,6 +77,7 @@ async function enviarCorreo({ to, subject, html }) {
     sender: { name: remitenteNombre, email: remitenteCorreo },
     to: [{ email: to }],
     htmlContent: construirCorreoHtml({ subject, html }),
+    ...(attachments?.length ? { attachment: attachments } : {}),
   });
 }
 

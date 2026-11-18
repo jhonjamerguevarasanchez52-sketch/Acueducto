@@ -6,6 +6,8 @@ const {
   CAMPOS_REQUERIDOS_PERFIL_COMPLETO,
 } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+const { eliminarCuenta } = require('../services/accountDeletionService');
+const authModel = require('../models/authModel');
 
 const MS_LIMITE_EDICION_PERFIL = DIAS_LIMITE_EDICION_PERFIL * 24 * 60 * 60 * 1000;
 
@@ -76,4 +78,29 @@ async function editarPerfil(req, res) {
   }
 }
 
-module.exports = { verPerfil, editarPerfil };
+async function eliminarMiCuenta(req, res) {
+  try {
+    const password = String(req.body?.passwordActual || '');
+    if (!password) return res.status(400).json({ error: 'Confirma tu contraseña para eliminar la cuenta.' });
+    const { error: authError } = await authModel.signIn(req.usuario.email, password);
+    if (authError) return res.status(401).json({ error: 'La contraseña no es correcta.' });
+    const resultado = await eliminarCuenta({
+      userId: req.usuario.id,
+      actor: req.usuario,
+      deletionType: 'usuario',
+      exitNote: req.body?.nota,
+    });
+    if (resultado.notFound) return res.status(404).json({ error: 'Perfil no encontrado' });
+    return res.status(200).json({
+      message: resultado.emailSent
+        ? 'Cuenta eliminada. Se envió un correo con el resumen de facturas pendientes.'
+        : 'Cuenta eliminada, pero no se pudo enviar el correo. La administración podrá reintentarlo.',
+      ...resultado,
+    });
+  } catch (err) {
+    if (err.statusCode && err.statusCode < 500) return res.status(err.statusCode).json({ error: err.message });
+    return errorInesperado(res, err);
+  }
+}
+
+module.exports = { verPerfil, editarPerfil, eliminarMiCuenta };

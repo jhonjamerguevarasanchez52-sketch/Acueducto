@@ -1,0 +1,80 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 4081 >>
+stream
+1 1 1 rg 0 0 595 842 re f
+0.04 0.20 0.37 rg 0 690 595 152 re f
+0.22 0.68 0.82 rg 0 686 595 4 re f
+0.78 0.92 0.97 RG 101 786 m 101 798.70254925 90.70254925 809 78 809 c 65.29745075 809 55 798.70254925 55 786 c 55 773.29745075 65.29745075 763 78 763 c 90.70254925 763 101 773.29745075 101 786 c S
+0.36 0.75 0.86 rg 81.1 763 m 81.1 764.712082725 79.712082725 766.1 78 766.1 c 76.287917275 766.1 74.9 764.712082725 74.9 763 c 74.9 761.287917275 76.287917275 759.9 78 759.9 c 79.712082725 759.9 81.1 761.287917275 81.1 763 c f
+0.36 0.75 0.86 rg 104.1 786 m 104.1 787.712082725 102.712082725 789.1 101 789.1 c 99.287917275 789.1 97.9 787.712082725 97.9 786 c 97.9 784.287917275 99.287917275 782.9 101 782.9 c 102.712082725 782.9 104.1 784.287917275 104.1 786 c f
+0.36 0.75 0.86 rg 81.1 809 m 81.1 810.712082725 79.712082725 812.1 78 812.1 c 76.287917275 812.1 74.9 810.712082725 74.9 809 c 74.9 807.287917275 76.287917275 805.9 78 805.9 c 79.712082725 805.9 81.1 807.287917275 81.1 809 c f
+0.36 0.75 0.86 rg 58.1 786 m 58.1 787.712082725 56.712082725 789.1 55 789.1 c 53.287917275 789.1 51.9 787.712082725 51.9 786 c 51.9 784.287917275 53.287917275 782.9 55 782.9 c 56.712082725 782.9 58.1 784.287917275 58.1 786 c f
+0.40 0.78 0.88 rg 78 770 m 91 786 91 793 78 802 c 65 793 65 786 78 770 c f
+1 1 1 rg 78 781 m 84 794 l 78 790 l 72 794 l h f
+BT /F2 10 Tf 0.72 0.88 0.95 rg 1 0 0 1 124 805 Tm (ACUEDUCTO CAMPO AMOR) Tj ET
+BT /F2 21 Tf 1 1 1 rg 1 0 0 1 124 776 Tm (CERTIFICADO DE) Tj ET
+BT /F2 21 Tf 1 1 1 rg 1 0 0 1 124 748 Tm (PAZ Y SALVO) Tj ET
+0.10 0.34 0.51 rg 424 746 126 29 re f
+BT /F2 9 Tf 0.91 0.97 0.99 rg 1 0 0 1 434 757 Tm (No. PS-20261118-563C0E50) Tj ET
+0.91 0.97 0.95 rg 55 632 485 34 re f
+0.13 0.58 0.43 rg 83 649 m 83 653.418278 79.418278 657 75 657 c 70.581722 657 67 653.418278 67 649 c 67 644.581722 70.581722 641 75 641 c 79.418278 641 83 644.581722 83 649 c f
+1 1 1 rg 71 649 m 74 646 l 80 653 l 78 655 l 74 650 l 72 652 l h f
+BT /F2 11 Tf 0.09 0.42 0.33 rg 1 0 0 1 92 645 Tm (ESTADO DE CUENTA: AL DIA) Tj ET
+BT /F2 9 Tf 0.09 0.42 0.33 rg 1 0 0 1 382 645 Tm (Saldo pendiente: $0 COP) Tj ET
+BT /F2 10 Tf 0.19 0.35 0.45 rg 1 0 0 1 55 594 Tm (A QUIEN CORRESPONDA) Tj ET
+BT /F2 12 Tf 0.04 0.20 0.37 rg 1 0 0 1 55 572 Tm (LA ADMINISTRACION DEL ACUEDUCTO CAMPO AMOR) Tj ET
+BT /F2 10 Tf 0.04 0.20 0.37 rg 1 0 0 1 55 545 Tm (CERTIFICA QUE:) Tj ET
+0.96 0.98 0.99 rg 55 477 485 51 re f
+0.22 0.68 0.82 rg 55 477 4 51 re f
+BT /F2 8 Tf 0.37 0.49 0.55 rg 1 0 0 1 72 507 Tm (TITULAR DEL SERVICIO) Tj ET
+BT /F2 13 Tf 0.04 0.20 0.37 rg 1 0 0 1 72 487 Tm (Usuario Prueba E2E 22cd59e7) Tj ET
+BT /F1 9 Tf 0.32 0.43 0.49 rg 1 0 0 1 62 444 Tm (Correo: e2e.usuario.22cd59e7@example.com) Tj ET
+BT /F1 9 Tf 0.32 0.43 0.49 rg 1 0 0 1 62 429 Tm (Numero de lote: E2E-22cd59e7) Tj ET
+BT /F1 9 Tf 0.32 0.43 0.49 rg 1 0 0 1 62 414 Tm (Direccion: Predio de prueba E2E) Tj ET
+BT /F1 9 Tf 0.32 0.43 0.49 rg 1 0 0 1 62 399 Tm (Zona: Zona de prueba) Tj ET
+BT /F1 10 Tf 0.16 0.27 0.33 rg 1 0 0 1 62 361 Tm (Que Usuario Prueba E2E 22cd59e7, identificado en el sistema del acueducto, se encuentra) Tj ET
+BT /F1 10 Tf 0.16 0.27 0.33 rg 1 0 0 1 62 344 Tm (a paz y salvo por concepto de las facturas registradas hasta la fecha de expedicion de) Tj ET
+BT /F1 10 Tf 0.16 0.27 0.33 rg 1 0 0 1 62 327 Tm (este certificado \(17/11/2026\).) Tj ET
+0.86 0.91 0.93 RG 1 w 55 320 m 540 320 l S
+BT /F1 9 Tf 0.37 0.49 0.55 rg 1 0 0 1 55 305 Tm (Este documento refleja el estado de cuenta a la fecha indicada.) Tj ET
+BT /F1 9 Tf 0.37 0.49 0.55 rg 1 0 0 1 55 290 Tm (No incluye obligaciones que se generen con posterioridad.) Tj ET
+BT /F1 10 Tf 0.30 0.42 0.48 rg 1 0 0 1 55 240 Tm (Atentamente,) Tj ET
+0.43 0.58 0.65 RG 0.8 w 55 216 m 235 216 l S
+BT /F2 9 Tf 0.04 0.20 0.37 rg 1 0 0 1 55 199 Tm (ADMINISTRACION) Tj ET
+BT /F1 9 Tf 0.37 0.49 0.55 rg 1 0 0 1 55 184 Tm (Acueducto Campo Amor) Tj ET
+0.96 0.98 0.99 rg 0 0 595 55 re f
+0.84 0.90 0.93 RG 1 w 0 55 m 595 55 l S
+BT /F1 8 Tf 0.37 0.49 0.55 rg 1 0 0 1 55 32 Tm (Expedido el 17/11/2026) Tj ET
+BT /F2 8 Tf 0.04 0.20 0.37 rg 1 0 0 1 390 32 Tm (PS-20261118-563C0E50) Tj ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000212 00000 n 
+0000000314 00000 n 
+0000000450 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+4582
+%%EOF

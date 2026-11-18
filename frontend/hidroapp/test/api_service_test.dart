@@ -49,7 +49,10 @@ void main() {
       );
       final api = ApiService(client: client);
       var unauthorizedCalls = 0;
-      api.onUnauthorized = () => unauthorizedCalls += 1;
+      api.onUnauthorized = () async {
+        unauthorizedCalls += 1;
+        return false;
+      };
       addTearDown(api.dispose);
 
       await expectLater(

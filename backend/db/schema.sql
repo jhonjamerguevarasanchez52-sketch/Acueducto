@@ -172,9 +172,68 @@ create table if not exists public.admin_audit_log (
 );
 create index if not exists idx_admin_audit_log_created_at
   on public.admin_audit_log (created_at desc);
+alter table public.admin_audit_log
+  add column if not exists actor_snapshot jsonb,
+  add column if not exists subject_user_id uuid;
+create index if not exists idx_admin_audit_subject_user
+  on public.admin_audit_log (subject_user_id, created_at desc);
 alter table public.admin_audit_log enable row level security;
 revoke all on table public.admin_audit_log from public, anon, authenticated;
 grant insert on table public.admin_audit_log to service_role;
+
+-- Archivo permanente e independiente de cuentas e historiales eliminados.
+create table if not exists public.deleted_users (
+  id uuid primary key default gen_random_uuid(),
+  deleted_user_id uuid not null unique,
+  role text not null check (role in ('administrador', 'usuario', 'fontanero')),
+  email text not null,
+  full_name text not null,
+  deletion_type text not null check (deletion_type in ('usuario', 'administrador')),
+  deleted_by_id uuid,
+  deleted_by_snapshot jsonb not null default '{}'::jsonb,
+  exit_note text,
+  profile_snapshot jsonb not null,
+  history_snapshot jsonb not null default '{}'::jsonb,
+  pending_invoices jsonb not null default '[]'::jsonb,
+  pending_total numeric(12,2) not null default 0,
+  status text not null default 'pending' check (status in ('pending', 'deleted', 'error')),
+  email_status text not null default 'pending' check (email_status in ('pending', 'sent', 'failed', 'not_required')),
+  email_error text,
+  error_message text,
+  requested_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+create index if not exists idx_deleted_users_deleted_at on public.deleted_users (deleted_at desc);
+create index if not exists idx_deleted_users_email on public.deleted_users (email);
+create index if not exists idx_deleted_users_status on public.deleted_users (status, email_status);
+alter table public.deleted_users enable row level security;
+revoke all on table public.deleted_users from public, anon, authenticated;
+grant all on table public.deleted_users to service_role;
+
+-- Certificados de paz y salvo emitidos para perfiles con saldo cero.
+create table if not exists public.clearance_certificates (
+  id uuid primary key default gen_random_uuid(),
+  certificate_number text not null unique,
+  profile_id uuid not null,
+  profile_snapshot jsonb not null,
+  invoice_snapshot jsonb not null default '[]'::jsonb,
+  confirmed_payments_snapshot jsonb not null default '[]'::jsonb,
+  outstanding_balance numeric(12,2) not null default 0 check (outstanding_balance = 0),
+  generated_by_id uuid,
+  generated_by_snapshot jsonb not null default '{}'::jsonb,
+  generated_at timestamptz not null default now(),
+  email_sent_to text,
+  email_status text not null default 'not_requested'
+    check (email_status in ('not_requested', 'sent', 'failed')),
+  email_error text
+);
+create index if not exists idx_clearance_certificates_profile
+  on public.clearance_certificates (profile_id, generated_at desc);
+create index if not exists idx_clearance_certificates_generated_at
+  on public.clearance_certificates (generated_at desc);
+alter table public.clearance_certificates enable row level security;
+revoke all on table public.clearance_certificates from public, anon, authenticated;
+grant all on table public.clearance_certificates to service_role;
 
 -- ----------------------------------------------------------------------------
 --  service_outages: cortes de servicio.

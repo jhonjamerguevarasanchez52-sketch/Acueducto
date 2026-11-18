@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
@@ -14,9 +14,9 @@ class PerfilScreen extends StatelessWidget {
   const PerfilScreen({super.key});
 
   Future<void> _editarPerfil(BuildContext context) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const EditarPerfilScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const EditarPerfilScreen()));
   }
 
   Future<void> _cerrarSesion(BuildContext context) async {
@@ -43,8 +43,85 @@ class PerfilScreen extends StatelessWidget {
       await context.read<AuthProvider>().logout();
     } catch (_) {
       if (context.mounted) {
-        AppSnackbar.error(context, 'No se pudo cerrar sesión. Intenta de nuevo.');
+        AppSnackbar.error(
+          context,
+          'No se pudo cerrar sesión. Intenta de nuevo.',
+        );
       }
+    }
+  }
+
+  Future<void> _eliminarCuenta(BuildContext context, String rol) async {
+    final password = TextEditingController();
+    final nota = TextEditingController();
+    final datos = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar cuenta'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'La cuenta se eliminará inmediatamente. Se guardará un historial administrativo y recibirás un correo con las facturas que queden pendientes.',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: password,
+                obscureText: true,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Contraseña actual',
+                ),
+              ),
+              if (rol == 'fontanero') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nota,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Nota de salida (obligatoria)',
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () {
+              if (password.text.trim().isEmpty ||
+                  (rol == 'fontanero' && nota.text.trim().isEmpty)) {
+                return;
+              }
+              Navigator.pop(ctx, {
+                'password': password.text,
+                'nota': nota.text,
+              });
+            },
+            child: const Text('Eliminar definitivamente'),
+          ),
+        ],
+      ),
+    );
+    final passwordActual = password.text;
+    final notaSalida = nota.text;
+    password.dispose();
+    nota.dispose();
+    if (datos == null || !context.mounted) return;
+    try {
+      await context.read<AuthProvider>().eliminarCuenta(
+        passwordActual: datos['password'] ?? passwordActual,
+        nota: rol == 'fontanero' ? (datos['nota'] ?? notaSalida) : null,
+      );
+    } catch (error) {
+      if (context.mounted) AppSnackbar.error(context, error.toString());
     }
   }
 
@@ -66,14 +143,18 @@ class PerfilScreen extends StatelessWidget {
                 CircleAvatar(
                   radius: 40,
                   backgroundColor: colores.chipBackground,
-                  child: const Icon(Icons.person,
-                      color: Color.fromARGB(255, 91, 153, 247), size: 44),
+                  child: const Icon(
+                    Icons.person,
+                    color: Color.fromARGB(255, 91, 153, 247),
+                    size: 44,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   perfil?.nombreCompleto ?? 'Usuario',
-                  style: textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
@@ -83,8 +164,10 @@ class PerfilScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: colores.chipBackground,
                     borderRadius: BorderRadius.circular(20),
@@ -141,13 +224,17 @@ class PerfilScreen extends StatelessWidget {
                 children: [
                   Text(
                     'Apariencia',
-                    style: textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Elige cómo se ve la app en este dispositivo.',
-                    style: TextStyle(fontSize: 12.5, color: colores.secondaryText),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: colores.secondaryText,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   SegmentedButton<ThemeMode>(
@@ -215,6 +302,16 @@ class PerfilScreen extends StatelessWidget {
               side: BorderSide(color: colores.danger),
             ),
           ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => _eliminarCuenta(context, perfil?.rol ?? 'usuario'),
+            icon: const Icon(Icons.delete_forever_outlined),
+            label: const Text('Eliminar cuenta'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colores.danger,
+              side: BorderSide(color: colores.danger),
+            ),
+          ),
         ],
       ),
     );
@@ -230,12 +327,17 @@ class _Dato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final texto = (valor == null || valor!.trim().isEmpty) ? 'Sin registrar' : valor!;
+    final texto = (valor == null || valor!.trim().isEmpty)
+        ? 'Sin registrar'
+        : valor!;
     final sinDato = texto == 'Sin registrar';
     final colores = AppColors.of(context);
     return ListTile(
       leading: Icon(icono, color: colores.info),
-      title: Text(etiqueta, style: TextStyle(fontSize: 13, color: colores.secondaryText)),
+      title: Text(
+        etiqueta,
+        style: TextStyle(fontSize: 13, color: colores.secondaryText),
+      ),
       subtitle: Text(
         texto,
         style: TextStyle(

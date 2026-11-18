@@ -112,10 +112,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> login(String correo, String password) async {
-    final data = await _api.post('/auth/login', body: {
-      'correo': correo.trim(),
-      'password': password,
-    });
+    final data = await _api.post(
+      '/auth/login',
+      body: {'correo': correo.trim(), 'password': password},
+    );
 
     String? token;
     try {
@@ -161,7 +161,8 @@ class AuthProvider extends ChangeNotifier {
       if (!supported) {
         throw ApiException('Este dispositivo no tiene biometría configurada.');
       }
-      final refreshToken = await _storage.read(_refreshTokenKey) ??
+      final refreshToken =
+          await _storage.read(_refreshTokenKey) ??
           await _storage.read(_legacyRefreshTokenKey);
       if (refreshToken == null || refreshToken.isEmpty) {
         throw ApiException(
@@ -180,7 +181,8 @@ class AuthProvider extends ChangeNotifier {
     if (!_biometricEnabled) {
       throw ApiException('El acceso biométrico está desactivado.');
     }
-    final refreshToken = await _storage.read(_refreshTokenKey) ??
+    final refreshToken =
+        await _storage.read(_refreshTokenKey) ??
         await _storage.read(_legacyRefreshTokenKey);
     if (refreshToken == null || refreshToken.isEmpty) {
       throw ApiException(
@@ -223,10 +225,10 @@ class AuthProvider extends ChangeNotifier {
     String codigo,
     String password,
   ) async {
-    await _api.post('/auth/verificar', body: {
-      'correo': correo.trim(),
-      'codigo': codigo.trim(),
-    });
+    await _api.post(
+      '/auth/verificar',
+      body: {'correo': correo.trim(), 'codigo': codigo.trim()},
+    );
     await login(correo, password);
   }
 
@@ -238,8 +240,10 @@ class AuthProvider extends ChangeNotifier {
   /// Pide al backend que envíe un código de recuperación de contraseña al
   /// correo. Por seguridad responde igual exista o no la cuenta.
   Future<void> solicitarRecuperacion(String correo) async {
-    await _api.post('/auth/solicitar-recuperacion',
-        body: {'correo': correo.trim()});
+    await _api.post(
+      '/auth/solicitar-recuperacion',
+      body: {'correo': correo.trim()},
+    );
   }
 
   /// Restablece la contraseña (sin sesión) con el código recibido por correo.
@@ -248,11 +252,14 @@ class AuthProvider extends ChangeNotifier {
     String codigo,
     String nuevaPassword,
   ) async {
-    await _api.post('/auth/resetear-password', body: {
-      'correo': correo.trim(),
-      'codigo': codigo.trim(),
-      'nuevaPassword': nuevaPassword,
-    });
+    await _api.post(
+      '/auth/resetear-password',
+      body: {
+        'correo': correo.trim(),
+        'codigo': codigo.trim(),
+        'nuevaPassword': nuevaPassword,
+      },
+    );
   }
 
   /// Cambia la contraseña de la cuenta ya autenticada. Se usa para el cambio
@@ -280,6 +287,21 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     await _clear(preserveBiometric: _biometricEnabled);
+    _setStatus(AuthStatus.unauthenticated);
+  }
+
+  Future<void> eliminarCuenta({
+    required String passwordActual,
+    String? nota,
+  }) async {
+    await _api.delete(
+      '/profile/mi-cuenta',
+      body: {
+        'passwordActual': passwordActual,
+        if (nota != null && nota.trim().isNotEmpty) 'nota': nota.trim(),
+      },
+    );
+    await _clear();
     _setStatus(AuthStatus.unauthenticated);
   }
 
@@ -320,7 +342,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> _renovarSesionInterno() async {
-    final refreshToken = await _storage.read(_refreshTokenKey) ??
+    final refreshToken =
+        await _storage.read(_refreshTokenKey) ??
         await _storage.read(_legacyRefreshTokenKey);
     if (refreshToken == null || refreshToken.isEmpty) {
       await _clear();
@@ -331,13 +354,17 @@ class AuthProvider extends ChangeNotifier {
     try {
       final data = await _api.renewSession(refreshToken);
       if (data is! Map || data['session'] is! Map) {
-        throw ApiException('El servidor no devolvió una sesión renovada válida.');
+        throw ApiException(
+          'El servidor no devolvió una sesión renovada válida.',
+        );
       }
       final session = data['session'] as Map;
       final accessToken = session['access_token'];
       final nextRefreshToken = session['refresh_token'];
       if (accessToken is! String || accessToken.isEmpty) {
-        throw ApiException('El servidor no devolvió un token de acceso válido.');
+        throw ApiException(
+          'El servidor no devolvió un token de acceso válido.',
+        );
       }
       await _storage.write(_tokenKey, accessToken);
       _api.authToken = accessToken;
@@ -348,7 +375,10 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (error) {
       final statusCode = error is ApiException ? error.statusCode : null;
-      if (statusCode == null || statusCode >= 500 || statusCode == 408 || statusCode == 429) {
+      if (statusCode == null ||
+          statusCode >= 500 ||
+          statusCode == 408 ||
+          statusCode == 429) {
         // Ante una falla temporal se conserva el refresh token para reintentar.
         _api.authToken = null;
         _setStatus(AuthStatus.unauthenticated);

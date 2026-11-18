@@ -46,39 +46,47 @@ class ApiService {
   Uri _uri(String path) => Uri.parse('${ApiConfig.baseUrl}$path');
 
   Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        if (authToken != null) 'Authorization': 'Bearer $authToken',
-      };
+    'Content-Type': 'application/json',
+    if (authToken != null) 'Authorization': 'Bearer $authToken',
+  };
 
-  Future<dynamic> get(String path) => _send(() => _client
-      .get(_uri(path), headers: _headers)
-      .timeout(_timeout));
+  Future<dynamic> get(String path) =>
+      _send(() => _client.get(_uri(path), headers: _headers).timeout(_timeout));
 
-  Future<dynamic> post(String path, {Object? body}) => _send(() => _client
-      .post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
-      .timeout(_timeout));
+  Future<dynamic> post(String path, {Object? body}) => _send(
+    () => _client
+        .post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
+        .timeout(_timeout),
+  );
 
   Future<dynamic> postBytes(
     String path, {
     required List<int> bytes,
     required String contentType,
-  }) =>
-      _send(
-        () => _client
-            .post(
-              _uri(path),
-              headers: {
-                'Content-Type': contentType,
-                if (authToken != null) 'Authorization': 'Bearer $authToken',
-              },
-              body: bytes,
-            )
-            .timeout(_timeout),
-      );
+  }) => _send(
+    () => _client
+        .post(
+          _uri(path),
+          headers: {
+            'Content-Type': contentType,
+            if (authToken != null) 'Authorization': 'Bearer $authToken',
+          },
+          body: bytes,
+        )
+        .timeout(_timeout),
+  );
 
-  Future<dynamic> put(String path, {Object? body}) => _send(() => _client
-      .put(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
-      .timeout(_timeout));
+  Future<dynamic> put(String path, {Object? body}) => _send(
+    () => _client
+        .put(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
+        .timeout(_timeout),
+  );
+
+  Future<dynamic> delete(String path, {Object? body}) => _send(
+    () => _client
+        .delete(_uri(path), headers: _headers, body: jsonEncode(body ?? {}))
+        .timeout(_timeout),
+  );
 
   /// Renews tokens through the public auth endpoint without re-entering
   /// [_send], which prevents a rejected refresh from creating a 401 loop.
@@ -111,7 +119,9 @@ class ApiService {
       res = await request();
     } on TimeoutException catch (e) {
       if (kDebugMode) debugPrint('[ApiService] timeout: $e');
-      throw ApiException('El servidor no respondió a tiempo. Verifica tu conexión.');
+      throw ApiException(
+        'El servidor no respondió a tiempo. Verifica tu conexión.',
+      );
     } catch (e, st) {
       // No filtramos el error real al usuario (podría ser un detalle técnico
       // sin sentido para él), pero sí lo dejamos en el log para poder
@@ -135,16 +145,22 @@ class ApiService {
       try {
         renewed = await onUnauthorized!.call();
       } catch (e) {
-        if (kDebugMode) debugPrint('[ApiService] no se pudo renovar la sesión: $e');
+        if (kDebugMode) {
+          debugPrint('[ApiService] no se pudo renovar la sesión: $e');
+        }
       }
       if (renewed) {
         try {
           res = await request();
         } on TimeoutException {
-          throw ApiException('El servidor no respondió a tiempo. Verifica tu conexión.');
+          throw ApiException(
+            'El servidor no respondió a tiempo. Verifica tu conexión.',
+          );
         } catch (e) {
           if (e is ApiException) rethrow;
-          if (kDebugMode) debugPrint('[ApiService] fallo al repetir petición: $e');
+          if (kDebugMode) {
+            debugPrint('[ApiService] fallo al repetir petición: $e');
+          }
           throw ApiException('No se pudo conectar con el servidor.');
         }
         data = null;
