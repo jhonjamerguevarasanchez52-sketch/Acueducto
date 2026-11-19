@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import 'cambiar_password_screen.dart';
 import '../widgets/core/core.dart';
 import 'editar_perfil_screen.dart';
+import 'eliminar_cuenta.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Pestaña "Perfil": muestra los datos de la cuenta del usuario, permite
@@ -53,80 +54,6 @@ class PerfilScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _eliminarCuenta(BuildContext context, String rol) async {
-    final password = TextEditingController();
-    final nota = TextEditingController();
-    final datos = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar cuenta'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'La cuenta se eliminará inmediatamente. Se guardará un historial administrativo y recibirás un correo con las facturas que queden pendientes.',
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: password,
-                obscureText: true,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Contraseña actual',
-                ),
-              ),
-              if (rol == 'fontanero') ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nota,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Nota de salida (obligatoria)',
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () {
-              if (password.text.trim().isEmpty ||
-                  (rol == 'fontanero' && nota.text.trim().isEmpty)) {
-                return;
-              }
-              Navigator.pop(ctx, {
-                'password': password.text,
-                'nota': nota.text,
-              });
-            },
-            child: const Text('Eliminar definitivamente'),
-          ),
-        ],
-      ),
-    );
-    final passwordActual = password.text;
-    final notaSalida = nota.text;
-    password.dispose();
-    nota.dispose();
-    if (datos == null || !context.mounted) return;
-    try {
-      await context.read<AuthProvider>().eliminarCuenta(
-        passwordActual: datos['password'] ?? passwordActual,
-        nota: rol == 'fontanero' ? (datos['nota'] ?? notaSalida) : null,
-      );
-    } catch (error) {
-      if (context.mounted) AppSnackbar.error(context, error.toString());
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final perfil = context.watch<AuthProvider>().profile;
@@ -145,16 +72,11 @@ class PerfilScreen extends StatelessWidget {
                 CircleAvatar(
                   radius: 40,
                   backgroundColor: colores.chipBackground,
-
                   child: const Icon(
-                    Icons.person,
+                    LucideIcons.user,
                     color: Color.fromARGB(255, 91, 153, 247),
                     size: 44,
                   ),
-
-                  child: const Icon(LucideIcons.user,
-                      color: Color.fromARGB(255, 91, 153, 247), size: 44),
-
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -230,21 +152,18 @@ class PerfilScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-
-                    'Apariencia',
+                    'Ajustes',
                     style: textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
-
-                    'Ajustes',
-                    style: textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w700),
-
                   ),
                   const SizedBox(height: 12),
                   Text(
                     'Apariencia',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: colores.secondaryText),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: colores.secondaryText,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -323,7 +242,8 @@ class PerfilScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: () => _eliminarCuenta(context, perfil?.rol ?? 'usuario'),
+            onPressed: () =>
+                solicitarEliminacionCuenta(context, perfil?.rol ?? 'usuario'),
             icon: const Icon(Icons.delete_forever_outlined),
             label: const Text('Eliminar cuenta'),
             style: OutlinedButton.styleFrom(
@@ -348,14 +268,17 @@ class _AjusteBiometria extends StatefulWidget {
 }
 
 class _AjusteBiometriaState extends State<_AjusteBiometria> {
-  late final Future<bool> _soportada =
-      context.read<AuthProvider>().deviceSupportsBiometrics();
+  late final Future<bool> _soportada = context
+      .read<AuthProvider>()
+      .deviceSupportsBiometrics();
   bool _cambiando = false;
 
   Future<void> _cambiar(bool activar) async {
     setState(() => _cambiando = true);
     try {
-      final hecho = await context.read<AuthProvider>().setBiometricEnabled(activar);
+      final hecho = await context.read<AuthProvider>().setBiometricEnabled(
+        activar,
+      );
       if (!mounted || !hecho) return;
       AppSnackbar.success(
         context,
@@ -366,7 +289,12 @@ class _AjusteBiometriaState extends State<_AjusteBiometria> {
     } on ApiException catch (e) {
       if (mounted) AppSnackbar.error(context, e.message);
     } catch (_) {
-      if (mounted) AppSnackbar.error(context, 'No se pudo validar la biometría. Intenta de nuevo.');
+      if (mounted) {
+        AppSnackbar.error(
+          context,
+          'No se pudo validar la biometría. Intenta de nuevo.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _cambiando = false);
     }

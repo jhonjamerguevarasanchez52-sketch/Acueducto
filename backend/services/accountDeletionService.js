@@ -134,15 +134,26 @@ async function eliminarCuenta({ userId, actor, deletionType, exitNote }) {
       status: 'pending',
       email_status: 'pending',
     }).select('id').single();
-    if (archiveError) throw new Error(`No se pudo archivar la cuenta: ${archiveError.message}`);
+    if (archiveError) {
+      const requiereMigracion = ['42P01', 'PGRST205'].includes(archiveError.code);
+      const error = new Error(requiereMigracion
+        ? 'Falta preparar el archivo de cuentas eliminadas. Ejecuta la migración 20261118_archivar_movimientos_al_eliminar_cuenta.sql en Supabase.'
+        : `No se pudo archivar la cuenta: ${archiveError.message}`);
+      if (requiereMigracion) error.statusCode = 503;
+      throw error;
+    }
     archiveId = archive.id;
   }
 
   const { error: deletionError } = await authModel.deleteUser(userId);
   if (deletionError) {
     await actualizarArchivo(archiveId, { status: 'error', error_message: deletionError.message });
-    const error = new Error(deletionError.message);
-    error.statusCode = deletionError.code === '23503' ? 409 : 500;
+    const bloqueaHistorial = deletionError.code === '23503'
+      || /database error deleting user|foreign key constraint|violates foreign key/i.test(deletionError.message || '');
+    const error = new Error(bloqueaHistorial
+      ? 'La base de datos aún bloquea la eliminación del historial contable. Ejecuta la migración 20261118_archivar_movimientos_al_eliminar_cuenta.sql y vuelve a intentarlo.'
+      : deletionError.message);
+    error.statusCode = bloqueaHistorial ? 409 : 500;
     throw error;
   }
 
