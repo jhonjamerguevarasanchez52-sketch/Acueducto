@@ -1,4 +1,4 @@
-const test = require('node:test');
+const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
@@ -8,6 +8,12 @@ const profileModelPath = path.join(__dirname, '../models/profileModel.js');
 const attemptsPath = path.join(__dirname, '../utils/controlIntentos.js');
 
 const attempts = { fallos: 0, exitos: 0 };
+
+beforeEach(() => {
+  attempts.fallos = 0;
+  attempts.exitos = 0;
+});
+
 const authModel = { signIn: async () => ({}), refreshSession: async () => ({}) };
 const profileModel = {
   findByEmail: async () => ({ data: { id: 'user-1', rol: 'administrador' }, error: null }),
