@@ -243,9 +243,11 @@ async function editarUsuario(req, res) {
   try {
     const { data, error } = await profileModel.update(userId, cambios);
 
-    if (error || !data) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (error?.code === '23505') {
+      return res.status(409).json({ error: 'Esa cédula ya está asociada a otra cuenta.' });
     }
+    if (error) return errorConsulta(res, error);
+    if (!data) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     await registrarAuditoria({
       adminId: req.usuario.id,

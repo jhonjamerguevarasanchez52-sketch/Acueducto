@@ -1200,7 +1200,7 @@ function App() {
                       {zones.map((zona) => <option key={zona} value={zona}>{zona}</option>)}
                     </select>
                   ) : (
-                    <input type={field.type || 'text'} min={field.type === 'number' ? '0' : undefined} step={field.type === 'number' ? 'any' : undefined} value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })} required={field.required} />
+                    <input type={field.type || 'text'} inputMode={field.name === 'cedula' ? 'numeric' : undefined} pattern={field.name === 'cedula' ? '[0-9]{5,15}' : undefined} minLength={field.name === 'cedula' ? 5 : undefined} maxLength={field.name === 'cedula' ? 15 : undefined} min={field.type === 'number' ? '0' : undefined} step={field.type === 'number' ? 'any' : undefined} value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: field.name === 'cedula' ? event.target.value.replace(/\D/g, '').slice(0, 15) : event.target.value })} required={field.required} />
                   )}
                 </label>
               ))}
