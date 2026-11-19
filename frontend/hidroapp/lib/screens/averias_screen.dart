@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../models/averia.dart';
@@ -7,7 +8,6 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/averias/averias.dart';
 import '../widgets/core/core.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Módulo "Averías": el usuario reporta una avería del servicio y hace
 /// seguimiento del estado en que la deja el fontanero.

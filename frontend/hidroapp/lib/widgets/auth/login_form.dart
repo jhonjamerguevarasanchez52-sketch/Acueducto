@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
@@ -9,7 +10,6 @@ import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../core/app_snackbar.dart';
 import 'auth_style.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Tarjeta blanca con el formulario de inicio de sesión: correo, contraseña y
 /// el botón de entrar. Conserva su propio estado (controllers, validación y la

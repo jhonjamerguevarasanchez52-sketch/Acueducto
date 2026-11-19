@@ -297,8 +297,6 @@ export default function SectionViews({ activeSection, context }) {
                       void performAction('usuarios', `${endpoints.adminUsers}/${user.id}`, 'DELETE', { nota }, 'Se archivará el historial, se notificará el correo del perfil y luego se eliminará la cuenta. ¿Continuar?')
                     }}><Trash2 size={14} />Eliminar</button>
 
-                    <button type="button" className="link-button danger-link" onClick={() => performAction('usuarios', `${endpoints.adminUsers}/${user.id}`, 'DELETE', undefined, 'Solo se pueden eliminar cuentas sin facturas ni pagos (por ejemplo, creadas por error). Si tiene historial, te ofreceremos desactivarla. ¿Continuar?')}><Trash2 size={14} />Eliminar</button>
-
                   </>}
                 </td>
               </tr>
