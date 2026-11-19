@@ -152,7 +152,10 @@ desde una cuenta Gmail.
 ## Eliminaci?n y archivo de perfiles
 
 Antes de desplegar la eliminaci?n de cuentas, ejecutar en Supabase
-`db/migrations/20261117_deleted_users_archive.sql`. La ruta autenticada
+`db/migrations/20261117_deleted_users_archive.sql` y, después,
+`db/migrations/20261118_archivar_movimientos_al_eliminar_cuenta.sql`. La segunda
+migración crea el archivo si falta y conserva las relaciones contables cuando
+se elimina un perfil. La ruta autenticada
 `DELETE /api/profile/mi-cuenta` permite a cualquier rol eliminar su propia cuenta
 de inmediato; exige la contrase?a actual y, para el fontanero, una nota de salida.
 `DELETE /api/admin/usuarios/:userId` archiva y elimina cuentas desde el panel.
@@ -192,13 +195,12 @@ servicio de correo Brevo ya configurado (`BREVO_API_KEY` y `EMAIL_USER`).
 
 ## Eliminación de usuarios
 
-Las facturas y los pagos son la contabilidad del acueducto y **nunca se borran**:
-un usuario con facturas o pagos no se puede eliminar (la API responde 409 con
-`puedeDesactivar: true` y la base de datos lo impide con `ON DELETE RESTRICT`).
-Para retirar a alguien, **desactívalo**: pierde el acceso y sale de la
-facturación, pero se conserva su historial. Solo se pueden eliminar cuentas sin
-movimientos (por ejemplo, creadas por error). Las averías asignadas a un
-fontanero eliminado conservan su historial y quedan sin asignación.
+Las facturas y los pagos son la contabilidad del acueducto y **nunca se borran**.
+Al eliminar una cuenta, su perfil e historial se archivan en `deleted_users`;
+las facturas y pagos originales permanecen en sus tablas con `perfil_id` nulo.
+Las averías asignadas a un fontanero eliminado conservan su historial y quedan
+sin asignación. Para retirar el acceso sin eliminar la cuenta, se puede seguir
+desactivando el perfil desde el panel.
 
 ## Reglas de las facturas
 

@@ -75,8 +75,8 @@ create sequence if not exists public.facturas_numero_seq;
 create table if not exists public.invoices (
   id                uuid primary key default gen_random_uuid(),
   numero_factura    bigint not null default nextval('public.facturas_numero_seq'),
-  -- restrict: las facturas son contabilidad; un usuario con historial se desactiva.
-  perfil_id         uuid not null references public.profiles (id) on delete restrict,
+  -- La factura se conserva si se elimina el perfil; el archivo guarda su identidad.
+  perfil_id         uuid references public.profiles (id) on delete set null,
   periodo           text not null,                 -- ej. '2026-09'
   tipo              text not null default 'servicio'
                     check (tipo in ('servicio', 'prepago', 'extraordinaria')),
@@ -113,7 +113,8 @@ create table if not exists public.invoice_service_periods (
 create table if not exists public.payments (
   id                  uuid primary key default gen_random_uuid(),
   factura_id          uuid not null references public.invoices (id) on delete restrict,
-  perfil_id           uuid not null references public.profiles (id) on delete restrict,
+  -- El pago se conserva si se elimina el perfil; el archivo guarda su identidad.
+  perfil_id           uuid references public.profiles (id) on delete set null,
   monto               numeric(12,2) not null check (monto > 0),
   cargo_wompi         numeric(12,2) not null default 0 check (cargo_wompi >= 0),
   monto_total         numeric(12,2) not null,
@@ -1201,33 +1202,25 @@ grant execute on function public.crear_factura_mensual_si_no_cubierta(uuid, text
 
 
 -- ----------------------------------------------------------------------------
--- 2. Proteger la contabilidad: facturas y pagos no se borran en cascada
+-- 2. Conservar la contabilidad al eliminar un perfil
 -- ----------------------------------------------------------------------------
--- Antes, eliminar un usuario borraba sus facturas y pagos confirmados. Ahora
--- la base de datos lo impide: un usuario con historial se DESACTIVA.
-do $$
-declare
-  r record;
-begin
-  for r in
-    select c.conname, c.conrelid::regclass as tabla, a.attname as columna,
-           c.confrelid::regclass as referida
-    from pg_constraint c
-    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
-    where c.contype = 'f'
-      and c.confdeltype = 'c' -- on delete cascade
-      and (
-        (c.conrelid = 'public.invoices'::regclass and a.attname = 'perfil_id') or
-        (c.conrelid = 'public.payments'::regclass and a.attname in ('perfil_id', 'factura_id'))
-      )
-  loop
-    execute format('alter table %s drop constraint %I', r.tabla, r.conname);
-    execute format(
-      'alter table %s add constraint %I foreign key (%I) references %s (id) on delete restrict',
-      r.tabla, r.conname, r.columna, r.referida
-    );
-  end loop;
-end $$;
+-- El archivo independiente conserva el perfil y el historial previo; estas
+-- relaciones mantienen las facturas y pagos con perfil_id nulo.
+alter table public.invoices alter column perfil_id drop not null;
+alter table public.invoices
+  drop constraint if exists facturas_perfil_id_fkey,
+  drop constraint if exists invoices_perfil_id_fkey;
+alter table public.invoices
+  add constraint facturas_perfil_id_fkey
+  foreign key (perfil_id) references public.profiles (id) on delete set null;
+
+alter table public.payments alter column perfil_id drop not null;
+alter table public.payments
+  drop constraint if exists pagos_perfil_id_fkey,
+  drop constraint if exists payments_perfil_id_fkey;
+alter table public.payments
+  add constraint pagos_perfil_id_fkey
+  foreign key (perfil_id) references public.profiles (id) on delete set null;
 
 
 -- ----------------------------------------------------------------------------

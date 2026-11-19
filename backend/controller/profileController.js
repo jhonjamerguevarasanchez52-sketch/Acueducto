@@ -108,7 +108,7 @@ async function eliminarMiCuenta(req, res) {
       ...resultado,
     });
   } catch (err) {
-    if (err.statusCode && err.statusCode < 500) return res.status(err.statusCode).json({ error: err.message });
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     return errorInesperado(res, err);
   }
 }
