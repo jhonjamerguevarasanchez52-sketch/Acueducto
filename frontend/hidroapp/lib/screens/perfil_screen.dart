@@ -261,15 +261,55 @@ class PerfilScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () =>
-                solicitarEliminacionCuenta(context, perfil?.rol ?? 'usuario'),
-            icon: const Icon(Icons.delete_forever_outlined),
-            label: const Text('Eliminar cuenta'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colores.danger,
-              side: BorderSide(color: colores.danger),
-            ),
+          // La política de privacidad va junto a "Eliminar cuenta" para que
+          // el usuario pueda consultarla antes de decidir.
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const ValueKey('abrir-politica-privacidad'),
+                  onPressed: () => _abrirPaginaLegal(
+                    context,
+                    ApiConfig.politicaPrivacidadUrl,
+                  ),
+                  icon: const Icon(LucideIcons.shieldCheck),
+                  label: const Text(
+                    'Política de privacidad',
+                    textAlign: TextAlign.center,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colores.info,
+                    side: BorderSide(color: colores.info),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => solicitarEliminacionCuenta(
+                    context,
+                    perfil?.rol ?? 'usuario',
+                  ),
+                  icon: const Icon(Icons.delete_forever_outlined),
+                  label: const Text(
+                    'Eliminar cuenta',
+                    textAlign: TextAlign.center,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colores.danger,
+                    side: BorderSide(color: colores.danger),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           const _InformacionLegal(),
@@ -279,31 +319,33 @@ class PerfilScreen extends StatelessWidget {
   }
 }
 
-/// Enlaces a las páginas públicas que exige Google Play: la política de
-/// privacidad y la solicitud de eliminación de cuenta.
+/// Abre una de las páginas públicas legales (política de privacidad o
+/// eliminación de cuenta) que exige Google Play.
+Future<void> _abrirPaginaLegal(BuildContext context, String url) async {
+  final uri = Uri.parse(url);
+  var abierta = false;
+  try {
+    // Dentro de la app (pestaña del navegador); si el teléfono no lo
+    // permite, se intenta con el navegador externo.
+    abierta = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+    if (!abierta) {
+      abierta = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  } catch (_) {
+    abierta = false;
+  }
+  if (!abierta && context.mounted) {
+    AppSnackbar.error(
+      context,
+      'No se pudo abrir la página. Revisa tu conexión e intenta de nuevo.',
+    );
+  }
+}
+
+/// Enlace a la página pública de eliminación de cuenta (qué se borra y qué
+/// se conserva). La política de privacidad está junto a "Eliminar cuenta".
 class _InformacionLegal extends StatelessWidget {
   const _InformacionLegal();
-
-  Future<void> _abrir(BuildContext context, String url) async {
-    final uri = Uri.parse(url);
-    var abierta = false;
-    try {
-      // Dentro de la app (pestaña del navegador); si el teléfono no lo
-      // permite, se intenta con el navegador externo.
-      abierta = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-      if (!abierta) {
-        abierta = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (_) {
-      abierta = false;
-    }
-    if (!abierta && context.mounted) {
-      AppSnackbar.error(
-        context,
-        'No se pudo abrir la página. Revisa tu conexión e intenta de nuevo.',
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -326,24 +368,6 @@ class _InformacionLegal extends StatelessWidget {
           child: Column(
             children: [
               ListTile(
-                key: const ValueKey('abrir-politica-privacidad'),
-                leading: Icon(LucideIcons.shieldCheck, color: colores.info),
-                title: const Text('Política de privacidad'),
-                subtitle: Text(
-                  'Cómo usamos y protegemos tus datos',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: colores.secondaryText,
-                  ),
-                ),
-                trailing: Icon(
-                  LucideIcons.chevronRight,
-                  color: colores.secondaryText,
-                ),
-                onTap: () => _abrir(context, ApiConfig.politicaPrivacidadUrl),
-              ),
-              const Divider(height: 1),
-              ListTile(
                 key: const ValueKey('abrir-eliminar-cuenta'),
                 leading: Icon(LucideIcons.fileText, color: colores.info),
                 title: const Text('Eliminación de cuenta y datos'),
@@ -358,7 +382,8 @@ class _InformacionLegal extends StatelessWidget {
                   LucideIcons.chevronRight,
                   color: colores.secondaryText,
                 ),
-                onTap: () => _abrir(context, ApiConfig.eliminarCuentaUrl),
+                onTap: () =>
+                    _abrirPaginaLegal(context, ApiConfig.eliminarCuentaUrl),
               ),
             ],
           ),
