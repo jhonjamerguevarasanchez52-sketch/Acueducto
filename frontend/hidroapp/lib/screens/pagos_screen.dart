@@ -4,10 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/pago.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import '../services/recibo_pago_service.dart';
-import '../services/wompi_checkout_service.dart';
+import '../services/flujo_pago_factura.dart';
 import '../theme/app_theme.dart';
-import '../utils/formato.dart';
 import '../widgets/core/core.dart';
 import '../widgets/pagos/pagos.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -58,57 +56,28 @@ class _PagosScreenState extends State<PagosScreen> with WidgetsBindingObserver {
   /// Reintenta un pago que quedó pendiente o fue rechazado: registra uno nuevo
   /// contra la misma factura, que vuelve a quedar a la espera de confirmación.
   Future<void> _pagar(Pago pago) async {
-    final eleccion = await mostrarPagarSheet(
-      context,
-      subtitulo: Formato.pesos(pago.monto),
-    );
-    if (eleccion == null || !mounted) return;
-
     try {
-      if (eleccion.metodo == 'wompi') {
-        final abierto = await WompiCheckoutService.pagar(
-          context,
-          context.read<AuthProvider>().api,
-          pago.facturaId,
-        );
-        if (!abierto) return;
-        if (!mounted) return;
-        AppSnackbar.success(
-          context,
-          'Checkout abierto. El estado se actualizará al volver.',
-        );
-        _refrescar();
-        return;
-      }
-      if (eleccion.metodo == 'fisico') {
-        final subido = await ReciboPagoService.subir(
-          context.read<AuthProvider>().api,
-          pago.facturaId,
-        );
-        if (!mounted) return;
-        if (subido) {
-          AppSnackbar.success(context, 'Recibo enviado. Pago pendiente de revisión.');
-          _refrescar();
-        }
-        return;
-      }
-      await context.read<AuthProvider>().api.post(
-        '/pagos',
-        body: {
-          'factura_id': pago.facturaId,
-          'metodo': eleccion.metodo,
-          if (eleccion.referencia != null) 'referencia': eleccion.referencia,
-        },
-      );
-      if (!mounted) return;
-      AppSnackbar.success(
+      final resultado = await FlujoPagoFactura.reintentarPago(
         context,
-        'Pago registrado. Queda pendiente de confirmación.',
+        context.read<AuthProvider>().api,
+        pago,
       );
+      final mensaje = FlujoPagoFactura.mensaje(resultado);
+      if (mensaje == null || !mounted) return;
+      AppSnackbar.success(context, mensaje);
       _refrescar();
     } on ApiException catch (e) {
       if (!mounted) return;
       AppSnackbar.error(context, e.message);
+      // Si el pago falló a mitad de camino, mostrar el estado real.
+      _refrescar();
+    } catch (_) {
+      if (!mounted) return;
+      AppSnackbar.error(
+        context,
+        'No se pudo completar el pago. Intenta de nuevo.',
+      );
+      _refrescar();
     }
   }
 
@@ -151,6 +120,7 @@ class _PagosScreenState extends State<PagosScreen> with WidgetsBindingObserver {
               );
             }
 
+            final reintentables = Pago.reintentables(pagos);
             return ListView.builder(
               // Espacio extra abajo: la barra de botones de Android y la gota
               // flotante no deben tapar el botón Pagar de la última tarjeta.
@@ -165,6 +135,7 @@ class _PagosScreenState extends State<PagosScreen> with WidgetsBindingObserver {
                 retraso: AppTheme.motionEscalon * i,
                 child: PagoCard(
                   pago: pagos[i],
+                  puedeReintentar: reintentables.contains(pagos[i].id),
                   onPagar: () => _pagar(pagos[i]),
                 ),
               ),

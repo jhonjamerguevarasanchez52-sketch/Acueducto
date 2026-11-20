@@ -1057,8 +1057,9 @@ function App() {
                 <label>Nombre<input value={newUser.nombre} onChange={(event) => setNewUser({ ...newUser, nombre: event.target.value })} required /></label>
                 <label>Apellido<input value={newUser.apellido} onChange={(event) => setNewUser({ ...newUser, apellido: event.target.value })} required /></label>
                 <label className="form-wide">Correo electrónico<input type="email" autoComplete="email" value={newUser.correo} onChange={(event) => setNewUser({ ...newUser, correo: event.target.value })} required /></label>
-                <label className="form-wide">Cédula<input inputMode="numeric" pattern="[0-9. -]{5,20}" value={newUser.cedula} onChange={(event) => setNewUser({ ...newUser, cedula: event.target.value })} required /></label>
-                <label className="form-wide">Rol
+                {/* Opcional: con la cédula la persona también puede iniciar sesión en la app. */}
+                <label>Cédula<input inputMode="numeric" autoComplete="off" placeholder="Solo números" value={newUser.cedula} onChange={(event) => setNewUser({ ...newUser, cedula: event.target.value })} /></label>
+                <label>Rol
                   <select value={newUser.rol} onChange={(event) => setNewUser({ ...newUser, rol: event.target.value })}>
                     <option value="usuario">Usuario</option>
                     <option value="fontanero">Fontanero</option>

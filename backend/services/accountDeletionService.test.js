@@ -10,11 +10,11 @@ function mockModule(filename, exports) {
   require.cache[filename] = { id: filename, filename, loaded: true, exports };
 }
 
-function crearServicio({ archiveInsertError = null, deleteError = null } = {}) {
+function crearServicio({ archiveInsertError = null, deleteError = null, rol = 'usuario', otrosAdministradores = 1 } = {}) {
   const updates = [];
   const perfil = {
     id: 'user-1',
-    rol: 'usuario',
+    rol,
     correo: 'ana@example.com',
     nombre: 'Ana',
     apellido: 'Torres',
@@ -27,8 +27,9 @@ function crearServicio({ archiveInsertError = null, deleteError = null } = {}) {
       this.cambios = null;
     }
 
-    select() { return this; }
+    select(_columnas, opciones) { this.conteo = Boolean(opciones?.head); return this; }
     eq() { return this; }
+    neq() { return this; }
     in() { return this; }
     insert() { this.operacion = 'insert'; return this; }
     update(cambios) { this.operacion = 'update'; this.cambios = cambios; return this; }
@@ -43,6 +44,7 @@ function crearServicio({ archiveInsertError = null, deleteError = null } = {}) {
           ? { data: null, error: archiveInsertError }
           : { data: { id: 'archive-1' }, error: null };
       }
+      if (this.tabla === 'profiles' && this.conteo) return { count: otrosAdministradores, error: null };
       if (this.tabla === 'profiles') return { data: perfil, error: null };
       if (this.tabla === 'deleted_users') return { data: null, error: null };
       return { data: [], error: null };
@@ -59,11 +61,14 @@ function crearServicio({ archiveInsertError = null, deleteError = null } = {}) {
   });
   mockModule(authPath, { deleteUser: async () => ({ error: deleteError }) });
   mockModule(path.join(__dirname, '../config/mailer.js'), { enviarCorreo: async () => true });
+  const invalidados = [];
+  mockModule(path.join(__dirname, '../utils/cacheSesiones.js'), { invalidarUsuario: (id) => invalidados.push(id) });
   delete require.cache[servicePath];
 
   return {
     service: require(servicePath),
     updates,
+    invalidados,
     actor: { id: 'user-1', email: perfil.correo, nombre: 'Ana', apellido: 'Torres', rol: 'usuario' },
   };
 }
@@ -97,4 +102,26 @@ test('identifica el bloqueo de la FK contable reportado por Supabase y permite r
     },
   );
   assert.ok(updates.some((cambios) => cambios.status === 'error'));
+});
+
+test('no permite eliminar al último administrador activo', async () => {
+  const { service, actor } = crearServicio({ rol: 'administrador', otrosAdministradores: 0 });
+
+  await assert.rejects(
+    service.eliminarCuenta({ userId: 'user-1', actor, deletionType: 'usuario' }),
+    (error) => {
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /único administrador/);
+      return true;
+    },
+  );
+});
+
+test('al eliminar la cuenta invalida su sesión en caché', async () => {
+  const { service, actor, invalidados } = crearServicio({ rol: 'administrador', otrosAdministradores: 2 });
+
+  const resultado = await service.eliminarCuenta({ userId: 'user-1', actor, deletionType: 'usuario' });
+
+  assert.equal(resultado.archiveId, 'archive-1');
+  assert.deepEqual(invalidados, ['user-1']);
 });

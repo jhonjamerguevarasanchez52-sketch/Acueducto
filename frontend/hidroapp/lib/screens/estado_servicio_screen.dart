@@ -121,7 +121,9 @@ class _EstadoServicioScreenState extends State<EstadoServicioScreen> {
                     child: Text(
                       'No hay cortes registrados en tu historial.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.of(context).secondaryText),
+                      style: TextStyle(
+                        color: AppColors.of(context).secondaryText,
+                      ),
                     ),
                   ),
               ],

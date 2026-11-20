@@ -145,16 +145,20 @@ class AppTheme {
       brightness: brightness,
     );
 
-    final fondoScaffold =
-        esOscuro ? const Color(0xFF0D1B24) : const Color(0xFFF6FAFD);
+    final fondoScaffold = esOscuro
+        ? const Color(0xFF0D1B24)
+        : const Color(0xFFF6FAFD);
     final fondoTarjeta = esOscuro ? const Color(0xFF13232D) : Colors.white;
-    final bordeSutil =
-        esOscuro ? const Color(0xFF24404E) : const Color(0xFFE3EEF4);
+    final bordeSutil = esOscuro
+        ? const Color(0xFF24404E)
+        : const Color(0xFFE3EEF4);
     final fondoCampo = esOscuro ? const Color(0xFF16262F) : surfaceTint;
     final fondoNavBar = esOscuro ? const Color(0xFF0F1E27) : Colors.white;
     final navInactivo = esOscuro ? const Color(0xFF6E8AA0) : _navInactivo;
     final navSeleccionado = esOscuro ? accent : primary;
-    final labelColor = esOscuro ? const Color(0xFF9FB7C4) : const Color(0xFF5B7A8C);
+    final labelColor = esOscuro
+        ? const Color(0xFF9FB7C4)
+        : const Color(0xFF5B7A8C);
 
     // Nunito: redondeada y amigable, pero todavía legible/seria para una app
     // de servicios. Se aplica a todo el árbol de texto (Text sin fontFamily
@@ -218,8 +222,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: fondoCampo,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(fieldRadius),
           borderSide: BorderSide.none,
@@ -256,8 +262,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(cardRadius),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 66,
@@ -286,14 +291,9 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      dividerTheme: DividerThemeData(
-        color: bordeSutil,
-        thickness: 1,
-      ),
+      dividerTheme: DividerThemeData(color: bordeSutil, thickness: 1),
       extensions: [esOscuro ? AppColors.dark : AppColors.light],
     );
   }

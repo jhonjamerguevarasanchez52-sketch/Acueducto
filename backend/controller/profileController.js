@@ -6,6 +6,7 @@ const {
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { eliminarCuenta } = require('../services/accountDeletionService');
 const authModel = require('../models/authModel');
+const { segundosDeBloqueo, registrarFallo, registrarExito } = require('../utils/controlIntentos');
 
 const MENSAJE_UBICACION_BLOQUEADA =
   'La dirección, la zona y el número de lote identifican tu servicio. Para cambiarlos, comunícate con el administrador del acueducto.';
@@ -92,8 +93,21 @@ async function eliminarMiCuenta(req, res) {
   try {
     const password = String(req.body?.passwordActual || '');
     if (!password) return res.status(400).json({ error: 'Confirma tu contraseña para eliminar la cuenta.' });
+    // Mismo límite de intentos que el login: con una sesión robada no se
+    // puede adivinar la contraseña probando aquí sin bloqueo.
+    const correo = String(req.usuario.email || '').toLowerCase();
+    const bloqueo = await segundosDeBloqueo('eliminar-cuenta', correo);
+    if (bloqueo) {
+      return res.status(429).json({
+        error: `Demasiados intentos fallidos. Vuelve a intentar en ${Math.ceil(bloqueo / 60)} minutos.`,
+      });
+    }
     const { error: authError } = await authModel.signIn(req.usuario.email, password);
-    if (authError) return res.status(401).json({ error: 'La contraseña no es correcta.' });
+    if (authError) {
+      await registrarFallo('eliminar-cuenta', correo);
+      return res.status(401).json({ error: 'La contraseña no es correcta.' });
+    }
+    await registrarExito('eliminar-cuenta', correo);
     const resultado = await eliminarCuenta({
       userId: req.usuario.id,
       actor: req.usuario,

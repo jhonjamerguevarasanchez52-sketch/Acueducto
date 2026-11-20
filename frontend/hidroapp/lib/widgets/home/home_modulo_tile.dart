@@ -40,9 +40,9 @@ class HomeModuloTile extends StatelessWidget {
             AppSnackbar.info(context, '"$label" estará disponible pronto');
             return;
           }
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => destino()),
-          );
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => destino()));
         },
       ),
     );

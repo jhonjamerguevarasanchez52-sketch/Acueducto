@@ -7,9 +7,14 @@ import 'screens/cambiar_password_obligatorio_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/welcome_screen.dart';
+import 'services/despertador_servidor.dart';
 import 'theme/app_theme.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Render (plan gratuito) puede estar dormido: se despierta ya, mientras se
+  // ve la bienvenida, y otra vez al volver a la app tras un rato.
+  DespertadorServidor().iniciar();
   runApp(const AcueductoApp());
 }
 
@@ -53,9 +58,7 @@ class AuthGate extends StatelessWidget {
 
     switch (auth.status) {
       case AuthStatus.unknown:
-        return const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        );
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
       case AuthStatus.authenticated:
         // Cuentas creadas por un administrador (incluye siempre al
         // fontanero, que nunca se autorregistra) arrancan con una

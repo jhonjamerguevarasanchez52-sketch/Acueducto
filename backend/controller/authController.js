@@ -9,6 +9,7 @@ const {
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarCodigoSeguridad, protegerCodigo, codigoCoincide } = require('../utils/securityCode');
 const { normalizarCorreo } = require('../utils/formato');
+const { normalizarCedula } = require('../utils/perfilCampos');
 const { escaparHtml } = require('../utils/html');
 const cacheSesiones = require('../utils/cacheSesiones');
 
@@ -38,7 +39,7 @@ function respuestaBloqueo(res, bloqueo, mensaje = 'Demasiados intentos fallidos'
 
 // Supabase Auth responde en inglés. El usuario siempre ve un mensaje claro en
 // español, sin revelar si el correo existe.
-function mensajeErrorLogin(error) {
+function mensajeErrorLogin(error, { porCedula = false } = {}) {
   const texto = String(error?.message || '').toLowerCase();
   if (texto.includes('email not confirmed')) {
     return 'Tu cuenta aún no está confirmada. Pide al administrador que la revise.';
@@ -46,8 +47,14 @@ function mensajeErrorLogin(error) {
   if (texto.includes('banned') || texto.includes('disabled')) {
     return 'Tu cuenta está desactivada. Contacta al administrador.';
   }
-  return 'Correo o contraseña incorrectos. Si no recuerdas tu contraseña, entra con un código a tu correo.';
+  return porCedula
+    ? MENSAJE_CEDULA_INCORRECTA
+    : 'Correo o contraseña incorrectos. Si no recuerdas tu contraseña, entra con un código a tu correo.';
 }
+
+// Mismo mensaje exista o no la cédula, para no revelar cuáles están registradas.
+const MENSAJE_CEDULA_INCORRECTA =
+  'Cédula o contraseña incorrectas. Si tu cédula no está registrada, entra con tu correo o pídele al acueducto que la agregue.';
 
 // Errores de transporte de Supabase Auth no significan que la contraseña sea
 // incorrecta. Reconocemos también errores de DNS/TLS/socket que varían según
@@ -137,50 +144,66 @@ async function validarPerfilParaIngresar(userId) {
 // No hay endpoint de auto-registro: las cuentas las crea el administrador
 // desde el panel (o con `scripts/crearUsuario.js`).
 
+// Se puede entrar con el correo o con la cédula (body.correo o body.cedula).
+// Con la cédula se busca el correo de la cuenta y se sigue igual que con el
+// correo. Los intentos fallidos se cuentan por la cédula escrita y, si existe,
+// también por el correo de la cuenta: cambiar de método no salta el bloqueo.
 async function iniciarSesion(req, res) {
-  const seEnvioCedula = req.body.cedula !== undefined && req.body.cedula !== null;
-  const cedula = seEnvioCedula ? String(req.body.cedula).replace(/\D/g, '') : '';
-  let correo = normalizarCorreo(req.body.correo);
   const { password } = req.body;
-  let identificador = seEnvioCedula ? cedula : correo;
+  const porCedula = req.body.cedula !== undefined && !req.body.correo;
+  let correo = normalizarCorreo(req.body.correo);
+  let claveCedula = null;
 
-  if (!identificador || !password) {
-    return res.status(400).json({ error: 'Cédula o correo y contraseña son obligatorios' });
-  }
-  if (seEnvioCedula && (cedula.length < 5 || cedula.length > 15)) {
-    return res.status(400).json({ error: 'La cédula debe tener entre 5 y 15 dígitos.' });
-  }
-
-  const bloqueo = await segundosDeBloqueo('login', identificador);
-  if (bloqueo) return respuestaBloqueo(res, bloqueo);
-
-  if (seEnvioCedula) {
-    try {
-      const { data: perfil, error } = await profileModel.findByCedula(cedula, 'correo');
-      if (error && error.code !== 'PGRST116') return errorConsulta(res, error);
-      correo = normalizarCorreo(perfil?.correo);
-    } catch (err) {
-      return errorInesperado(res, err);
+  if (porCedula) {
+    const cedula = normalizarCedula(req.body.cedula);
+    if (!cedula || !password) {
+      return res.status(400).json({
+        error: cedula === null
+          ? 'La cédula debe tener solo números (entre 5 y 15 dígitos).'
+          : 'Cédula y contraseña son obligatorias',
+      });
     }
-
-    // No revela si la cédula está registrada.
-    if (!correo) {
-      await registrarFallo('login', identificador);
-      return res.status(401).json({ error: mensajeErrorLogin({ message: 'Invalid login credentials' }) });
-    }
-    identificador = correo;
-    const bloqueoCuenta = await segundosDeBloqueo('login', identificador);
-    if (bloqueoCuenta) return respuestaBloqueo(res, bloqueoCuenta);
+    claveCedula = `cedula:${cedula}`;
+  } else if (!correo || !password) {
+    return res.status(400).json({ error: 'Correo y contraseña son obligatorios' });
   }
+
+  if (claveCedula) {
+    const bloqueoCedula = await segundosDeBloqueo('login', claveCedula);
+    if (bloqueoCedula) return respuestaBloqueo(res, bloqueoCedula);
+  }
+
+  const fallo = async () => {
+    if (claveCedula) await registrarFallo('login', claveCedula);
+    if (correo) await registrarFallo('login', correo);
+  };
 
   try {
+    if (claveCedula) {
+      const { data: perfil, error: errorBusqueda } = await reintentarServicioSupabase(
+        () => profileModel.findByCedula(claveCedula.slice('cedula:'.length), 'correo'),
+      );
+      if (errorBusqueda) {
+        if (esErrorTransitorioAuth(errorBusqueda)) return responderAuthNoDisponible(res, errorBusqueda);
+        return errorConsulta(res, errorBusqueda);
+      }
+      if (!perfil?.correo) {
+        await fallo();
+        return res.status(401).json({ error: MENSAJE_CEDULA_INCORRECTA });
+      }
+      correo = normalizarCorreo(perfil.correo);
+    }
+
+    const bloqueo = await segundosDeBloqueo('login', correo);
+    if (bloqueo) return respuestaBloqueo(res, bloqueo);
+
     const { data, error } = await iniciarSesionSupabase(correo, password);
 
     if (error) {
       // No contar fallos de red como intentos de contraseña.
       if (esErrorTransitorioAuth(error)) return responderAuthNoDisponible(res, error);
-      await registrarFallo('login', correo);
-      return res.status(401).json({ error: mensajeErrorLogin(error) });
+      await fallo();
+      return res.status(401).json({ error: mensajeErrorLogin(error, { porCedula }) });
     }
 
     const resultado = await validarPerfilParaIngresar(data.user.id);
@@ -191,6 +214,7 @@ async function iniciarSesion(req, res) {
     if (resultado.status) return res.status(resultado.status).json({ error: resultado.mensaje });
 
     await registrarExito('login', correo);
+    if (claveCedula) await registrarExito('login', claveCedula);
     return res.status(200).json({
       message: 'Inicio de sesión exitoso',
       session: data.session,

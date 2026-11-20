@@ -40,21 +40,28 @@ class Averia {
     final reportante = json['reportante'] is Map
         ? Map<String, dynamic>.from(json['reportante'] as Map)
         : const <String, dynamic>{};
-    final nombre = '${reportante['nombre'] ?? ''} ${reportante['apellido'] ?? ''}'.trim();
+    final nombre =
+        '${reportante['nombre'] ?? ''} ${reportante['apellido'] ?? ''}'.trim();
     return Averia(
       id: json['id']?.toString() ?? '',
       descripcion: json['descripcion']?.toString() ?? '',
       estado: json['estado']?.toString() ?? 'reportada',
-      zona: ((json['zona'] ?? reportante['zona'])?.toString().trim().isEmpty ?? true)
+      zona:
+          ((json['zona'] ?? reportante['zona'])?.toString().trim().isEmpty ??
+              true)
           ? null
           : (json['zona'] ?? reportante['zona']).toString(),
-      direccion: ((json['direccion'] ?? reportante['direccion'])?.toString().trim().isEmpty ?? true)
+      direccion:
+          ((json['direccion'] ?? reportante['direccion'])
+                  ?.toString()
+                  .trim()
+                  .isEmpty ??
+              true)
           ? null
           : (json['direccion'] ?? reportante['direccion']).toString(),
-      notaFontanero:
-          (json['nota_fontanero']?.toString().trim().isEmpty ?? true)
-              ? null
-              : json['nota_fontanero'].toString(),
+      notaFontanero: (json['nota_fontanero']?.toString().trim().isEmpty ?? true)
+          ? null
+          : json['nota_fontanero'].toString(),
       reportanteNombre: nombre.isEmpty ? null : nombre,
       reportanteCorreo: reportante['correo']?.toString(),
       reportanteTelefono: reportante['telefono']?.toString(),
@@ -62,9 +69,9 @@ class Averia {
       fechaResolucion: parsearFecha(json['fecha_resolucion']),
       audios: json['audios'] is List
           ? (json['audios'] as List)
-              .whereType<Map>()
-              .map((e) => AveriaAudio.fromJson(Map<String, dynamic>.from(e)))
-              .toList()
+                .whereType<Map>()
+                .map((e) => AveriaAudio.fromJson(Map<String, dynamic>.from(e)))
+                .toList()
           : const [],
     );
   }
@@ -111,11 +118,11 @@ class AveriaAudio {
   final DateTime? expiraEn;
 
   factory AveriaAudio.fromJson(Map<String, dynamic> json) => AveriaAudio(
-        id: json['id']?.toString() ?? '',
-        duracionS: (json['duracion_s'] as num?)?.toInt() ?? 0,
-        transcripcion: json['transcripcion']?.toString() ?? '',
-        disponible: json['disponible'] == true,
-        escuchadoEn: parsearFecha(json['escuchado_en']),
-        expiraEn: parsearFecha(json['expira_en']),
-      );
+    id: json['id']?.toString() ?? '',
+    duracionS: (json['duracion_s'] as num?)?.toInt() ?? 0,
+    transcripcion: json['transcripcion']?.toString() ?? '',
+    disponible: json['disponible'] == true,
+    escuchadoEn: parsearFecha(json['escuchado_en']),
+    expiraEn: parsearFecha(json['expira_en']),
+  );
 }

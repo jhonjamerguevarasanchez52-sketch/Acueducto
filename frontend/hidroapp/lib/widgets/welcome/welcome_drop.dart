@@ -37,10 +37,8 @@ class WelcomeDrop extends StatelessWidget {
     final ang = 1.6 * off;
     final opacity = phase.win(0.30, 0.40).clamp(0.0, 1.0);
 
-    final floatDy =
-        assembled ? math.sin(dropIdle * 2 * math.pi) * 6.0 : 0.0;
-    final floatRot =
-        assembled ? math.sin(dropIdle * 2 * math.pi) * 0.08 : 0.0;
+    final floatDy = assembled ? math.sin(dropIdle * 2 * math.pi) * 6.0 : 0.0;
+    final floatRot = assembled ? math.sin(dropIdle * 2 * math.pi) * 0.08 : 0.0;
 
     Widget half(bool left) => RepaintBoundary(
       child: ClipRect(

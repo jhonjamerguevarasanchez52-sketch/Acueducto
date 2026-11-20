@@ -27,14 +27,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _versionNotificaciones = 0;
 
   List<Widget> get _pantallas => [
-        const HomeScreen(),
-        const FacturasScreen(),
-        AveriasScreen(key: ValueKey('averias-$_versionAverias')),
-        NotificacionesScreen(
-          key: ValueKey('notificaciones-$_versionNotificaciones'),
-        ),
-        const PerfilScreen(),
-      ];
+    const HomeScreen(),
+    const FacturasScreen(),
+    AveriasScreen(key: ValueKey('averias-$_versionAverias')),
+    NotificacionesScreen(
+      key: ValueKey('notificaciones-$_versionNotificaciones'),
+    ),
+    const PerfilScreen(),
+  ];
 
   static const _iconos = [
     (LucideIcons.house, LucideIcons.house, 'Inicio'),
@@ -97,13 +97,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   // Construidos en cada build (en vez de una lista const) para poder darle a
   // cada ícono un pequeño rebote cuando su pestaña queda seleccionada.
   List<NavigationDestination> get _destinos => [
-        for (final (i, datos) in _iconos.indexed)
-          NavigationDestination(
-            icon: _IconoConRebote(icono: datos.$1, activo: _indice == i),
-            selectedIcon: _IconoConRebote(icono: datos.$2, activo: true),
-            label: datos.$3,
-          ),
-      ];
+    for (final (i, datos) in _iconos.indexed)
+      NavigationDestination(
+        icon: _IconoConRebote(icono: datos.$1, activo: _indice == i),
+        selectedIcon: _IconoConRebote(icono: datos.$2, activo: true),
+        label: datos.$3,
+      ),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +111,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       body: IndexedStack(index: _indice, children: _pantallas),
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.of(context).cardBorder)),
+          border: Border(
+            top: BorderSide(color: AppColors.of(context).cardBorder),
+          ),
         ),
         child: NavigationBar(
           selectedIndex: _indice,

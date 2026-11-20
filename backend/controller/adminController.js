@@ -1,8 +1,6 @@
 const authModel = require('../models/authModel');
 const profileModel = require('../models/profileModel');
-
-
-const { extraerCambiosPerfil } = require('../utils/perfilCampos');
+const { extraerCambiosPerfil, extraerCedula } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
 const { generarPasswordTemporal } = require('../utils/passwords');
 const { enviarCorreo } = require('../config/mailer');
@@ -18,6 +16,14 @@ const { normalizarCorreo } = require('../utils/formato');
 
 
 const ROLES_VALIDOS = ['administrador', 'usuario', 'fontanero'];
+
+const MENSAJE_CEDULA_REPETIDA = 'Esa cédula ya está registrada en otra cuenta';
+
+// La revisión previa evita casi siempre el choque, pero dos altas a la vez
+// con la misma cédula las frena el índice único de la base de datos.
+function esCedulaRepetida(error) {
+  return error?.code === '23505' && /cedula/i.test(`${error.message} ${error.details}`);
+}
 
 // Crear un usuario con contraseña temporal generada automáticamente.
 // Pensado para que un administrador dé de alta a alguien sin tener que
@@ -44,6 +50,13 @@ async function crearUsuario(req, res) {
 
   const { cambios: datosOpcionales, error: errorCampos } = extraerCambiosPerfil(req.body);
   if (errorCampos) return res.status(400).json({ error: errorCampos });
+  const { cambios: datosCedula, error: errorCedula } = extraerCedula(req.body);
+  if (errorCedula) return res.status(400).json({ error: errorCedula });
+  if (datosCedula.cedula) {
+    const { data: duenoCedula, error: errorBusqueda } = await profileModel.findByCedula(datosCedula.cedula, 'id');
+    if (errorBusqueda) return errorConsulta(res, errorBusqueda);
+    if (duenoCedula) return res.status(409).json({ error: MENSAJE_CEDULA_REPETIDA });
+  }
 
   const passwordTemporal = generarPasswordTemporal();
   let userId;
@@ -64,6 +77,7 @@ async function crearUsuario(req, res) {
     // transacción: si algo falla, el fontanero actual no pierde su rol.
     const { error: profileError } = await profileModel.create({
       ...datosOpcionales,
+      ...datosCedula,
       id: userId,
       nombre: String(nombre).trim(),
       apellido: String(apellido).trim(),
@@ -77,9 +91,7 @@ async function crearUsuario(req, res) {
     if (profileError) {
       // Evitamos dejar un usuario huérfano en auth.users sin perfil asociado.
       await authModel.deleteUser(userId).catch(() => {});
-      if (profileError.code === '23505') {
-        return res.status(409).json({ error: 'Esa cédula ya está asociada a otra cuenta.' });
-      }
+      if (esCedulaRepetida(profileError)) return res.status(409).json({ error: MENSAJE_CEDULA_REPETIDA });
       return errorConsulta(res, profileError);
     }
     if (rol === 'fontanero') {
@@ -233,18 +245,30 @@ async function cambiarRol(req, res) {
 async function editarUsuario(req, res) {
   const { userId } = req.params;
 
-  const { cambios, error: errorCampos } = extraerCambiosPerfil(req.body);
+  const { cambios: cambiosPerfil, error: errorCampos } = extraerCambiosPerfil(req.body);
   if (errorCampos) return res.status(400).json({ error: errorCampos });
+  const { cambios: cambiosCedula, error: errorCedula } = extraerCedula(req.body);
+  if (errorCedula) return res.status(400).json({ error: errorCedula });
+  const cambios = { ...cambiosPerfil, ...cambiosCedula };
 
   if (Object.keys(cambios).length === 0) {
     return res.status(400).json({ error: 'No hay campos válidos para actualizar' });
   }
 
   try {
+    if (cambios.cedula) {
+      const { data: duenoCedula, error: errorBusqueda } = await profileModel.findByCedula(cambios.cedula, 'id');
+      if (errorBusqueda) return errorConsulta(res, errorBusqueda);
+      if (duenoCedula && duenoCedula.id !== userId) {
+        return res.status(409).json({ error: MENSAJE_CEDULA_REPETIDA });
+      }
+    }
+
     const { data, error } = await profileModel.update(userId, cambios);
 
-    if (error?.code === '23505') {
-      return res.status(409).json({ error: 'Esa cédula ya está asociada a otra cuenta.' });
+    if (esCedulaRepetida(error)) return res.status(409).json({ error: MENSAJE_CEDULA_REPETIDA });
+    if (error || !data) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
     }
     if (error) return errorConsulta(res, error);
     if (!data) return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -303,6 +327,11 @@ async function cambiarEstadoUsuario(req, res) {
 
 async function eliminarUsuario(req, res) {
   const { userId } = req.params;
+  // Desde el panel no se puede borrar la propia cuenta: dejaría al acueducto
+  // sin el administrador que está haciendo la operación.
+  if (userId === req.usuario.id) {
+    return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta' });
+  }
   try {
     const resultado = await eliminarCuenta({
       userId,

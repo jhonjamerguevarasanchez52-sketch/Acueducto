@@ -7,13 +7,11 @@ import '../../theme/app_theme.dart';
 /// título plano por defecto. Se usa en lugar de `AppBar` en las pantallas
 /// internas para que todas compartan el mismo look-and-feel.
 class HidroAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const HidroAppBar({
-    super.key,
-    this.title,
-    this.titleWidget,
-    this.actions,
-  }) : assert(title != null || titleWidget != null,
-            'HidroAppBar necesita `title` o `titleWidget`');
+  const HidroAppBar({super.key, this.title, this.titleWidget, this.actions})
+    : assert(
+        title != null || titleWidget != null,
+        'HidroAppBar necesita `title` o `titleWidget`',
+      );
 
   final String? title;
   final Widget? titleWidget;
@@ -36,9 +34,7 @@ class HidroAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
       ),
-      title: _TituloAnimado(
-        child: titleWidget ?? Text(title!),
-      ),
+      title: _TituloAnimado(child: titleWidget ?? Text(title!)),
       actions: actions,
     );
   }

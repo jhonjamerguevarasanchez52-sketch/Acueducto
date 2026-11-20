@@ -25,10 +25,7 @@ class FilaDetalle extends StatelessWidget {
           Expanded(
             child: Text(
               texto,
-              style: TextStyle(
-                fontSize: 13,
-                color: secundario,
-              ),
+              style: TextStyle(fontSize: 13, color: secundario),
             ),
           ),
         ],

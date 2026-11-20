@@ -41,14 +41,19 @@ class Profile {
 
   /// Texto de ubicación a mostrar/confirmar al reportar una avería.
   String? get ubicacionCuenta {
-    final partes = [direccion, zona]
-        .where((p) => p != null && p.trim().isNotEmpty)
-        .toList();
+    final partes = [
+      direccion,
+      zona,
+    ].where((p) => p != null && p.trim().isNotEmpty).toList();
     return partes.isEmpty ? null : partes.join(' · ');
   }
 
-  bool get perfilCompleto => [telefono, numeroLote, direccion, zona]
-      .every((valor) => valor != null && valor.trim().isNotEmpty);
+  bool get perfilCompleto => [
+    telefono,
+    numeroLote,
+    direccion,
+    zona,
+  ].every((valor) => valor != null && valor.trim().isNotEmpty);
 
   /// Dirección, zona y lote identifican el servicio. El usuario solo puede
   /// llenarlos si están vacíos; después los cambia el administrador (el

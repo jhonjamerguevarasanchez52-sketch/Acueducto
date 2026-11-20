@@ -43,10 +43,10 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
     setState(() => _verificando = true);
     try {
       await context.read<AuthProvider>().verificarCuenta(
-            widget.correo,
-            _codigoCtrl.text,
-            widget.password,
-          );
+        widget.correo,
+        _codigoCtrl.text,
+        widget.password,
+      );
       // Sesión iniciada: AuthGate reconstruye esta ruta como HomeScreen. Al
       // salir de la pila, la pantalla de login que quedó debajo también se va.
       if (mounted) Navigator.of(context).pop();
@@ -61,9 +61,9 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
     if (_reenviando) return;
     setState(() => _reenviando = true);
     try {
-      await context
-          .read<AuthProvider>()
-          .reenviarCodigoVerificacion(widget.correo);
+      await context.read<AuthProvider>().reenviarCodigoVerificacion(
+        widget.correo,
+      );
       if (mounted) {
         AppSnackbar.info(
           context,
@@ -99,11 +99,12 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
             Text.rich(
               TextSpan(
                 style: TextStyle(
-                    fontSize: 13.5, color: authMutedDe(context), height: 1.4),
+                  fontSize: 13.5,
+                  color: authMutedDe(context),
+                  height: 1.4,
+                ),
                 children: [
-                  const TextSpan(
-                    text: 'Enviamos un código de 6 dígitos a\n',
-                  ),
+                  const TextSpan(text: 'Enviamos un código de 6 dígitos a\n'),
                   TextSpan(
                     text: widget.correo,
                     style: TextStyle(
@@ -112,7 +113,8 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
                     ),
                   ),
                   const TextSpan(
-                      text: '. Escríbelo aquí para activar tu cuenta.'),
+                    text: '. Escríbelo aquí para activar tu cuenta.',
+                  ),
                 ],
               ),
             ),
@@ -159,7 +161,9 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
                       height: 22,
                       width: 22,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Verificar y entrar'),
             ),
@@ -167,9 +171,7 @@ class _VerificarCuentaFormState extends State<VerificarCuentaForm> {
             TextButton(
               onPressed: _reenviando ? null : _reenviar,
               style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
-              child: Text(
-                _reenviando ? 'Enviando…' : 'Reenviar código',
-              ),
+              child: Text(_reenviando ? 'Enviando…' : 'Reenviar código'),
             ),
           ],
         ),

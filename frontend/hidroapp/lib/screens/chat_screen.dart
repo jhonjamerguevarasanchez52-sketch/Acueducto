@@ -90,10 +90,12 @@ class _ChatScreenState extends State<ChatScreen> {
     final historial = _mensajes
         .take(fin)
         .where((m) => m.autor != ChatAutor.error)
-        .map((m) => <String, String>{
-              'role': m.autor == ChatAutor.usuario ? 'user' : 'assistant',
-              'content': m.texto,
-            })
+        .map(
+          (m) => <String, String>{
+            'role': m.autor == ChatAutor.usuario ? 'user' : 'assistant',
+            'content': m.texto,
+          },
+        )
         .toList();
     final inicio = historial.length > 8 ? historial.length - 8 : 0;
     return historial.skip(inicio).toList();
@@ -137,10 +139,12 @@ class _ChatScreenState extends State<ChatScreen> {
       _confirmadas.add(propuesta);
       _mensajes.add(ChatMensaje.usuario('Sí, avisar al fontanero'));
     });
-    final exito = await _pedir(body: {
-      'confirmarAveria': true,
-      'descripcion': propuesta.averiaPorConfirmar,
-    });
+    final exito = await _pedir(
+      body: {
+        'confirmarAveria': true,
+        'descripcion': propuesta.averiaPorConfirmar,
+      },
+    );
     // Si falló, se puede volver a intentar desde el mismo botón.
     if (!exito && mounted) setState(() => _confirmadas.remove(propuesta));
   }
@@ -157,39 +161,46 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final data = await context.read<AuthProvider>().api.post(
-            '/chat',
-            body: {...body, if (_audioIds.isNotEmpty) 'audioIds': _audioIds},
-          );
+        '/chat',
+        body: {...body, if (_audioIds.isNotEmpty) 'audioIds': _audioIds},
+      );
 
       final respuesta = data is Map && data['respuesta'] is String
           ? (data['respuesta'] as String).trim()
           : 'No pude generar una respuesta.';
       final accion = data is Map ? data['accion'] : null;
-      final descripcion = accion is Map &&
+      final descripcion =
+          accion is Map &&
               accion['tipo'] == 'confirmar_averia' &&
               accion['descripcion'] is String
           ? accion['descripcion'] as String
           : null;
 
       if (!mounted) return false;
-      setState(() => _mensajes.add(
-            ChatMensaje.asistente(respuesta, averiaPorConfirmar: descripcion),
-          ));
+      setState(
+        () => _mensajes.add(
+          ChatMensaje.asistente(respuesta, averiaPorConfirmar: descripcion),
+        ),
+      );
       exito = true;
     } on ApiException catch (e) {
       if (!mounted) return false;
       // Algunos rechazos traen una respuesta de GOTA en vez de un error.
       final respuesta = e.data is Map ? (e.data as Map)['respuesta'] : null;
-      setState(() => _mensajes.add(
-            respuesta is String
-                ? ChatMensaje.asistente(respuesta)
-                : ChatMensaje.error(e.message),
-          ));
+      setState(
+        () => _mensajes.add(
+          respuesta is String
+              ? ChatMensaje.asistente(respuesta)
+              : ChatMensaje.error(e.message),
+        ),
+      );
     } catch (_) {
       if (!mounted) return false;
-      setState(() => _mensajes.add(
-            ChatMensaje.error('Algo salió mal. Intenta de nuevo en un momento.'),
-          ));
+      setState(
+        () => _mensajes.add(
+          ChatMensaje.error('Algo salió mal. Intenta de nuevo en un momento.'),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _enviando = false);
@@ -209,7 +220,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (ultimoUsuario.texto.isEmpty) return;
     setState(() {
       _mensajes.removeWhere((m) => m.autor == ChatAutor.error);
-      final indice = _mensajes.lastIndexWhere((m) => m.autor == ChatAutor.usuario);
+      final indice = _mensajes.lastIndexWhere(
+        (m) => m.autor == ChatAutor.usuario,
+      );
       if (indice >= 0) _mensajes.removeAt(indice);
       _entradaCtrl.text = ultimoUsuario.texto;
       _textoDeAudio = ultimoUsuario.deAudio;
@@ -262,7 +275,10 @@ class _ChatScreenState extends State<ChatScreen> {
       final grabado = await _audio.detener();
       if (grabado == null || grabado.duracion < const Duration(seconds: 1)) {
         if (mounted) {
-          AppSnackbar.info(context, 'El audio quedó muy corto. Mantén el micrófono un poco más.');
+          AppSnackbar.info(
+            context,
+            'El audio quedó muy corto. Mantén el micrófono un poco más.',
+          );
         }
         return;
       }
@@ -271,10 +287,12 @@ class _ChatScreenState extends State<ChatScreen> {
       if (resultado.audioId != null) _audioIds.add(resultado.audioId!);
       // Si ya había texto escrito, el audio se suma en vez de reemplazarlo.
       final previo = _entradaCtrl.text.trim();
-      _entradaCtrl.text =
-          previo.isEmpty ? resultado.transcripcion : '$previo ${resultado.transcripcion}';
-      _entradaCtrl.selection =
-          TextSelection.collapsed(offset: _entradaCtrl.text.length);
+      _entradaCtrl.text = previo.isEmpty
+          ? resultado.transcripcion
+          : '$previo ${resultado.transcripcion}';
+      _entradaCtrl.selection = TextSelection.collapsed(
+        offset: _entradaCtrl.text.length,
+      );
       setState(() => _textoDeAudio = true);
       _entradaFocus.requestFocus();
     } on ApiException catch (e) {
@@ -311,7 +329,11 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               radius: 14,
               backgroundColor: Colors.white,
-              child: Icon(LucideIcons.droplet, size: 16, color: AppTheme.primary),
+              child: Icon(
+                LucideIcons.droplet,
+                size: 16,
+                color: AppTheme.primary,
+              ),
             ),
             SizedBox(width: 10),
             Text('GOTA'),
@@ -326,10 +348,12 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               itemCount: _mensajes.length + (_enviando ? 1 : 0),
               itemBuilder: (context, i) {
-                if (i == _mensajes.length) return const ChatBurbujaEscribiendo();
+                if (i == _mensajes.length)
+                  return const ChatBurbujaEscribiendo();
                 final mensaje = _mensajes[i];
                 // El botón solo se ofrece en la propuesta más reciente.
-                final puedeConfirmar = mensaje.averiaPorConfirmar != null &&
+                final puedeConfirmar =
+                    mensaje.averiaPorConfirmar != null &&
                     i == _mensajes.length - 1 &&
                     !_confirmadas.contains(mensaje);
                 return ChatBurbuja(

@@ -21,7 +21,8 @@ class IngresarConCodigoScreen extends StatefulWidget {
   final String correoInicial;
 
   @override
-  State<IngresarConCodigoScreen> createState() => _IngresarConCodigoScreenState();
+  State<IngresarConCodigoScreen> createState() =>
+      _IngresarConCodigoScreenState();
 }
 
 class _IngresarConCodigoScreenState extends State<IngresarConCodigoScreen> {
@@ -75,11 +76,18 @@ class _IngresarConCodigoScreenState extends State<IngresarConCodigoScreen> {
       if (!mounted) return;
       setState(() => _codigoEnviado = true);
       _iniciarEspera();
-      AppSnackbar.info(context, 'Si el correo está registrado, te llegará un código.');
+      AppSnackbar.info(
+        context,
+        'Si el correo está registrado, te llegará un código.',
+      );
     } on ApiException catch (e) {
       if (mounted) AppSnackbar.error(context, e.message);
     } catch (_) {
-      if (mounted) AppSnackbar.error(context, 'No se pudo enviar el código. Intenta de nuevo.');
+      if (mounted)
+        AppSnackbar.error(
+          context,
+          'No se pudo enviar el código. Intenta de nuevo.',
+        );
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
@@ -98,7 +106,8 @@ class _IngresarConCodigoScreenState extends State<IngresarConCodigoScreen> {
     } on ApiException catch (e) {
       if (mounted) AppSnackbar.error(context, e.message);
     } catch (_) {
-      if (mounted) AppSnackbar.error(context, 'No se pudo ingresar. Intenta de nuevo.');
+      if (mounted)
+        AppSnackbar.error(context, 'No se pudo ingresar. Intenta de nuevo.');
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
@@ -123,15 +132,17 @@ class _IngresarConCodigoScreenState extends State<IngresarConCodigoScreen> {
               const SizedBox(height: 16),
               Text(
                 _codigoEnviado ? 'Revisa tu correo' : 'Entra sin contraseña',
-                style: tema.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                style: tema.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 _codigoEnviado
                     ? 'Te enviamos un código de 6 dígitos a ${_correo.text.trim()}. '
-                        'Escríbelo aquí. Vence en 15 minutos.'
+                          'Escríbelo aquí. Vence en 15 minutos.'
                     : 'Escribe tu correo y te enviaremos un código para entrar. '
-                        'No necesitas recordar ninguna contraseña.',
+                          'No necesitas recordar ninguna contraseña.',
                 style: tema.textTheme.bodyMedium,
               ),
               const SizedBox(height: 24),
@@ -175,7 +186,9 @@ class _IngresarConCodigoScreenState extends State<IngresarConCodigoScreen> {
             width: double.infinity,
             child: FilledButton(
               onPressed: _cargando ? null : _enviarCodigo,
-              child: _cargando ? const _Cargando() : const Text('Enviarme el código'),
+              child: _cargando
+                  ? const _Cargando()
+                  : const Text('Enviarme el código'),
             ),
           ),
         ],
@@ -198,7 +211,11 @@ class _IngresarConCodigoScreenState extends State<IngresarConCodigoScreen> {
             autofillHints: const [AutofillHints.oneTimeCode],
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 26, letterSpacing: 10, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              fontSize: 26,
+              letterSpacing: 10,
+              fontWeight: FontWeight.w700,
+            ),
             onChanged: (valor) {
               // Con los 6 dígitos completos entra solo, sin buscar el botón.
               if (valor.length == 6 && !_cargando) _entrar();
@@ -226,15 +243,19 @@ class _IngresarConCodigoScreenState extends State<IngresarConCodigoScreen> {
           const SizedBox(height: 8),
           TextButton(
             onPressed: (_cargando || _segundos > 0) ? null : _enviarCodigo,
-            child: Text(_segundos > 0 ? 'Reenviar código en ${_segundos}s' : 'Reenviar código'),
+            child: Text(
+              _segundos > 0
+                  ? 'Reenviar código en ${_segundos}s'
+                  : 'Reenviar código',
+            ),
           ),
           TextButton(
             onPressed: _cargando
                 ? null
                 : () => setState(() {
-                      _codigoEnviado = false;
-                      _codigo.clear();
-                    }),
+                    _codigoEnviado = false;
+                    _codigo.clear();
+                  }),
             child: const Text('Usar otro correo'),
           ),
         ],

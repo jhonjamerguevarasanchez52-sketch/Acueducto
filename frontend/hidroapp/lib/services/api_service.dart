@@ -9,14 +9,19 @@ import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../utils/lenguaje_ofensivo.dart';
 
-/// Error de API con el mensaje y los datos que devuelve el backend.
+/// Error de API con el mensaje que devuelve el backend (`{ "error": "..." }`).
 class ApiException implements Exception {
   ApiException(this.message, {this.statusCode, this.data});
 
   final String message;
   final int? statusCode;
+
+  /// Cuerpo de la respuesta ya decodificado (si lo hubo). Permite leer flags
+  /// extra que manda el backend junto al error, como `requiereVerificacion`.
   final dynamic data;
 
+  /// `true` cuando el backend rechazó el login porque la cuenta todavía no ha
+  /// confirmado su código de verificación.
   bool get requiereVerificacion =>
       data is Map && (data as Map)['requiereVerificacion'] == true;
 
@@ -24,6 +29,8 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// La petición superó el tiempo máximo de espera. Se distingue de un fallo de
+/// conexión porque no conviene reintentarla automáticamente.
 class _TiempoAgotado extends ApiException {
   _TiempoAgotado()
     : super(
@@ -31,20 +38,31 @@ class _TiempoAgotado extends ApiException {
       );
 }
 
-/// Cliente HTTP del backend REST.
+/// Cliente HTTP delgado sobre el backend REST.
+///
+/// Inyecta el token `Authorization: Bearer <token>` cuando está disponible y
+/// normaliza los errores a [ApiException].
 class ApiService {
   ApiService({http.Client? client, this.tiempoMaximo = tiempoMaximoPorDefecto})
     : _client = client ?? http.Client();
 
   final http.Client _client;
 
-  /// Render puede tardar en responder cuando el servicio acaba de despertar.
-  static const Duration tiempoMaximoPorDefecto = Duration(seconds: 45);
+  /// Render (plan gratuito) tarda 30–60 s en despertar el servidor dormido.
+  /// Con 45 s la primera petición del día fallaba justo cuando el servidor
+  /// estaba a punto de responder; 75 s cubre el arranque con margen.
+  static const Duration tiempoMaximoPorDefecto = Duration(seconds: 75);
 
+  /// Tiempo máximo de espera por petición (configurable para las pruebas).
   final Duration tiempoMaximo;
+
+  /// Token de acceso de Supabase. Lo setea el [AuthProvider] al iniciar sesión.
   String? authToken;
 
-  /// Renueva la sesión si una petición autenticada recibe 401.
+  /// Se invoca cuando una petición autenticada recibe 401, antes de dar la
+  /// sesión por perdida: debe renovar [authToken] con el refresh token
+  /// guardado y devolver `true` si lo logró, para reintentar la petición una
+  /// sola vez. Si devuelve `false`, quien la implementa cierra la sesión.
   Future<bool> Function()? onUnauthorized;
 
   static const _rutaRenovarSesion = '/auth/renovar-sesion';
@@ -56,11 +74,22 @@ class ApiService {
     if (authToken != null) 'Authorization': 'Bearer $authToken',
   };
 
+  /// Los GET no cambian nada en el servidor, así que se reintentan una vez
+  /// ante un fallo de conexión (típico mientras Render despierta). Tras un
+  /// timeout NO se reintenta: el usuario ya esperó el máximo y volver a
+  /// esperar lo mismo duplicaría la espera sin avisarle.
   Future<dynamic> get(String path) => _send(
     path,
     () => _client.get(_uri(path), headers: _headers).timeout(tiempoMaximo),
     reintentarFalloDeRed: true,
   );
+
+  /// Ningún texto con groserías o lenguaje ofensivo sale de la app: se avisa
+  /// al instante sin esperar al servidor (que tiene la misma regla).
+  static Future<dynamic>? _rechazarOfensivo(Object? body) =>
+      cuerpoConLenguajeOfensivo(body)
+      ? Future.error(ApiException(mensajeLenguajeOfensivo, statusCode: 400))
+      : null;
 
   Future<dynamic> post(String path, {Object? body}) =>
       _rechazarOfensivo(body) ??
@@ -100,6 +129,8 @@ class ApiService {
             .timeout(tiempoMaximo),
       );
 
+  /// [body] es opcional: por ejemplo, eliminar la cuenta envía la contraseña
+  /// para confirmar.
   Future<dynamic> delete(String path, {Object? body}) => _send(
     path,
     () => _client
@@ -111,14 +142,11 @@ class ApiService {
         .timeout(tiempoMaximo),
   );
 
-  static Future<dynamic>? _rechazarOfensivo(Object? body) =>
-      cuerpoConLenguajeOfensivo(body)
-      ? Future.error(ApiException(mensajeLenguajeOfensivo, statusCode: 400))
-      : null;
-
-  /// Renueva el refresh token sin pasar por [_send] para evitar un bucle 401.
+  /// Cambia el refresh token por una sesión nueva llamando directamente al
+  /// endpoint público, sin pasar por [_send]: así un refresh rechazado nunca
+  /// dispara otra renovación (bucle de 401).
   Future<dynamic> renewSession(String refreshToken) async {
-    final response = await _ejecutar(
+    final res = await _ejecutar(
       () => _client
           .post(
             _uri(_rutaRenovarSesion),
@@ -127,20 +155,20 @@ class ApiService {
           )
           .timeout(tiempoMaximo),
     );
-    final data = _decodificar(response);
-    if (response.statusCode >= 200 && response.statusCode < 300) return data;
-    final message = data is Map && data['error'] is String
+    final data = _decodificar(res);
+    if (res.statusCode >= 200 && res.statusCode < 300) return data;
+    final msg = data is Map && data['error'] is String
         ? data['error'] as String
         : 'No se pudo renovar la sesión.';
-    throw ApiException(message, statusCode: response.statusCode, data: data);
+    throw ApiException(msg, statusCode: res.statusCode, data: data);
   }
 
-  static dynamic _decodificar(http.Response response) {
-    if (response.body.isEmpty) return null;
+  static dynamic _decodificar(http.Response res) {
+    if (res.body.isEmpty) return null;
     try {
-      return jsonDecode(response.body);
+      return jsonDecode(res.body);
     } catch (_) {
-      return response.body;
+      return res.body;
     }
   }
 
@@ -149,36 +177,54 @@ class ApiService {
     Future<http.Response> Function() request, {
     bool reintentarFalloDeRed = false,
   }) async {
-    http.Response response;
+    final tokenUsado = authToken;
+    http.Response res;
     try {
-      response = await _ejecutar(request);
-    } on ApiException catch (error) {
-      if (!reintentarFalloDeRed || error is _TiempoAgotado) rethrow;
-      response = await _ejecutar(request);
+      res = await _ejecutar(request);
+    } on ApiException catch (e) {
+      if (!reintentarFalloDeRed || e is _TiempoAgotado) rethrow;
+      res = await _ejecutar(request);
     }
 
-    if (response.statusCode == 401 &&
-        authToken != null &&
-        path != _rutaRenovarSesion &&
-        onUnauthorized != null) {
-      var renewed = false;
-      try {
-        renewed = await onUnauthorized!.call();
-      } catch (error) {
-        if (kDebugMode) {
-          debugPrint('[ApiService] no se pudo renovar la sesión: $error');
-        }
-      }
-      if (renewed) response = await _ejecutar(request);
+    // El access token de Supabase vence (≈1 h). Antes de dar la sesión por
+    // perdida pedimos uno nuevo con el refresh token y repetimos la petición
+    // una sola vez. Si otra petición ya lo renovó, basta con reintentar.
+    if (res.statusCode == 401 &&
+        tokenUsado != null &&
+        path != _rutaRenovarSesion) {
+      final renovado =
+          authToken != tokenUsado ||
+          (onUnauthorized != null && await _renovar());
+      if (renovado && authToken != null) res = await _ejecutar(request);
     }
 
-    final data = _decodificar(response);
-    if (response.statusCode >= 200 && response.statusCode < 300) return data;
+    final data = _decodificar(res);
 
-    final message = data is Map && data['error'] is String
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return data;
+    }
+
+    final msg = data is Map && data['error'] is String
         ? data['error'] as String
-        : 'Error ${response.statusCode}';
-    throw ApiException(message, statusCode: response.statusCode, data: data);
+        : 'Error ${res.statusCode}';
+
+    throw ApiException(msg, statusCode: res.statusCode, data: data);
+  }
+
+  /// Si quien renueva lanza un [ApiException] (falla temporal de red o del
+  /// servidor), ese mensaje es el que ve el usuario: la sesión sigue abierta.
+  /// Cualquier otro fallo inesperado cuenta como "no se pudo" y la petición
+  /// original termina con su 401 en vez de con un error confuso.
+  Future<bool> _renovar() async {
+    try {
+      return await onUnauthorized!();
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      if (kDebugMode)
+        debugPrint('[ApiService] no se pudo renovar la sesión: $e');
+      return false;
+    }
   }
 
   Future<http.Response> _ejecutar(
@@ -186,31 +232,35 @@ class ApiService {
   ) async {
     try {
       return await request();
-    } on TimeoutException catch (error) {
-      if (kDebugMode) debugPrint('[ApiService] timeout: $error');
+    } on TimeoutException catch (e) {
+      if (kDebugMode) debugPrint('[ApiService] timeout: $e');
       throw _TiempoAgotado();
-    } catch (error, stackTrace) {
-      if (kDebugMode) {
-        debugPrint('[ApiService] fallo de red: $error\n$stackTrace');
-      }
-      throw ApiException(mensajeFalloDeRed(error));
+    } catch (e, st) {
+      // No filtramos el error real al usuario (podría ser un detalle técnico
+      // sin sentido para él), pero sí lo dejamos en el log para poder
+      // diagnosticar problemas reales (DNS, certificado, etc.) en vez de que
+      // todo se vea igual que "sin internet".
+      if (kDebugMode) debugPrint('[ApiService] fallo de red: $e\n$st');
+      throw ApiException(mensajeFalloDeRed(e));
     }
   }
 
+  /// Traduce el fallo de red a un mensaje que el usuario pueda resolver, con
+  /// un código corto para que nos diga qué le salió sin ver el log.
   @visibleForTesting
-  static String mensajeFalloDeRed(Object error) {
-    if (error is HandshakeException || error is TlsException) {
+  static String mensajeFalloDeRed(Object e) {
+    if (e is HandshakeException || e is TlsException) {
       return 'No se pudo establecer una conexión segura con el servidor. '
           'Revisa que la fecha y la hora del teléfono estén en automático. '
           '(código RED-TLS)';
     }
-    final text = error.toString();
-    if (text.contains('Failed host lookup') ||
-        text.contains('No address associated with hostname')) {
+    final texto = e.toString();
+    if (texto.contains('Failed host lookup') ||
+        texto.contains('No address associated with hostname')) {
       return 'No hay internet o no se encontró el servidor. Revisa tus datos '
           'o el Wi-Fi y vuelve a intentar. (código RED-DNS)';
     }
-    if (error is SocketException) {
+    if (e is SocketException) {
       return 'No se pudo conectar con el servidor. Revisa tu conexión y que '
           'la app tenga permiso de usar datos. (código RED-SOCKET)';
     }

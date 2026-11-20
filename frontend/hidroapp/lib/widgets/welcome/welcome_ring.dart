@@ -70,7 +70,10 @@ class WelcomeRing extends StatelessWidget {
           ),
         ),
         Opacity(
-          opacity: (phase.flash(kRingFlashA, kRingFlashB) * 0.35).clamp(0.0, 1.0),
+          opacity: (phase.flash(kRingFlashA, kRingFlashB) * 0.35).clamp(
+            0.0,
+            1.0,
+          ),
           child: Container(
             width: 150,
             height: 150,

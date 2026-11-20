@@ -16,7 +16,8 @@ class _AdminPagosScreenState extends State<AdminPagosScreen> {
 
   Future<void> _verRecibo(String url) async {
     final uri = Uri.tryParse(url);
-    final abierto = uri != null &&
+    final abierto =
+        uri != null &&
         await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!abierto && mounted) _aviso('No se pudo abrir el recibo.');
   }

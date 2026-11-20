@@ -102,8 +102,10 @@ class ChatBarraEntrada extends StatelessWidget {
                 decoration: const InputDecoration(
                   hintText: 'Escribe tu mensaje…',
                   counterText: '',
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
               ),
             ),
@@ -120,8 +122,8 @@ class ChatBarraEntrada extends StatelessWidget {
                   onPressed: !habilitada
                       ? null
                       : usarMicrofono
-                          ? onGrabar
-                          : onEnviar,
+                      ? onGrabar
+                      : onEnviar,
                   icon: Icon(
                     usarMicrofono ? LucideIcons.mic : LucideIcons.send,
                   ),
@@ -205,10 +207,10 @@ class ChatBarraEntrada extends StatelessWidget {
   }
 
   static ButtonStyle _estiloBoton(Color color) => IconButton.styleFrom(
-        minimumSize: const Size(48, 48),
-        backgroundColor: color,
-        disabledBackgroundColor: const Color(0xFFBFD9E7),
-      );
+    minimumSize: const Size(48, 48),
+    backgroundColor: color,
+    disabledBackgroundColor: const Color(0xFFBFD9E7),
+  );
 
   static String _formato(Duration d) =>
       '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';

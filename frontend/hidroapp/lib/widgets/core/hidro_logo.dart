@@ -165,17 +165,26 @@ class HidroDropPainter extends CustomPainter {
     final drop = Path()
       ..moveTo(w * 0.5, 0)
       ..cubicTo(w * 0.95, h * 0.28, w, h * 0.55, w, h * 0.64)
-      ..arcToPoint(Offset(w * 0.5, h),
-          radius: Radius.circular(w * 0.52), clockwise: true)
-      ..arcToPoint(Offset(0, h * 0.64),
-          radius: Radius.circular(w * 0.52), clockwise: true)
+      ..arcToPoint(
+        Offset(w * 0.5, h),
+        radius: Radius.circular(w * 0.52),
+        clockwise: true,
+      )
+      ..arcToPoint(
+        Offset(0, h * 0.64),
+        radius: Radius.circular(w * 0.52),
+        clockwise: true,
+      )
       ..cubicTo(0, h * 0.55, w * 0.05, h * 0.28, w * 0.5, 0)
       ..close();
 
     // Sombra de contacto (muy sutil, sin glow).
     canvas.drawOval(
       Rect.fromCenter(
-          center: Offset(w * 0.5, h), width: w * 0.66, height: h * 0.12),
+        center: Offset(w * 0.5, h),
+        width: w * 0.66,
+        height: h * 0.12,
+      ),
       Paint()
         ..color = Colors.black.withValues(alpha: 0.16)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
@@ -212,7 +221,10 @@ class HidroDropPainter extends CustomPainter {
       ..lineTo(w, h)
       ..lineTo(0, h)
       ..close();
-    canvas.drawPath(wave, Paint()..color = Colors.white.withValues(alpha: 0.14));
+    canvas.drawPath(
+      wave,
+      Paint()..color = Colors.white.withValues(alpha: 0.14),
+    );
 
     // Brillo diagonal tipo reflejo de vidrio.
     final glint = Path()
@@ -220,7 +232,10 @@ class HidroDropPainter extends CustomPainter {
       ..quadraticBezierTo(w * 0.18, h * 0.40, w * 0.30, h * 0.56)
       ..quadraticBezierTo(w * 0.40, h * 0.38, w * 0.30, h * 0.20)
       ..close();
-    canvas.drawPath(glint, Paint()..color = Colors.white.withValues(alpha: 0.20));
+    canvas.drawPath(
+      glint,
+      Paint()..color = Colors.white.withValues(alpha: 0.20),
+    );
 
     canvas.restore();
   }

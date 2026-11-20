@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../config/api_config.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import 'admin/admin_api.dart';
+import 'admin/admin_pagos_screen.dart';
 import 'cambiar_password_screen.dart';
 import '../widgets/core/core.dart';
 import 'editar_perfil_screen.dart';
@@ -218,6 +222,22 @@ class PerfilScreen extends StatelessWidget {
               style: TextStyle(color: colores.secondaryText, fontSize: 12),
             ),
           ),
+          if (perfil?.rol == 'administrador') ...[
+            const SizedBox(height: 16),
+            // Revisión de los recibos de pago físico que suben los usuarios.
+            FilledButton.tonalIcon(
+              key: const ValueKey('abrir-recibos-por-revisar'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AdminPagosScreen(
+                    api: AdminApi(context.read<AuthProvider>().api),
+                  ),
+                ),
+              ),
+              icon: const Icon(LucideIcons.receiptText),
+              label: const Text('Recibos por revisar'),
+            ),
+          ],
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () => Navigator.of(context).push(
@@ -251,8 +271,99 @@ class PerfilScreen extends StatelessWidget {
               side: BorderSide(color: colores.danger),
             ),
           ),
+          const SizedBox(height: 24),
+          const _InformacionLegal(),
         ],
       ),
+    );
+  }
+}
+
+/// Enlaces a las páginas públicas que exige Google Play: la política de
+/// privacidad y la solicitud de eliminación de cuenta.
+class _InformacionLegal extends StatelessWidget {
+  const _InformacionLegal();
+
+  Future<void> _abrir(BuildContext context, String url) async {
+    final uri = Uri.parse(url);
+    var abierta = false;
+    try {
+      // Dentro de la app (pestaña del navegador); si el teléfono no lo
+      // permite, se intenta con el navegador externo.
+      abierta = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      if (!abierta) {
+        abierta = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      abierta = false;
+    }
+    if (!abierta && context.mounted) {
+      AppSnackbar.error(
+        context,
+        'No se pudo abrir la página. Revisa tu conexión e intenta de nuevo.',
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'Información legal',
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: colores.secondaryText,
+            ),
+          ),
+        ),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                key: const ValueKey('abrir-politica-privacidad'),
+                leading: Icon(LucideIcons.shieldCheck, color: colores.info),
+                title: const Text('Política de privacidad'),
+                subtitle: Text(
+                  'Cómo usamos y protegemos tus datos',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: colores.secondaryText,
+                  ),
+                ),
+                trailing: Icon(
+                  LucideIcons.chevronRight,
+                  color: colores.secondaryText,
+                ),
+                onTap: () => _abrir(context, ApiConfig.politicaPrivacidadUrl),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                key: const ValueKey('abrir-eliminar-cuenta'),
+                leading: Icon(LucideIcons.fileText, color: colores.info),
+                title: const Text('Eliminación de cuenta y datos'),
+                subtitle: Text(
+                  'Qué se borra y qué se conserva',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: colores.secondaryText,
+                  ),
+                ),
+                trailing: Icon(
+                  LucideIcons.chevronRight,
+                  color: colores.secondaryText,
+                ),
+                onTap: () => _abrir(context, ApiConfig.eliminarCuentaUrl),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
