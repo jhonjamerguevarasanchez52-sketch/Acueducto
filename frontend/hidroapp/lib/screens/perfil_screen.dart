@@ -345,10 +345,10 @@ class _InformacionLegal extends StatelessWidget {
               const Divider(height: 1),
               ListTile(
                 key: const ValueKey('abrir-eliminar-cuenta'),
-                leading: Icon(LucideIcons.userX, color: colores.info),
-                title: const Text('Eliminar mi cuenta'),
+                leading: Icon(LucideIcons.fileText, color: colores.info),
+                title: const Text('Eliminación de cuenta y datos'),
                 subtitle: Text(
-                  'Cómo solicitarlo y qué pasa con tus datos',
+                  'Qué se borra y qué se conserva',
                   style: TextStyle(
                     fontSize: 12.5,
                     color: colores.secondaryText,

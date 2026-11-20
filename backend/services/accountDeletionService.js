@@ -87,6 +87,20 @@ async function eliminarCuenta({ userId, actor, deletionType, exitNote }) {
   if (profileError) throw new Error(`No se pudo consultar el perfil: ${profileError.message}`);
   if (!profile) return { notFound: true };
 
+  // El acueducto no puede quedarse sin administrador: el último activo no se
+  // puede eliminar (ni desde la app ni desde el panel).
+  if (profile.rol === 'administrador') {
+    const { count, error: errorConteo } = await supabaseAdmin
+      .from('profiles').select('id', { count: 'exact', head: true })
+      .eq('rol', 'administrador').eq('activo', true).neq('id', userId);
+    if (errorConteo) throw new Error(`No se pudo verificar los administradores: ${errorConteo.message}`);
+    if (!count) {
+      const error = new Error('Eres el único administrador activo. Crea otro administrador antes de eliminar esta cuenta.');
+      error.statusCode = 409;
+      throw error;
+    }
+  }
+
   if (profile.rol === 'fontanero' && !String(exitNote || '').trim()) {
     const error = new Error('El fontanero debe escribir una nota antes de eliminar su perfil.');
     error.statusCode = 400;
