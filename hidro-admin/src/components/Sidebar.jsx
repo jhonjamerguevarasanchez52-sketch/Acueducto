@@ -8,6 +8,8 @@ import {
   ReceiptText,
   SlidersHorizontal,
   Users,
+  UserRoundX,
+  BadgeCheck,
   Wallet,
   Waves,
   X,
@@ -16,6 +18,8 @@ import {
 const items = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'usuarios', label: 'Usuarios', icon: Users },
+  { id: 'eliminados', label: 'Perfiles eliminados', icon: UserRoundX },
+  { id: 'paz-y-salvo', label: 'Paz y salvo', icon: BadgeCheck },
   { id: 'facturas', label: 'Facturación', icon: ReceiptText },
   { id: 'pagos', label: 'Pagos', icon: Wallet },
   { id: 'cortes', label: 'Cortes y reconexiones', icon: Droplets },

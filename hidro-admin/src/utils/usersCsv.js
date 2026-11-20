@@ -109,6 +109,7 @@ export function parseUsersRows(rows) {
   const nameIndex = columnIndex(['nombre'])
   const surnameIndex = columnIndex(['apellido'])
   const emailIndex = columnIndex(['correo', 'email', 'correo_electronico'])
+  const cedulaIndex = columnIndex(['cedula', 'documento', 'numero_documento'])
   const roleIndex = columnIndex(['rol', 'role'])
 
   if (nameIndex === -1 || surnameIndex === -1 || emailIndex === -1) {
@@ -116,15 +117,19 @@ export function parseUsersRows(rows) {
   }
 
   const seenEmails = new Set()
+  const seenCedulas = new Set()
   return nonEmptyRows.slice(1).map(({ values, line }) => {
     const nombre = String(values[nameIndex] ?? '').trim()
     const apellido = String(values[surnameIndex] ?? '').trim()
     const correo = String(values[emailIndex] ?? '').trim().toLowerCase()
+    const cedula = cedulaIndex === -1 ? '' : String(values[cedulaIndex] ?? '').replace(/\D/g, '')
     const rol = roleIndex === -1 ? 'usuario' : String(values[roleIndex] ?? '').trim().toLowerCase() || 'usuario'
     const errors = []
 
     if (!nombre) errors.push('Falta el nombre.')
     if (!apellido) errors.push('Falta el apellido.')
+    if (cedula && (cedula.length < 5 || cedula.length > 15)) errors.push('La cédula debe tener entre 5 y 15 dígitos.')
+    if (cedula && seenCedulas.has(cedula)) errors.push('La cédula está repetida en el archivo.')
     if (!correo) {
       errors.push('Falta el correo.')
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
@@ -136,12 +141,14 @@ export function parseUsersRows(rows) {
       errors.push('El rol debe ser usuario, fontanero o administrador.')
     }
     if (correo) seenEmails.add(correo)
+    if (cedula) seenCedulas.add(cedula)
 
     return {
       line,
       nombre,
       apellido,
       correo,
+      ...(cedula ? { cedula } : {}),
       rol,
       error: errors.join(' '),
     }

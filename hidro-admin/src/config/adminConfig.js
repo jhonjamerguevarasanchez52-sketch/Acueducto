@@ -9,6 +9,8 @@ export const quickActions = [
 
 export const resourceEndpointBySection = {
   usuarios: 'adminUsers',
+  eliminados: 'deletedUsers',
+  'paz-y-salvo': 'pazYSalvo',
   facturas: 'facturasTodas',
   pagos: 'pagos',
   cortes: 'cortes',

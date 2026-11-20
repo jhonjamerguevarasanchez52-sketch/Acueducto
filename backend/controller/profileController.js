@@ -4,6 +4,8 @@ const {
   CAMPOS_UBICACION_SERVICIO,
 } = require('../utils/perfilCampos');
 const { errorInesperado, errorConsulta } = require('../utils/httpErrores');
+const { eliminarCuenta } = require('../services/accountDeletionService');
+const authModel = require('../models/authModel');
 
 const MENSAJE_UBICACION_BLOQUEADA =
   'La dirección, la zona y el número de lote identifican tu servicio. Para cambiarlos, comunícate con el administrador del acueducto.';
@@ -32,6 +34,10 @@ async function editarPerfil(req, res) {
 
   const { cambios: datosActualizar, error: errorCampos } = extraerCambiosPerfil(req.body);
   if (errorCampos) return res.status(400).json({ error: errorCampos });
+
+  if ('cedula' in datosActualizar && req.usuario.rol !== 'administrador') {
+    return res.status(403).json({ error: 'Solo un administrador puede actualizar la cédula.' });
+  }
 
   if (Object.keys(datosActualizar).length === 0) {
     return res.status(400).json({ error: 'No hay campos válidos para actualizar' });
@@ -69,7 +75,7 @@ async function editarPerfil(req, res) {
     const { data, error } = await profileModel.update(
       userId,
       datosActualizar,
-      tocaUbicacion ? undefined : req.db,
+      tocaUbicacion || (esAdministrador && 'cedula' in datosActualizar) ? undefined : req.db,
     );
 
     if (error) {
@@ -82,4 +88,29 @@ async function editarPerfil(req, res) {
   }
 }
 
-module.exports = { verPerfil, editarPerfil };
+async function eliminarMiCuenta(req, res) {
+  try {
+    const password = String(req.body?.passwordActual || '');
+    if (!password) return res.status(400).json({ error: 'Confirma tu contraseña para eliminar la cuenta.' });
+    const { error: authError } = await authModel.signIn(req.usuario.email, password);
+    if (authError) return res.status(401).json({ error: 'La contraseña no es correcta.' });
+    const resultado = await eliminarCuenta({
+      userId: req.usuario.id,
+      actor: req.usuario,
+      deletionType: 'usuario',
+      exitNote: req.body?.nota,
+    });
+    if (resultado.notFound) return res.status(404).json({ error: 'Perfil no encontrado' });
+    return res.status(200).json({
+      message: resultado.emailSent
+        ? 'Cuenta eliminada. Se envió un correo con el resumen de facturas pendientes.'
+        : 'Cuenta eliminada, pero no se pudo enviar el correo. La administración podrá reintentarlo.',
+      ...resultado,
+    });
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    return errorInesperado(res, err);
+  }
+}
+
+module.exports = { verPerfil, editarPerfil, eliminarMiCuenta };

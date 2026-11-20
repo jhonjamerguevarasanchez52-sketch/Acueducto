@@ -149,7 +149,7 @@ function App() {
     if (sessionStatus !== 'authenticated' || activeSection !== 'dashboard') return
 
     let cancelled = false
-    Promise.all(Object.entries(resourceEndpointBySection).map(async ([section, endpointName]) => {
+    Promise.all(Object.entries(resourceEndpointBySection).filter(([section]) => !['eliminados', 'paz-y-salvo'].includes(section)).map(async ([section, endpointName]) => {
       try {
         const data = await fetchResource(endpointName)
         return { section, data: Array.isArray(data) ? data : [], error: '' }
@@ -199,7 +199,11 @@ function App() {
     setSearchQuery('')
     loadSection(section)
     if (section === 'facturas' || section === 'pagos') void ensureUsersLoaded()
+
+    if (section === 'paz-y-salvo') void ensureUsersLoaded()
+
     if (section === 'cortes') void loadSection('cortesProgramados')
+
     if (section === 'reportes') {
       void Promise.all(['usuarios', 'facturas', 'pagos'].map((name) => loadSection(name)))
     }
@@ -276,8 +280,8 @@ function App() {
       return `"${safeText.replaceAll('"', '""')}"`
     }
     const lines = [
-      ['nombre', 'apellido', 'correo', 'rol', 'error'],
-      ...errors.map((user) => [user.nombre, user.apellido, user.correo, user.rol, user.error || user.message]),
+      ['nombre', 'apellido', 'correo', 'cedula', 'rol', 'error'],
+      ...errors.map((user) => [user.nombre, user.apellido, user.correo, user.cedula, user.rol, user.error || user.message]),
     ]
     const csv = lines.map((line) => line.map(quote).join(',')).join('\r\n')
     const file = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
@@ -313,6 +317,7 @@ function App() {
             nombre: user.nombre,
             apellido: user.apellido,
             correo: user.correo,
+            cedula: user.cedula,
             rol: user.rol,
           },
         })
@@ -357,15 +362,16 @@ function App() {
           { header: 'nombre', key: 'nombre', width: 20 },
           { header: 'apellido', key: 'apellido', width: 20 },
           { header: 'correo', key: 'correo', width: 32 },
+          { header: 'cedula', key: 'cedula', width: 18 },
           { header: 'rol', key: 'rol', width: 18 },
         ]
-        sheet.addRow({ nombre: 'Ana', apellido: 'Lopez', correo: 'ana@ejemplo.com', rol: 'usuario' })
+        sheet.addRow({ nombre: 'Ana', apellido: 'Lopez', correo: 'ana@ejemplo.com', cedula: '1234567890', rol: 'usuario' })
         sheet.views = [{ state: 'frozen', ySplit: 1 }]
-        sheet.autoFilter = 'A1:D1'
+        sheet.autoFilter = 'A1:E1'
         const buffer = await workbook.xlsx.writeBuffer()
         downloadFile(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'plantilla-usuarios.xlsx')
       } else {
-        const content = '\uFEFFnombre,apellido,correo,rol\r\nAna,Lopez,ana@ejemplo.com,usuario\r\n'
+        const content = '\uFEFFnombre,apellido,correo,cedula,rol\r\nAna,Lopez,ana@ejemplo.com,1234567890,usuario\r\n'
         downloadFile(new Blob([content], { type: 'text/csv;charset=utf-8' }), 'plantilla-usuarios.csv')
       }
       setBulkUserError('')
@@ -583,6 +589,27 @@ function App() {
     }
   }
 
+  const handleDeleteOwnAdminAccount = async () => {
+    if (!window.confirm('Se archivará tu historial como administrador, se enviará el resumen de saldos pendientes a tu correo y tu cuenta se eliminará inmediatamente. ¿Continuar?')) return
+    const passwordActual = window.prompt('Confirma tu contraseña actual para eliminar tu cuenta:')
+    if (passwordActual === null) return
+    if (!passwordActual.trim()) {
+      setProfileError('Debes confirmar tu contraseña actual.')
+      return
+    }
+    setProfileError('')
+    try {
+      await apiRequest('/profile/mi-cuenta', {
+        method: 'DELETE',
+        body: { passwordActual },
+      })
+      setProfileOpen(false)
+      handleLogout()
+    } catch (error) {
+      setProfileError(error.message || 'No fue posible eliminar tu cuenta.')
+    }
+  }
+
   const handleChangeProfilePassword = async (event) => {
     event.preventDefault()
     setPasswordError('')
@@ -760,6 +787,8 @@ function App() {
   const sectionTitles = {
     dashboard: 'HIDRO-APP',
     usuarios: 'Usuarios',
+    eliminados: 'Perfiles eliminados',
+    'paz-y-salvo': 'Paz y salvo',
     facturas: 'Facturación',
     pagos: 'Pagos',
     cortes: 'Cortes y reconexiones',
@@ -843,6 +872,7 @@ function App() {
     sectionData,
     sectionErrors,
     loadingSections,
+    loadSection,
     filterRows,
     profile,
     endpoints,
@@ -992,6 +1022,12 @@ function App() {
                 {isChangingProfilePassword ? 'Actualizando...' : 'Cambiar contraseña'}
               </button>
             </form>
+
+            <div className="profile-form">
+              <button type="button" className="link-button danger-link" onClick={handleDeleteOwnAdminAccount}>
+                Eliminar mi cuenta de administrador
+              </button>
+            </div>
           </section>
         </div>
       )}
@@ -1055,8 +1091,8 @@ function App() {
               <button type="button" className="soft-button" onClick={() => setBulkUserOpen(false)} disabled={isImportingUsers}>Cerrar</button>
             </div>
             <p className="bulk-help">
-              Sube un archivo CSV UTF-8 o Excel (.xlsx) con las columnas <strong>nombre, apellido, correo</strong> y, opcionalmente, <strong>rol</strong>.
-              Si omites el rol, se asignará “usuario�?. Máximo {MAX_BULK_USERS} usuarios y 5 MB por archivo.
+              Sube un archivo CSV UTF-8 o Excel (.xlsx) con las columnas <strong>nombre, apellido, correo</strong> y, opcionalmente, <strong>cédula y rol</strong>.
+              Si omites el rol, se asignará “usuario”. Máximo {MAX_BULK_USERS} usuarios y 5 MB por archivo.
             </p>
             <div className="bulk-template-actions">
               <button type="button" className="link-button bulk-template-button" onClick={() => handleDownloadUsersTemplate('xlsx')}>
@@ -1165,7 +1201,7 @@ function App() {
                       {zones.map((zona) => <option key={zona} value={zona}>{zona}</option>)}
                     </select>
                   ) : (
-                    <input type={field.type || 'text'} min={field.type === 'number' ? '0' : undefined} step={field.type === 'number' ? 'any' : undefined} value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: event.target.value })} required={field.required} />
+                    <input type={field.type || 'text'} inputMode={field.name === 'cedula' ? 'numeric' : undefined} pattern={field.name === 'cedula' ? '[0-9]{5,15}' : undefined} minLength={field.name === 'cedula' ? 5 : undefined} maxLength={field.name === 'cedula' ? 15 : undefined} min={field.type === 'number' ? '0' : undefined} step={field.type === 'number' ? 'any' : undefined} value={operationForm[field.name] ?? ''} onChange={(event) => setOperationForm({ ...operationForm, [field.name]: field.name === 'cedula' ? event.target.value.replace(/\D/g, '').slice(0, 15) : event.target.value })} required={field.required} />
                   )}
                 </label>
               ))}

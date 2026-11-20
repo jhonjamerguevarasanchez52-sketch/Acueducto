@@ -178,6 +178,8 @@ export const endpoints = {
   resetPassword: '/auth/resetear-password',
   profile: '/profile/mi-perfil',
   adminUsers: '/admin/usuarios',
+  deletedUsers: '/admin/usuarios-eliminados',
+  pazYSalvo: '/admin/paz-y-salvo',
   facturas: '/facturas',
   facturasTodas: '/facturas/todas',
   generarFacturasMensuales: '/facturas/generar-mensuales',

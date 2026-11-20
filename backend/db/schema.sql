@@ -20,7 +20,7 @@ create table if not exists public.profiles (
   apellido                       text not null,
   correo                         text unique not null,
   -- solo dígitos; opcional pero única (también sirve para iniciar sesión)
-  cedula                         text unique check (cedula ~ '^[0-9]{5,15}$'),
+  cedula                         text check (cedula ~ '^[0-9]{5,15}$'),
   rol                            text not null default 'usuario'
                                    check (rol in ('administrador', 'usuario', 'fontanero')),
   activo                         boolean not null default true,
@@ -45,6 +45,10 @@ create table if not exists public.profiles (
   -- limitar la edición del perfil a una vez cada 30 días.
   updated_at                     timestamptz
 );
+
+create unique index if not exists idx_profiles_cedula_unica
+  on public.profiles (cedula)
+  where cedula is not null and cedula <> '';
 
 -- Solo puede existir una cuenta con acceso global a las averías.
 create unique index if not exists idx_profiles_un_solo_fontanero
@@ -72,8 +76,8 @@ create sequence if not exists public.facturas_numero_seq;
 create table if not exists public.invoices (
   id                uuid primary key default gen_random_uuid(),
   numero_factura    bigint not null default nextval('public.facturas_numero_seq'),
-  -- restrict: las facturas son contabilidad; un usuario con historial se desactiva.
-  perfil_id         uuid not null references public.profiles (id) on delete restrict,
+  -- La factura se conserva si se elimina el perfil; el archivo guarda su identidad.
+  perfil_id         uuid references public.profiles (id) on delete set null,
   periodo           text not null,                 -- ej. '2026-09'
   tipo              text not null default 'servicio'
                     check (tipo in ('servicio', 'prepago', 'extraordinaria')),
@@ -110,7 +114,8 @@ create table if not exists public.invoice_service_periods (
 create table if not exists public.payments (
   id                  uuid primary key default gen_random_uuid(),
   factura_id          uuid not null references public.invoices (id) on delete restrict,
-  perfil_id           uuid not null references public.profiles (id) on delete restrict,
+  -- El pago se conserva si se elimina el perfil; el archivo guarda su identidad.
+  perfil_id           uuid references public.profiles (id) on delete set null,
   monto               numeric(12,2) not null check (monto > 0),
   cargo_wompi         numeric(12,2) not null default 0 check (cargo_wompi >= 0),
   monto_total         numeric(12,2) not null,
@@ -175,9 +180,68 @@ create table if not exists public.admin_audit_log (
 );
 create index if not exists idx_admin_audit_log_created_at
   on public.admin_audit_log (created_at desc);
+alter table public.admin_audit_log
+  add column if not exists actor_snapshot jsonb,
+  add column if not exists subject_user_id uuid;
+create index if not exists idx_admin_audit_subject_user
+  on public.admin_audit_log (subject_user_id, created_at desc);
 alter table public.admin_audit_log enable row level security;
 revoke all on table public.admin_audit_log from public, anon, authenticated;
 grant insert on table public.admin_audit_log to service_role;
+
+-- Archivo permanente e independiente de cuentas e historiales eliminados.
+create table if not exists public.deleted_users (
+  id uuid primary key default gen_random_uuid(),
+  deleted_user_id uuid not null unique,
+  role text not null check (role in ('administrador', 'usuario', 'fontanero')),
+  email text not null,
+  full_name text not null,
+  deletion_type text not null check (deletion_type in ('usuario', 'administrador')),
+  deleted_by_id uuid,
+  deleted_by_snapshot jsonb not null default '{}'::jsonb,
+  exit_note text,
+  profile_snapshot jsonb not null,
+  history_snapshot jsonb not null default '{}'::jsonb,
+  pending_invoices jsonb not null default '[]'::jsonb,
+  pending_total numeric(12,2) not null default 0,
+  status text not null default 'pending' check (status in ('pending', 'deleted', 'error')),
+  email_status text not null default 'pending' check (email_status in ('pending', 'sent', 'failed', 'not_required')),
+  email_error text,
+  error_message text,
+  requested_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+create index if not exists idx_deleted_users_deleted_at on public.deleted_users (deleted_at desc);
+create index if not exists idx_deleted_users_email on public.deleted_users (email);
+create index if not exists idx_deleted_users_status on public.deleted_users (status, email_status);
+alter table public.deleted_users enable row level security;
+revoke all on table public.deleted_users from public, anon, authenticated;
+grant all on table public.deleted_users to service_role;
+
+-- Certificados de paz y salvo emitidos para perfiles con saldo cero.
+create table if not exists public.clearance_certificates (
+  id uuid primary key default gen_random_uuid(),
+  certificate_number text not null unique,
+  profile_id uuid not null,
+  profile_snapshot jsonb not null,
+  invoice_snapshot jsonb not null default '[]'::jsonb,
+  confirmed_payments_snapshot jsonb not null default '[]'::jsonb,
+  outstanding_balance numeric(12,2) not null default 0 check (outstanding_balance = 0),
+  generated_by_id uuid,
+  generated_by_snapshot jsonb not null default '{}'::jsonb,
+  generated_at timestamptz not null default now(),
+  email_sent_to text,
+  email_status text not null default 'not_requested'
+    check (email_status in ('not_requested', 'sent', 'failed')),
+  email_error text
+);
+create index if not exists idx_clearance_certificates_profile
+  on public.clearance_certificates (profile_id, generated_at desc);
+create index if not exists idx_clearance_certificates_generated_at
+  on public.clearance_certificates (generated_at desc);
+alter table public.clearance_certificates enable row level security;
+revoke all on table public.clearance_certificates from public, anon, authenticated;
+grant all on table public.clearance_certificates to service_role;
 
 -- ----------------------------------------------------------------------------
 --  service_outages: cortes de servicio.
@@ -1141,33 +1205,25 @@ grant execute on function public.crear_factura_mensual_si_no_cubierta(uuid, text
 
 
 -- ----------------------------------------------------------------------------
--- 2. Proteger la contabilidad: facturas y pagos no se borran en cascada
+-- 2. Conservar la contabilidad al eliminar un perfil
 -- ----------------------------------------------------------------------------
--- Antes, eliminar un usuario borraba sus facturas y pagos confirmados. Ahora
--- la base de datos lo impide: un usuario con historial se DESACTIVA.
-do $$
-declare
-  r record;
-begin
-  for r in
-    select c.conname, c.conrelid::regclass as tabla, a.attname as columna,
-           c.confrelid::regclass as referida
-    from pg_constraint c
-    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
-    where c.contype = 'f'
-      and c.confdeltype = 'c' -- on delete cascade
-      and (
-        (c.conrelid = 'public.invoices'::regclass and a.attname = 'perfil_id') or
-        (c.conrelid = 'public.payments'::regclass and a.attname in ('perfil_id', 'factura_id'))
-      )
-  loop
-    execute format('alter table %s drop constraint %I', r.tabla, r.conname);
-    execute format(
-      'alter table %s add constraint %I foreign key (%I) references %s (id) on delete restrict',
-      r.tabla, r.conname, r.columna, r.referida
-    );
-  end loop;
-end $$;
+-- El archivo independiente conserva el perfil y el historial previo; estas
+-- relaciones mantienen las facturas y pagos con perfil_id nulo.
+alter table public.invoices alter column perfil_id drop not null;
+alter table public.invoices
+  drop constraint if exists facturas_perfil_id_fkey,
+  drop constraint if exists invoices_perfil_id_fkey;
+alter table public.invoices
+  add constraint facturas_perfil_id_fkey
+  foreign key (perfil_id) references public.profiles (id) on delete set null;
+
+alter table public.payments alter column perfil_id drop not null;
+alter table public.payments
+  drop constraint if exists pagos_perfil_id_fkey,
+  drop constraint if exists payments_perfil_id_fkey;
+alter table public.payments
+  add constraint pagos_perfil_id_fkey
+  foreign key (perfil_id) references public.profiles (id) on delete set null;
 
 
 -- ----------------------------------------------------------------------------

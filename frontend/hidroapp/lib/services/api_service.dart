@@ -129,9 +129,17 @@ class ApiService {
             .timeout(tiempoMaximo),
       );
 
-  Future<dynamic> delete(String path) => _send(
+  /// [body] es opcional: por ejemplo, eliminar la cuenta envía la contraseña
+  /// para confirmar.
+  Future<dynamic> delete(String path, {Object? body}) => _send(
     path,
-    () => _client.delete(_uri(path), headers: _headers).timeout(tiempoMaximo),
+    () => _client
+        .delete(
+          _uri(path),
+          headers: _headers,
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(tiempoMaximo),
   );
 
   /// Cambia el refresh token por una sesión nueva llamando directamente al

@@ -442,6 +442,21 @@ class AuthProvider extends ChangeNotifier {
     _setStatus(AuthStatus.unauthenticated);
   }
 
+  Future<void> eliminarCuenta({
+    required String passwordActual,
+    String? nota,
+  }) async {
+    await _api.delete(
+      '/profile/mi-cuenta',
+      body: {
+        'passwordActual': passwordActual,
+        if (nota != null && nota.trim().isNotEmpty) 'nota': nota.trim(),
+      },
+    );
+    await _clear();
+    _setStatus(AuthStatus.unauthenticated);
+  }
+
   Future<void> _loadProfile() async {
     final data = await _api.get('/profile/mi-perfil');
     if (data is Map<String, dynamic>) {

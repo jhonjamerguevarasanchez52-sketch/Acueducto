@@ -12,6 +12,7 @@ import 'admin/admin_pagos_screen.dart';
 import 'cambiar_password_screen.dart';
 import '../widgets/core/core.dart';
 import 'editar_perfil_screen.dart';
+import 'eliminar_cuenta.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Pestaña "Perfil": muestra los datos de la cuenta del usuario, permite
@@ -259,6 +260,17 @@ class PerfilScreen extends StatelessWidget {
               side: BorderSide(color: colores.danger),
             ),
           ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () =>
+                solicitarEliminacionCuenta(context, perfil?.rol ?? 'usuario'),
+            icon: const Icon(Icons.delete_forever_outlined),
+            label: const Text('Eliminar cuenta'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colores.danger,
+              side: BorderSide(color: colores.danger),
+            ),
+          ),
           const SizedBox(height: 24),
           const _InformacionLegal(),
         ],
@@ -388,11 +400,12 @@ class _AjusteBiometriaState extends State<_AjusteBiometria> {
     } on ApiException catch (e) {
       if (mounted) AppSnackbar.error(context, e.message);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         AppSnackbar.error(
           context,
           'No se pudo validar la biometría. Intenta de nuevo.',
         );
+      }
     } finally {
       if (mounted) setState(() => _cambiando = false);
     }

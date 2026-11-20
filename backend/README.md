@@ -148,15 +148,59 @@ ejecución del periodo reintente solo los envíos fallidos. El envío usa el pro
 transaccional Brevo ya integrado en el backend; no usa la API de Gmail para enviar
 desde una cuenta Gmail.
 
+
+## Eliminaci?n y archivo de perfiles
+
+Antes de desplegar la eliminaci?n de cuentas, ejecutar en Supabase
+`db/migrations/20261117_deleted_users_archive.sql` y, después,
+`db/migrations/20261118_archivar_movimientos_al_eliminar_cuenta.sql`. La segunda
+migración crea el archivo si falta y conserva las relaciones contables cuando
+se elimina un perfil. La ruta autenticada
+`DELETE /api/profile/mi-cuenta` permite a cualquier rol eliminar su propia cuenta
+de inmediato; exige la contrase?a actual y, para el fontanero, una nota de salida.
+`DELETE /api/admin/usuarios/:userId` archiva y elimina cuentas desde el panel.
+
+El backend copia el perfil, facturas, pagos, aver?as reportadas y asignadas,
+cortes, avisos y acciones administrativas a `deleted_users` antes de borrar la
+cuenta de Supabase Auth. Conserva los saldos de facturas pendientes/vencidas y
+env?a al correo archivado una confirmaci?n con el detalle. Si Brevo falla, la
+cuenta igual se elimina; el archivo queda marcado para reintento desde
+**Perfiles eliminados** en el panel.
+
+El endpoint `GET /api/admin/usuarios-eliminados` alimenta el panel. Desde esa
+secci?n se puede descargar un resumen CSV y el archivo completo JSON. Se debe
+configurar `BREVO_API_KEY` y `EMAIL_USER` para enviar las notificaciones. Las
+acciones administrativas nuevas guardan la identidad del administrador; las
+aprobaciones manuales de pagos ya se auditan y ahora tambi?n se registran altas,
+bajas y cambios de usuarios. Esta auditor?a empieza a recopilarse al desplegar
+estos cambios; no reconstruye operaciones pasadas que nunca se registraron.
+
+
+## Estado de cuenta y certificado de paz y salvo
+
+Ejecuta en Supabase `db/migrations/20261117_paz_y_salvo.sql` antes de desplegar.
+El listado administrativo de usuarios muestra `Al d?a` o `Saldo pendiente` con
+el saldo calculado desde facturas abiertas y pagos confirmados. Desde **Paz y
+salvo** se puede expedir una constancia para un perfil o varios perfiles al d?a,
+descargar un PDF combinado o un certificado individual, y enviar cada PDF al
+correo registrado. Los perfiles con saldo no reciben certificado; sus facturas
+se muestran en el panel. Cada emisi?n conserva una copia del perfil, facturas,
+pagos confirmados, fecha y administrador que la gener?.
+
+El endpoint administrativo `POST /api/admin/paz-y-salvo` recibe
+`perfil_ids: [uuid, ...]` y opcionalmente `enviar_correo: true`. El PDF queda
+registrado en `clearance_certificates`; el archivo se puede volver a descargar
+con `GET /api/admin/paz-y-salvo/:certificateId/descargar`. La expedici?n usa el
+servicio de correo Brevo ya configurado (`BREVO_API_KEY` y `EMAIL_USER`).
+
 ## Eliminación de usuarios
 
-Las facturas y los pagos son la contabilidad del acueducto y **nunca se borran**:
-un usuario con facturas o pagos no se puede eliminar (la API responde 409 con
-`puedeDesactivar: true` y la base de datos lo impide con `ON DELETE RESTRICT`).
-Para retirar a alguien, **desactívalo**: pierde el acceso y sale de la
-facturación, pero se conserva su historial. Solo se pueden eliminar cuentas sin
-movimientos (por ejemplo, creadas por error). Las averías asignadas a un
-fontanero eliminado conservan su historial y quedan sin asignación.
+Las facturas y los pagos son la contabilidad del acueducto y **nunca se borran**.
+Al eliminar una cuenta, su perfil e historial se archivan en `deleted_users`;
+las facturas y pagos originales permanecen en sus tablas con `perfil_id` nulo.
+Las averías asignadas a un fontanero eliminado conservan su historial y quedan
+sin asignación. Para retirar el acceso sin eliminar la cuenta, se puede seguir
+desactivando el perfil desde el panel.
 
 ## Reglas de las facturas
 
@@ -190,3 +234,4 @@ fontanero eliminado conservan su historial y quedan sin asignación.
   (estado `REEMBOLSADO`).
 - Una factura con un pago en curso no se puede anular ni cambiar de valor hasta
   resolver ese pago.
+

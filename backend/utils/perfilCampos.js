@@ -1,6 +1,6 @@
 // Campos editables de "profiles" por su propio dueño o por un administrador.
 const CAMPOS_EDITABLES_PERFIL = [
-  'nombre', 'apellido', 'telefono', 'numero_lote',
+  'nombre', 'apellido', 'cedula', 'telefono', 'numero_lote',
   'direccion', 'ocupacion', 'zona',
 ];
 
@@ -32,6 +32,14 @@ function extraerCambiosPerfil(cuerpo = {}) {
       return { error: `El campo ${campo} debe ser texto.` };
     }
     const texto = String(valor).trim();
+    if (campo === 'cedula' && texto) {
+      const cedula = texto.replace(/\D/g, '');
+      if (cedula.length < 5 || cedula.length > 15) {
+        return { error: 'La cédula debe tener entre 5 y 15 dígitos.' };
+      }
+      cambios[campo] = cedula;
+      continue;
+    }
     if (texto.length > MAX_LARGO_CAMPO_PERFIL) {
       return { error: `El campo ${campo} admite máximo ${MAX_LARGO_CAMPO_PERFIL} caracteres.` };
     }

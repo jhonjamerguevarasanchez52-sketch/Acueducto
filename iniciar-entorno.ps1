@@ -8,7 +8,7 @@ $sdkAndroid = Join-Path $env:LOCALAPPDATA 'Android\sdk'
 $avdHome = Join-Path $env:USERPROFILE '.android\avd'
 $configVsCode = Get-Content (Join-Path $raiz '.vscode\settings.json') -Raw | ConvertFrom-Json
 $avd = $configVsCode.'hidroapp.androidAvd'
-if ([string]::IsNullOrWhiteSpace($avd)) { $avd = 'Pixel_9' }
+if ([string]::IsNullOrWhiteSpace($avd)) { $avd = 'Pixel_8' }
 if ($avd -notmatch '^[A-Za-z0-9_.-]+$') { throw "Nombre de AVD no válido: $avd" }
 
 $env:ANDROID_USER_HOME = Join-Path $env:USERPROFILE '.android'

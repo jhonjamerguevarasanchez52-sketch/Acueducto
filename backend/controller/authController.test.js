@@ -1,4 +1,4 @@
-const test = require('node:test');
+const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
@@ -8,9 +8,16 @@ const profileModelPath = path.join(__dirname, '../models/profileModel.js');
 const attemptsPath = path.join(__dirname, '../utils/controlIntentos.js');
 
 const attempts = { fallos: 0, exitos: 0 };
+
+beforeEach(() => {
+  attempts.fallos = 0;
+  attempts.exitos = 0;
+});
+
 const authModel = { signIn: async () => ({}), refreshSession: async () => ({}) };
 const profileModel = {
   findByEmail: async () => ({ data: { id: 'user-1', rol: 'administrador' }, error: null }),
+  findByCedula: async () => ({ data: { correo: 'usuario@ejemplo.com' }, error: null }),
   getById: async () => ({}),
 };
 
@@ -48,10 +55,55 @@ function ejecutarLogin() {
     .then(() => res);
 }
 
+function ejecutarLoginConCedula(cedula = '1.234.567.890') {
+  const res = respuestaCapturada();
+  return iniciarSesion({ body: { cedula, password: 'clave-valida' } }, res).then(() => res);
+}
+
 function ejecutarRenovacion(refreshToken) {
   const res = respuestaCapturada();
   return renovarSesion({ body: { refreshToken } }, res).then(() => res);
 }
+
+test('inicia sesión por cédula y autentica con el correo del perfil', async () => {
+  let correoAutenticado;
+  profileModel.findByCedula = async (cedula, columnas) => {
+    assert.equal(cedula, '1234567890');
+    assert.equal(columnas, 'correo');
+    return { data: { correo: 'usuario@ejemplo.com' }, error: null };
+  };
+  authModel.signIn = async (correo, password) => {
+    correoAutenticado = correo;
+    assert.equal(password, 'clave-valida');
+    return {
+      data: { user: { id: 'user-1' }, session: { access_token: 'token-cedula' } },
+      error: null,
+    };
+  };
+  profileModel.getById = async () => ({
+    data: { rol: 'usuario', is_verified: true, activo: true },
+    error: null,
+  });
+
+  const res = await ejecutarLoginConCedula();
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.session.access_token, 'token-cedula');
+  assert.equal(correoAutenticado, 'usuario@ejemplo.com');
+});
+
+test('una cédula no registrada recibe el mismo error genérico de credenciales', async () => {
+  // findByCedula usa maybeSingle(): una cédula inexistente llega sin datos y sin error.
+  profileModel.findByCedula = async () => ({ data: null, error: null });
+  authModel.signIn = async () => {
+    throw new Error('No debe consultar Auth para una cédula inexistente');
+  };
+
+  const res = await ejecutarLoginConCedula('9876543210');
+
+  assert.equal(res.statusCode, 401);
+  assert.match(res.body.error, /cédula o contraseña incorrectas/i);
+});
 
 test('reintenta un 503 de Auth y permite login cuando Supabase se recupera', async () => {
   let llamadasAuth = 0;
