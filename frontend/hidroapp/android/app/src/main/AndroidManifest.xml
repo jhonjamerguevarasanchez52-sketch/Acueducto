@@ -63,5 +63,10 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="https"/>
         </intent>
+        <!-- Pestañas del navegador (Custom Tabs) para leer la política de
+             privacidad y la eliminación de cuenta sin salir de la app. -->
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService"/>
+        </intent>
     </queries>
 </manifest>

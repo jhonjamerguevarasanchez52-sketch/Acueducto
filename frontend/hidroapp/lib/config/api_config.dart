@@ -61,6 +61,11 @@ class ApiConfig {
   /// [DespertadorServidor] para despertar Render al abrir la app.
   static String get healthUrl => '$_raiz/health';
 
+  /// Páginas públicas del backend que exige Google Play (fuera de `/api`).
+  /// Se abren desde Perfil → Información legal.
+  static String get politicaPrivacidadUrl => '$_raiz/privacidad';
+  static String get eliminarCuentaUrl => '$_raiz/eliminar-cuenta';
+
   /// URL del servidor sin el sufijo `/api`.
   static String get _raiz {
     final base = baseUrl.replaceFirst(RegExp(r'/+$'), '');

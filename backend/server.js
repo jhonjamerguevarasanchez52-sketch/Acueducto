@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -80,6 +81,13 @@ app.get('/health', (req, res) => res.status(200).json({ status: 'ok', uptime: pr
 app.get('/', (req, res) => {
   res.send('API del Acueducto Campo Amor funcionando 🚰');
 });
+
+// Páginas públicas que exige Google Play: la política de privacidad y la
+// solicitud de eliminación de cuenta. Sus URL van en la ficha de Play Console,
+// así que no deben cambiar de ruta.
+const carpetaLegal = path.join(__dirname, 'public', 'legal');
+app.get('/privacidad', (req, res) => res.sendFile(path.join(carpetaLegal, 'privacidad.html')));
+app.get('/eliminar-cuenta', (req, res) => res.sendFile(path.join(carpetaLegal, 'eliminar-cuenta.html')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);

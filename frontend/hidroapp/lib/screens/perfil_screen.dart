@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../config/api_config.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
@@ -257,8 +259,99 @@ class PerfilScreen extends StatelessWidget {
               side: BorderSide(color: colores.danger),
             ),
           ),
+          const SizedBox(height: 24),
+          const _InformacionLegal(),
         ],
       ),
+    );
+  }
+}
+
+/// Enlaces a las páginas públicas que exige Google Play: la política de
+/// privacidad y la solicitud de eliminación de cuenta.
+class _InformacionLegal extends StatelessWidget {
+  const _InformacionLegal();
+
+  Future<void> _abrir(BuildContext context, String url) async {
+    final uri = Uri.parse(url);
+    var abierta = false;
+    try {
+      // Dentro de la app (pestaña del navegador); si el teléfono no lo
+      // permite, se intenta con el navegador externo.
+      abierta = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      if (!abierta) {
+        abierta = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      abierta = false;
+    }
+    if (!abierta && context.mounted) {
+      AppSnackbar.error(
+        context,
+        'No se pudo abrir la página. Revisa tu conexión e intenta de nuevo.',
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'Información legal',
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: colores.secondaryText,
+            ),
+          ),
+        ),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                key: const ValueKey('abrir-politica-privacidad'),
+                leading: Icon(LucideIcons.shieldCheck, color: colores.info),
+                title: const Text('Política de privacidad'),
+                subtitle: Text(
+                  'Cómo usamos y protegemos tus datos',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: colores.secondaryText,
+                  ),
+                ),
+                trailing: Icon(
+                  LucideIcons.chevronRight,
+                  color: colores.secondaryText,
+                ),
+                onTap: () => _abrir(context, ApiConfig.politicaPrivacidadUrl),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                key: const ValueKey('abrir-eliminar-cuenta'),
+                leading: Icon(LucideIcons.userX, color: colores.info),
+                title: const Text('Eliminar mi cuenta'),
+                subtitle: Text(
+                  'Cómo solicitarlo y qué pasa con tus datos',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: colores.secondaryText,
+                  ),
+                ),
+                trailing: Icon(
+                  LucideIcons.chevronRight,
+                  color: colores.secondaryText,
+                ),
+                onTap: () => _abrir(context, ApiConfig.eliminarCuentaUrl),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

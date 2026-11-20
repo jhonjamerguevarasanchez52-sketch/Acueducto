@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eliminar mi cuenta · Acueducto Campo Amor</title>
+<meta name="description" content="Cómo solicitar la eliminación de tu cuenta de la app Acueducto Campo Amor y qué datos se borran o se conservan.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primario: #0277BD; --primario-oscuro: #01579B; --fondo: #F4F9FC; --tarjeta: #FFFFFF;
+    --borde: #E3EEF4; --chip: #EAF5FB; --texto: #12303F; --texto-2: #4F6B7A;
+    --ok: #2E7D32; --ok-fondo: #E8F5E9; --aviso: #8A4B00; --aviso-fondo: #FFF4E5;
+    --peligro: #C62828; --peligro-fondo: #FDECEC;
+    --pendiente: #FFF59D; --pendiente-texto: #5D4500;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --primario: #4FC3F7; --primario-oscuro: #29B6F6; --fondo: #0B171E; --tarjeta: #13232D;
+      --borde: #24404E; --chip: #16262F; --texto: #E6F1F7; --texto-2: #A9C0CE;
+      --ok: #66BB6A; --ok-fondo: #13291A; --aviso: #FFA657; --aviso-fondo: #2B1E10;
+      --peligro: #EF5350; --peligro-fondo: #2E1416;
+      --pendiente: #5C4F00; --pendiente-texto: #FFF3B0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --primario: #4FC3F7; --primario-oscuro: #29B6F6; --fondo: #0B171E; --tarjeta: #13232D;
+    --borde: #24404E; --chip: #16262F; --texto: #E6F1F7; --texto-2: #A9C0CE;
+    --ok: #66BB6A; --ok-fondo: #13291A; --aviso: #FFA657; --aviso-fondo: #2B1E10;
+    --peligro: #EF5350; --peligro-fondo: #2E1416; --pendiente: #5C4F00; --pendiente-texto: #FFF3B0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fondo); color: var(--texto);
+    font-family: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16.5px; line-height: 1.65; -webkit-font-smoothing: antialiased;
+  }
+  header.portada { background: linear-gradient(135deg, #01579B 0%, #0277BD 55%, #0398D6 100%); color: #fff; padding: 48px 16px 72px; }
+  .contenedor { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  .marca { display: flex; align-items: center; gap: 10px; font-weight: 800; opacity: .95; }
+  header h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; font-weight: 800; }
+  header p.lead { margin: 0; font-size: 18px; opacity: .92; max-width: 640px; }
+  main { margin-top: -44px; padding-bottom: 48px; }
+  .tarjeta { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 18px; padding: 28px clamp(18px, 4vw, 36px); margin-bottom: 18px; box-shadow: 0 1px 2px rgba(1,87,155,.05); }
+  h2 { font-size: 22px; margin: 0 0 12px; line-height: 1.3; }
+  h3 { font-size: 17px; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  ul { padding-left: 22px; margin: 0 0 12px; }
+  li { margin: 4px 0; }
+  a { color: var(--primario); text-underline-offset: 3px; }
+  .opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+  .opcion { border: 1px solid var(--borde); border-radius: 14px; padding: 18px; }
+  .opcion .etiqueta { display: inline-block; background: var(--chip); color: var(--primario); font-weight: 800; font-size: 13px; padding: 2px 10px; border-radius: 999px; margin-bottom: 8px; }
+  ol.pasos { list-style: none; padding: 0; margin: 8px 0 0; counter-reset: paso; }
+  ol.pasos li { counter-increment: paso; position: relative; padding-left: 40px; margin: 10px 0; }
+  ol.pasos li::before { content: counter(paso); position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--primario); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+  :root[data-theme="dark"] ol.pasos li::before { color: #0B171E; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) ol.pasos li::before { color: #0B171E; } }
+  .dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .caja { border-radius: 14px; padding: 18px; }
+  .caja.borra { background: var(--ok-fondo); border-left: 4px solid var(--ok); }
+  .caja.conserva { background: var(--aviso-fondo); border-left: 4px solid var(--aviso); }
+  .nota { border-radius: 12px; padding: 12px 16px; margin: 12px 0 0; font-size: 15px; }
+  .nota.peligro { background: var(--peligro-fondo); border-left: 4px solid var(--peligro); }
+  .pendiente { background: var(--pendiente); color: var(--pendiente-texto); padding: 0 5px; border-radius: 4px; font-weight: 700; }
+  .plazos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .plazos div { background: var(--chip); border-radius: 14px; padding: 14px 16px; }
+  .plazos strong { display: block; font-size: 22px; color: var(--primario); line-height: 1.2; }
+  footer { color: var(--texto-2); font-size: 14px; text-align: center; padding: 8px 16px 40px; }
+  @media print { header.portada { background: none; color: #000; padding: 0 0 12px; } main { margin-top: 0; } }
+</style>
+</head>
+<body>
+
+<header class="portada">
+  <div class="contenedor">
+    <div class="marca">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5c3.6 4.4 6.5 8 6.5 11.5a6.5 6.5 0 0 1-13 0c0-3.5 2.9-7.1 6.5-11.5Z" fill="#fff"/><path d="M9 15.2a3 3 0 0 0 3 2.8" stroke="#0277BD" stroke-width="1.8" stroke-linecap="round"/></svg>
+      Acueducto Campo Amor
+    </div>
+    <h1>Eliminar mi cuenta</h1>
+    <p class="lead">Cómo solicitar que eliminemos tu cuenta de la app <strong>Acueducto Campo Amor</strong> y tus datos personales, qué se borra y qué debemos conservar por ley.</p>
+  </div>
+</header>
+
+<main class="contenedor">
+
+  <section class="tarjeta">
+    <h2>Cómo solicitarlo</h2>
+    <div class="opciones">
+      <div class="opcion">
+        <span class="etiqueta">Desde la app</span>
+        <ol class="pasos">
+          <li>Abre la app e inicia sesión.</li>
+          <li>Entra a <strong>Perfil</strong>.</li>
+          <li>Toca <strong>Eliminar mi cuenta</strong>.</li>
+          <li>Confirma con tu contraseña.</li>
+        </ol>
+      </div>
+      <div class="opcion">
+        <span class="etiqueta">Sin la app</span>
+        <p>Si ya no tienes la app o no puedes entrar, escríbenos con el asunto <strong>"Eliminar mi cuenta"</strong>:</p>
+        <ul>
+          <li>Correo: <a href="mailto:acueductocampoamor87@gmail.com">acueductocampoamor87@gmail.com</a></li>
+          <li>WhatsApp: <a href="https://wa.me/573214018748">321 401 8748</a></li>
+          <li>En la oficina del acueducto: vereda Majo, sector Campoamor, Garzón (lunes a viernes, 8:00 a. m. a 5:00 p. m.)</li>
+        </ul>
+        <p>Incluye tu <strong>nombre completo</strong>, tu <strong>número de cédula</strong> y el <strong>correo registrado</strong> en la app.</p>
+      </div>
+    </div>
+    <p style="margin-top:14px">Para evitar que alguien elimine tu cuenta sin tu permiso, verificaremos tu identidad antes de hacerlo. Por ejemplo, podemos enviarte un código al correo registrado.</p>
+  </section>
+
+  <section class="tarjeta">
+    <h2>Qué pasa con tus datos</h2>
+    <div class="dos">
+      <div class="caja borra">
+        <h3>Se elimina</h3>
+        <ul>
+          <li>Tu acceso a la app, que queda cancelado de inmediato.</li>
+          <li>Tu teléfono, correo y ocupación.</li>
+          <li>Tus notificaciones.</li>
+          <li>Tus notas de voz y sus transcripciones.</li>
+          <li>Tus datos personales en los reportes de averías. El reporte queda sin datos que te identifiquen, solo como registro técnico de la red.</li>
+          <li>Si nunca tuviste facturas ni pagos, <strong>todos</strong> tus datos se borran por completo.</li>
+        </ul>
+      </div>
+      <div class="caja conserva">
+        <h3>Se conserva por obligación legal</h3>
+        <ul>
+          <li>Tus facturas, pagos y comprobantes de pago, junto con tu nombre, cédula y dirección del predio, porque son soporte contable.</li>
+          <li>Se guardan durante <span class="pendiente">10 años</span> (artículo 28 de la Ley 962 de 2005 y artículo 60 del Código de Comercio). Solo se usan para fines contables, tributarios o para atender requerimientos de autoridades, y después se eliminan.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="nota peligro"><strong>Importante:</strong> eliminar tu cuenta de la app <strong>no cancela tu suscripción al servicio de agua ni las deudas pendientes</strong>. Para retirarte del servicio debes hacer el trámite en la oficina del acueducto.</div>
+  </section>
+
+  <section class="tarjeta">
+    <h2>Plazos</h2>
+    <div class="plazos">
+      <div><strong>Inmediato</strong>Cancelación del acceso cuando lo pides desde la app.</div>
+      <div><strong>15 días hábiles</strong>Plazo máximo para eliminar tus datos y confirmártelo por correo.</div>
+      <div><strong>10 años</strong>Conservación de los registros contables. Después se borran.</div>
+    </div>
+  </section>
+
+  <section class="tarjeta">
+    <h2>¿Solo quieres borrar algunos datos?</h2>
+    <p>No tienes que eliminar toda la cuenta. Puedes corregir tus datos desde <em>Perfil → Editar perfil</em>, o pedirnos por los mismos canales que borremos datos concretos, como tu teléfono, tu ocupación o tus audios.</p>
+    <p>Más información en nuestra <a href="/privacidad">Política de privacidad</a>.</p>
+  </section>
+
+</main>
+
+<footer>
+  Asociación de Usuarios del Acueducto Regional Campoamor · NIT 900.790.925-0 · Garzón, Huila, Colombia<br>
+  <a href="/privacidad">Política de privacidad</a>
+</footer>
+
+</body>
+</html>
