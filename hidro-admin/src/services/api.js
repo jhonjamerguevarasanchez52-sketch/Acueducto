@@ -17,6 +17,16 @@ const API_URL = import.meta.env.DEV
   ? '/api'
   : API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`
 
+// Render (plan gratuito) apaga el servidor tras 15 minutos sin peticiones y
+// tarda cerca de un minuto en volver. Al abrir el panel se le hace un GET a
+// /health sin esperar respuesta: mientras el administrador escribe su clave,
+// el servidor ya está arrancando. Nunca muestra errores.
+export function despertarServidor() {
+  if (import.meta.env.DEV || typeof fetch !== 'function') return
+  const raiz = API_URL.replace(/\/api$/, '')
+  fetch(`${raiz}/health`, { cache: 'no-store' }).catch(() => {})
+}
+
 const TOKEN_KEY = 'hidro_token'
 const REFRESH_KEY = 'hidro_refresh_token'
 

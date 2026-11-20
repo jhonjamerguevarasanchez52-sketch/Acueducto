@@ -49,7 +49,9 @@ class ApiService {
   final http.Client _client;
 
   /// Render (plan gratuito) tarda 30–60 s en despertar el servidor dormido.
-  static const Duration tiempoMaximoPorDefecto = Duration(seconds: 45);
+  /// Con 45 s la primera petición del día fallaba justo cuando el servidor
+  /// estaba a punto de responder; 75 s cubre el arranque con margen.
+  static const Duration tiempoMaximoPorDefecto = Duration(seconds: 75);
 
   /// Tiempo máximo de espera por petición (configurable para las pruebas).
   final Duration tiempoMaximo;

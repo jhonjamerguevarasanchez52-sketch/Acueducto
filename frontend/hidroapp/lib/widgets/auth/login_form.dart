@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -20,6 +22,13 @@ enum MetodoIngreso { correo, cedula }
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
 
+  /// Tras este tiempo sin respuesta se avisa que el servidor está despertando.
+  static const esperaAntesDelAviso = Duration(seconds: 6);
+
+  static const avisoServidorDespertando =
+      'El servidor se está despertando, esto puede tardar hasta un minuto. '
+      'No cierres la app.';
+
   @override
   State<LoginForm> createState() => _LoginFormState();
 }
@@ -34,6 +43,8 @@ class _LoginFormState extends State<LoginForm> {
   MetodoIngreso _metodo = MetodoIngreso.correo;
   final _passwordCtrl = TextEditingController();
   bool _cargando = false;
+  bool _servidorLento = false;
+  Timer? _avisoLento;
   bool _verPassword = false;
 
   @override
@@ -69,6 +80,7 @@ class _LoginFormState extends State<LoginForm> {
 
   @override
   void dispose() {
+    _avisoLento?.cancel();
     _correoCtrl.dispose();
     _cedulaCtrl.dispose();
     _passwordCtrl.dispose();
@@ -80,6 +92,12 @@ class _LoginFormState extends State<LoginForm> {
     final auth = context.read<AuthProvider>();
     FocusScope.of(context).unfocus();
     setState(() => _cargando = true);
+    // Si el servidor estaba dormido (Render gratuito) la respuesta puede
+    // tardar cerca de un minuto: se explica en vez de dejar solo el círculo.
+    _avisoLento?.cancel();
+    _avisoLento = Timer(LoginForm.esperaAntesDelAviso, () {
+      if (mounted && _cargando) setState(() => _servidorLento = true);
+    });
     try {
       if (_metodo == MetodoIngreso.cedula) {
         await auth.loginConCedula(_cedulaCtrl.text, _passwordCtrl.text);
@@ -103,8 +121,23 @@ class _LoginFormState extends State<LoginForm> {
         return;
       }
       AppSnackbar.error(context, e.message);
+    } catch (_) {
+      // Fallos que no vienen del servidor (por ejemplo, el teléfono no pudo
+      // guardar la sesión): antes no se mostraba ningún mensaje.
+      if (mounted) {
+        AppSnackbar.error(
+          context,
+          'No se pudo iniciar sesión en este teléfono. Intenta de nuevo.',
+        );
+      }
     } finally {
-      if (mounted) setState(() => _cargando = false);
+      _avisoLento?.cancel();
+      if (mounted) {
+        setState(() {
+          _cargando = false;
+          _servidorLento = false;
+        });
+      }
     }
   }
 
@@ -268,6 +301,15 @@ class _LoginFormState extends State<LoginForm> {
                     )
                   : const Text('Ingresar al sistema'),
             ),
+            if (_cargando && _servidorLento) ...[
+              const SizedBox(height: 12),
+              Text(
+                LoginForm.avisoServidorDespertando,
+                key: const Key('aviso_servidor_despertando'),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, color: authMutedDe(context)),
+              ),
+            ],
           ],
         ),
       ),

@@ -57,6 +57,18 @@ class ApiConfig {
     return 'http://localhost:$port/api';
   }
 
+  /// `GET /health` del backend (vive fuera de `/api`). Lo usa
+  /// [DespertadorServidor] para despertar Render al abrir la app.
+  static String get healthUrl => '$_raiz/health';
+
+  /// URL del servidor sin el sufijo `/api`.
+  static String get _raiz {
+    final base = baseUrl.replaceFirst(RegExp(r'/+$'), '');
+    return base.endsWith('/api')
+        ? base.substring(0, base.length - '/api'.length)
+        : base;
+  }
+
   static bool _isPrivateHttpUrl(String value) {
     final uri = Uri.tryParse(value);
     if (uri == null || uri.scheme != 'http') return false;
