@@ -3,7 +3,7 @@ const supabaseAdmin = require('../config/supabaseAdminClient');
 const { enviarCorreo } = require('../config/mailer');
 const { escaparHtml } = require('../utils/html');
 const { consultarEstadoCuenta } = require('./estadoCuentaService');
-const { generarPdfPazYSalvos } = require('../utils/pazYSalvoPdf');
+const { generarPdfPazYSalvos, generarPdfPertenencia } = require('../utils/pazYSalvoPdf');
 const { registrarAuditoria } = require('../utils/auditoria');
 
 function numeroCertificado() {
@@ -34,7 +34,7 @@ async function generarCertificados({ perfilIds, enviar, actor }) {
   }
 
   const { data: perfiles, error: errorPerfiles } = await supabaseAdmin.from('profiles')
-    .select('id, nombre, apellido, correo, rol, numero_lote, direccion, zona, activo')
+    .select('id, nombre, apellido, correo, cedula, rol, numero_lote, direccion, zona, activo')
     .in('id', ids);
   if (errorPerfiles) throw errorPerfiles;
   const estados = await consultarEstadoCuenta(ids);
@@ -161,4 +161,18 @@ async function reenviarCertificado(id) {
   return { email: data.email_sent_to };
 }
 
-module.exports = { generarCertificados, listarCertificados, descargarCertificado, reenviarCertificado };
+async function generarCertificadoPertenencia(perfilId) {
+  const { data: perfil, error } = await supabaseAdmin.from('profiles')
+    .select('id, nombre, apellido, cedula')
+    .eq('id', perfilId).single();
+  if (error) throw error;
+  if (!perfil.cedula) {
+    const err = new Error('El usuario no tiene cédula registrada. Completa ese dato antes de generar el certificado.');
+    err.statusCode = 400;
+    throw err;
+  }
+  const pdf = generarPdfPertenencia(perfil);
+  return { pdfBase64: pdf.toString('base64'), filename: `certificado-pertenencia-${perfil.cedula}.pdf` };
+}
+
+module.exports = { generarCertificados, listarCertificados, descargarCertificado, reenviarCertificado, generarCertificadoPertenencia };

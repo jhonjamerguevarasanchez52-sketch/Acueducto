@@ -14,6 +14,7 @@ const {
   verPazYSalvos,
   descargarPazYSalvo,
   reenviarPazYSalvo,
+  generarCertificadoPertenenciaUsuario,
 } = require('../controller/adminController');
 const { verificarToken } = require('../middleware/authMiddleware');
 const verificarAdmin = require('../middleware/adminMiddleware');
@@ -22,6 +23,7 @@ const verificarAdmin = require('../middleware/adminMiddleware');
 router.use(verificarToken, verificarAdmin);
 
 router.post('/usuarios', crearUsuario);
+router.get('/usuarios/:userId/certificado-pertenencia', generarCertificadoPertenenciaUsuario);
 router.get('/usuarios', verTodosUsuarios);
 router.get('/usuarios-eliminados', verUsuariosEliminados);
 router.post('/usuarios-eliminados/:archiveId/reintentar-correo', reenviarAvisoEliminacion);

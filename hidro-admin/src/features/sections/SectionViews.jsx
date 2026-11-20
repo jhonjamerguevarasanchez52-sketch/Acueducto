@@ -28,6 +28,8 @@ export default function SectionViews({ activeSection, context }) {
   const [pazOcupado, setPazOcupado] = useState(false)
   const [pazMensaje, setPazMensaje] = useState('')
   const [pazError, setPazError] = useState('')
+  const [pertenenciaOcupado, setPertenenciaOcupado] = useState('')
+  const [pertenenciaError, setPertenenciaError] = useState('')
   const {
     sectionData,
     sectionErrors,
@@ -112,6 +114,19 @@ export default function SectionViews({ activeSection, context }) {
       descargarPdfBase64(result.pdfBase64, result.filename)
     } catch (error) {
       setPazError(error.message || 'No fue posible descargar el certificado.')
+    }
+  }
+
+  const generarCertificadoPertenencia = async (user) => {
+    setPertenenciaOcupado(user.id)
+    setPertenenciaError('')
+    try {
+      const result = await apiRequest(`${endpoints.adminUsers}/${user.id}/certificado-pertenencia`)
+      descargarPdfBase64(result.pdfBase64, result.filename)
+    } catch (error) {
+      setPertenenciaError(error.message || 'No fue posible generar el certificado de pertenencia.')
+    } finally {
+      setPertenenciaOcupado('')
     }
   }
 
@@ -424,6 +439,34 @@ export default function SectionViews({ activeSection, context }) {
       </section>
     </div>
   }
+
+  const renderCertificaciones = () => (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Constancias de afiliación</p>
+          <h3>Certificado de pertenencia al acueducto</h3>
+        </div>
+      </div>
+      <p className="report-caption">Selecciona al usuario para generar y descargar su certificado de pertenencia a la Asociación del Acueducto Regional Campoamor. Esta certificación es independiente del paz y salvo.</p>
+      {pertenenciaError && <p className="auth-error" role="alert">{pertenenciaError}</p>}
+      <div className="table-wrap"><table><thead><tr><th>Nombre</th><th>Cédula</th><th>Correo</th><th>Acción</th></tr></thead>
+        <tbody>
+          {sectionErrors.usuarios ? <tr><td colSpan="4" className="table-message error-text">{sectionErrors.usuarios}</td></tr>
+            : loadingSections.usuarios ? <tr><td colSpan="4" className="table-message">Cargando usuarios...</td></tr>
+              : users.length === 0 ? <tr><td colSpan="4" className="table-message">No hay usuarios registrados.</td></tr>
+                : users.map((user) => <tr key={user.id}>
+                  <td>{[user.nombre, user.apellido].filter(Boolean).join(' ') || 'Sin nombre'}</td>
+                  <td>{user.cedula || 'Sin cédula registrada'}</td>
+                  <td>{user.correo || '—'}</td>
+                  <td><button type="button" className="link-button" disabled={!user.cedula || pertenenciaOcupado === user.id} onClick={() => generarCertificadoPertenencia(user)}>
+                    <Download size={14} />{pertenenciaOcupado === user.id ? 'Generando...' : 'Generar certificado'}
+                  </button></td>
+                </tr>)}
+        </tbody>
+      </table></div>
+    </section>
+  )
 
   const renderFacturas = () => (
     <div className="panel">
@@ -840,6 +883,7 @@ export default function SectionViews({ activeSection, context }) {
     usuarios: renderUsers(),
     eliminados: renderDeletedUsers(),
     'paz-y-salvo': renderPazYSalvo(),
+    certificaciones: renderCertificaciones(),
     facturas: renderFacturas(),
     pagos: renderPagos(),
     cortes: renderCortes(),

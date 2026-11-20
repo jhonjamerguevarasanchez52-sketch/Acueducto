@@ -63,9 +63,10 @@ function contenidoCertificado(certificado) {
   stream += rect(0, 690, 595, 152, '0.04 0.20 0.37');
   stream += rect(0, 686, 595, 4, '0.22 0.68 0.82');
   stream += logoAcueducto();
-  stream += linea('ACUEDUCTO CAMPO AMOR', 124, 805, 10, 'F2', '0.72 0.88 0.95');
-  stream += linea('CERTIFICADO DE', 124, 776, 21, 'F2', '1 1 1');
-  stream += linea('PAZ Y SALVO', 124, 748, 21, 'F2', '1 1 1');
+  stream += linea('ASOCIACION DEL ACUEDUCTO REGIONAL CAMPOAMOR', 124, 809, 8, 'F2', '0.72 0.88 0.95');
+  stream += linea('NIT 900.790.925-0', 124, 794, 8, 'F1', '0.72 0.88 0.95');
+  stream += linea('CERTIFICADO DE', 124, 773, 21, 'F2', '1 1 1');
+  stream += linea('PAZ Y SALVO', 124, 745, 21, 'F2', '1 1 1');
   stream += rect(424, 746, 126, 29, '0.10 0.34 0.51');
   stream += linea(`No. ${certificadoNo}`, 434, 757, 9, 'F2', '0.91 0.97 0.99');
 
@@ -88,6 +89,7 @@ function contenidoCertificado(certificado) {
 
   let y = 444;
   const datos = [];
+  if (perfil.cedula) datos.push(`Cedula: ${perfil.cedula}`);
   if (perfil.correo) datos.push(`Correo: ${perfil.correo}`);
   if (perfil.numero_lote) datos.push(`Numero de lote: ${perfil.numero_lote}`);
   if (perfil.direccion) datos.push(`Direccion: ${perfil.direccion}`);
@@ -99,7 +101,7 @@ function contenidoCertificado(certificado) {
     }
   }
 
-  const declaracion = `Que ${nombre}, identificado en el sistema del acueducto, se encuentra a paz y salvo por concepto de las facturas registradas hasta la fecha de expedicion de este certificado (${fecha}).`;
+  const declaracion = `Que ${nombre}${perfil.cedula ? `, identificado(a) con cedula No. ${perfil.cedula},` : ''} se encuentra a paz y salvo por concepto de las facturas registradas hasta la fecha de expedicion de este certificado (${fecha}).`;
   const parrafoY = Math.min(y - 23, 392);
   let textoY = parrafoY;
   for (const texto of envolver(declaracion, 88)) {
@@ -116,7 +118,7 @@ function contenidoCertificado(certificado) {
   stream += linea('Atentamente,', 55, firmaY + 39, 10, 'F1', '0.30 0.42 0.48');
   stream += trazo(55, firmaY + 15, 235, firmaY + 15, '0.43 0.58 0.65', 0.8);
   stream += linea('ADMINISTRACION', 55, firmaY - 2, 9, 'F2', '0.04 0.20 0.37');
-  stream += linea('Acueducto Campo Amor', 55, firmaY - 17, 9, 'F1', '0.37 0.49 0.55');
+  stream += linea('Asociacion del Acueducto Regional Campoamor', 55, firmaY - 17, 8, 'F1', '0.37 0.49 0.55');
 
   // Pie de pagina y folio de validacion.
   stream += rect(0, 0, 595, 55, '0.96 0.98 0.99');
@@ -126,7 +128,40 @@ function contenidoCertificado(certificado) {
   return stream;
 }
 
-function generarPdfPazYSalvos(certificados) {
+function contenidoPertenencia(perfil) {
+  const nombre = `${perfil.nombre || ''} ${perfil.apellido || ''}`.trim() || 'Usuario';
+  const cedula = perfil.cedula || 'No registrada';
+  const fecha = new Date().toLocaleDateString('es-CO');
+  let stream = rect(0, 0, 595, 842, '1 1 1');
+  stream += rect(0, 690, 595, 152, '0.04 0.20 0.37');
+  stream += rect(0, 686, 595, 4, '0.22 0.68 0.82');
+  stream += logoAcueducto();
+  stream += linea('ASOCIACION DEL ACUEDUCTO REGIONAL CAMPOAMOR', 124, 805, 9, 'F2', '0.72 0.88 0.95');
+  stream += linea('NIT 900.790.925-0', 124, 787, 9, 'F1', '0.72 0.88 0.95');
+  stream += linea('CERTIFICADO DE', 55, 625, 20, 'F2', '0.04 0.20 0.37');
+  stream += linea('PERTENENCIA', 55, 596, 20, 'F2', '0.04 0.20 0.37');
+  stream += linea('A QUIEN CORRESPONDA', 55, 535, 10, 'F2', '0.19 0.35 0.45');
+  stream += linea('LA ADMINISTRACION CERTIFICA QUE:', 55, 505, 12, 'F2', '0.04 0.20 0.37');
+  stream += rect(55, 426, 485, 55, '0.96 0.98 0.99');
+  stream += rect(55, 426, 4, 55, '0.22 0.68 0.82');
+  stream += linea(nombre, 72, 458, 14, 'F2', '0.04 0.20 0.37');
+  stream += linea(`Cedula de ciudadania: ${cedula}`, 72, 438, 10, 'F1', '0.32 0.43 0.49');
+  const texto = `${nombre}, identificado(a) con cedula de ciudadania No. ${cedula}, pertenece a la Asociacion del Acueducto Regional Campoamor, identificada con NIT 900.790.925-0.`;
+  envolver(texto, 82).forEach((lineaTexto, index) => {
+    stream += linea(lineaTexto, 62, 375 - index * 18, 11, 'F1', '0.16 0.27 0.33');
+  });
+  stream += linea(`Se expide el ${fecha} a solicitud del interesado.`, 62, 300, 10, 'F1', '0.16 0.27 0.33');
+  stream += linea('Atentamente,', 55, 205, 10, 'F1', '0.30 0.42 0.48');
+  stream += trazo(55, 180, 250, 180, '0.43 0.58 0.65', 0.8);
+  stream += linea('ADMINISTRACION', 55, 163, 9, 'F2', '0.04 0.20 0.37');
+  stream += linea('Asociacion del Acueducto Regional Campoamor', 55, 146, 9, 'F1', '0.37 0.49 0.55');
+  stream += rect(0, 0, 595, 55, '0.96 0.98 0.99');
+  stream += trazo(0, 55, 595, 55, '0.84 0.90 0.93', 1);
+  stream += linea('NIT 900.790.925-0', 55, 32, 8, 'F2', '0.04 0.20 0.37');
+  return stream;
+}
+
+function generarPdf(certificados, renderContenido) {
   const lista = certificados || [];
   if (!lista.length) throw new Error('No hay certificados para generar.');
   const objetos = [];
@@ -138,7 +173,7 @@ function generarPdfPazYSalvos(certificados) {
   lista.forEach((certificado, index) => {
     const pageId = 5 + index * 2;
     const contentId = pageId + 1;
-    const stream = contenidoCertificado(certificado);
+    const stream = renderContenido(certificado);
     objetos[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`;
     objetos[contentId] = `<< /Length ${Buffer.byteLength(stream, 'ascii')} >>\nstream\n${stream}endstream`;
   });
@@ -158,4 +193,12 @@ function generarPdfPazYSalvos(certificados) {
   return Buffer.from(pdf, 'ascii');
 }
 
-module.exports = { generarPdfPazYSalvos };
+function generarPdfPazYSalvos(certificados) {
+  return generarPdf(certificados, contenidoCertificado);
+}
+
+function generarPdfPertenencia(perfil) {
+  return generarPdf([perfil], contenidoPertenencia);
+}
+
+module.exports = { generarPdfPazYSalvos, generarPdfPertenencia };

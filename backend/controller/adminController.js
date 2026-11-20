@@ -12,7 +12,7 @@ const { escaparHtml } = require('../utils/html');
 const { eliminarCuenta, listarCuentasEliminadas, reenviarCorreoArchivo } = require('../services/accountDeletionService');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { consultarEstadoCuenta } = require('../services/estadoCuentaService');
-const { generarCertificados, listarCertificados, descargarCertificado, reenviarCertificado } = require('../services/pazYSalvoService');
+const { generarCertificados, listarCertificados, descargarCertificado, reenviarCertificado, generarCertificadoPertenencia } = require('../services/pazYSalvoService');
 
 const { normalizarCorreo } = require('../utils/formato');
 
@@ -386,6 +386,23 @@ async function reenviarPazYSalvo(req, res) {
   }
 }
 
+async function generarCertificadoPertenenciaUsuario(req, res) {
+  try {
+    const resultado = await generarCertificadoPertenencia(req.params.userId);
+    await registrarAuditoria({
+      adminId: req.usuario.id,
+      accion: 'certificado_pertenencia_generado',
+      tabla: 'profiles',
+      registroId: req.params.userId,
+      detalle: { subject_user_id: req.params.userId },
+    });
+    return res.status(200).json(resultado);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    return errorInesperado(res, err);
+  }
+}
+
 module.exports = {
   crearUsuario,
   verTodosUsuarios,
@@ -400,4 +417,5 @@ module.exports = {
   verPazYSalvos,
   descargarPazYSalvo,
   reenviarPazYSalvo,
+  generarCertificadoPertenenciaUsuario,
 };

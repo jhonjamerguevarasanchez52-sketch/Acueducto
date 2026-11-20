@@ -200,7 +200,7 @@ function App() {
     loadSection(section)
     if (section === 'facturas' || section === 'pagos') void ensureUsersLoaded()
 
-    if (section === 'paz-y-salvo') void ensureUsersLoaded()
+    if (section === 'paz-y-salvo' || section === 'certificaciones') void ensureUsersLoaded()
 
     if (section === 'cortes') void loadSection('cortesProgramados')
 
@@ -708,6 +708,8 @@ function App() {
     try {
       const sections = activeSection === 'dashboard'
         ? Object.keys(resourceEndpointBySection)
+        : activeSection === 'certificaciones'
+          ? ['usuarios']
         : [activeSection]
       await Promise.all(sections.map(loadSection))
     } finally {
@@ -789,6 +791,7 @@ function App() {
     usuarios: 'Usuarios',
     eliminados: 'Perfiles eliminados',
     'paz-y-salvo': 'Paz y salvo',
+    certificaciones: 'Certificaciones',
     facturas: 'Facturación',
     pagos: 'Pagos',
     cortes: 'Cortes y reconexiones',
