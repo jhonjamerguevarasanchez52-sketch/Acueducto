@@ -84,7 +84,31 @@ class AuthProvider extends ChangeNotifier {
   bool get debeCambiarPassword => _profile?.debeCambiarPassword ?? false;
 
   /// Se llama al arrancar la app: intenta restaurar la sesión guardada.
+  ///
+  /// Si el almacenamiento seguro del teléfono falla al leer (llave del
+  /// sistema perdida o datos restaurados de otro equipo), se descarta la
+  /// sesión guardada y se muestra el login. Sin esto la excepción dejaba la
+  /// app para siempre en la pantalla de carga.
   Future<void> bootstrap() async {
+    try {
+      await _restaurarSesion();
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[AuthProvider] sesión guardada ilegible: $error');
+      }
+      try {
+        await _clear();
+      } catch (_) {
+        // Si ni siquiera se puede borrar, igual se sigue al login.
+      }
+      _api.authToken = null;
+      _profile = null;
+      _biometricEnabled = false;
+      _setStatus(AuthStatus.unauthenticated);
+    }
+  }
+
+  Future<void> _restaurarSesion() async {
     _biometricEnabled = await _storage.read(_biometricEnabledKey) == 'true';
     if (_biometricEnabled) {
       // Si el usuario eligió biometría, cada apertura de la app pide su
