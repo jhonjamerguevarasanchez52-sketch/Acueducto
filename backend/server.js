@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -50,7 +51,7 @@ if (enProduccion) {
   }
 }
 
-
+// Detrás del proxy de Render para que el rate-limit lea la IP real.
 app.set('trust proxy', 1);
 
 app.use(helmet());
@@ -78,12 +79,19 @@ app.use(limiteGeneral);
 // llevar groserías ni lenguaje ofensivo o racista.
 app.use(bloquearLenguajeOfensivo);
 
-
+// Healthcheck para Render, pg_cron (mantener despierto) y monitoreo
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
 
 app.get('/', (req, res) => {
   res.send('API del Acueducto Campo Amor funcionando 🚰');
 });
+
+// Páginas públicas que exige Google Play: la política de privacidad y la
+// solicitud de eliminación de cuenta. Sus URL van en la ficha de Play Console,
+// así que no deben cambiar de ruta.
+const carpetaLegal = path.join(__dirname, 'public', 'legal');
+app.get('/privacidad', (req, res) => res.sendFile(path.join(carpetaLegal, 'privacidad.html')));
+app.get('/eliminar-cuenta', (req, res) => res.sendFile(path.join(carpetaLegal, 'eliminar-cuenta.html')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);

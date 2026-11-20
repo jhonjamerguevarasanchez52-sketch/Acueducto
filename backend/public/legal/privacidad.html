@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidad · Acueducto Campo Amor</title>
+<meta name="description" content="Cómo el Acueducto Veredal Campo Amor recolecta, usa y protege los datos personales de los usuarios de su aplicación móvil.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primario: #0277BD;
+    --primario-oscuro: #01579B;
+    --fondo: #F4F9FC;
+    --tarjeta: #FFFFFF;
+    --borde: #E3EEF4;
+    --chip: #EAF5FB;
+    --texto: #12303F;
+    --texto-2: #4F6B7A;
+    --ok: #2E7D32;
+    --ok-fondo: #E8F5E9;
+    --aviso: #8A4B00;
+    --aviso-fondo: #FFF4E5;
+    --pendiente: #FFF59D;
+    --pendiente-texto: #5D4500;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --primario: #4FC3F7;
+      --primario-oscuro: #29B6F6;
+      --fondo: #0B171E;
+      --tarjeta: #13232D;
+      --borde: #24404E;
+      --chip: #16262F;
+      --texto: #E6F1F7;
+      --texto-2: #A9C0CE;
+      --ok: #66BB6A;
+      --ok-fondo: #13291A;
+      --aviso: #FFA657;
+      --aviso-fondo: #2B1E10;
+      --pendiente: #5C4F00;
+      --pendiente-texto: #FFF3B0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --primario: #4FC3F7; --primario-oscuro: #29B6F6; --fondo: #0B171E; --tarjeta: #13232D;
+    --borde: #24404E; --chip: #16262F; --texto: #E6F1F7; --texto-2: #A9C0CE; --ok: #66BB6A;
+    --ok-fondo: #13291A; --aviso: #FFA657; --aviso-fondo: #2B1E10; --pendiente: #5C4F00; --pendiente-texto: #FFF3B0;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--fondo); color: var(--texto);
+    font-family: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16.5px; line-height: 1.65; -webkit-font-smoothing: antialiased;
+  }
+  header.portada {
+    background: linear-gradient(135deg, #01579B 0%, #0277BD 55%, #0398D6 100%);
+    color: #fff; padding: 48px 16px 72px;
+  }
+  .contenedor { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  .marca { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .2px; opacity: .95; }
+  .marca svg { flex: none; }
+  header h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; font-weight: 800; }
+  header p.lead { margin: 0; font-size: 18px; opacity: .92; max-width: 640px; }
+  .metadatos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .metadatos span { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.25); padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; }
+  main { margin-top: -44px; padding-bottom: 48px; }
+  .tarjeta { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 18px; padding: 28px clamp(18px, 4vw, 36px); margin-bottom: 18px; box-shadow: 0 1px 2px rgba(1,87,155,.05); }
+  .resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 14px; }
+  .resumen div { background: var(--chip); border-radius: 14px; padding: 14px 16px; font-size: 15px; }
+  .resumen strong { display: block; color: var(--primario-oscuro); margin-bottom: 2px; }
+  :root[data-theme="dark"] .resumen strong { color: var(--primario); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .resumen strong { color: var(--primario); } }
+  nav.indice ol { columns: 2 240px; column-gap: 28px; padding-left: 22px; margin: 8px 0 0; }
+  nav.indice li { margin: 3px 0; break-inside: avoid; }
+  a { color: var(--primario); text-underline-offset: 3px; }
+  h2 { font-size: 22px; margin: 0 0 12px; line-height: 1.3; display: flex; gap: 12px; align-items: baseline; }
+  h2 .num { flex: none; display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--chip); color: var(--primario); font-size: 15px; font-weight: 800; transform: translateY(-2px); }
+  h3 { font-size: 17px; margin: 20px 0 6px; }
+  section { scroll-margin-top: 16px; }
+  p { margin: 0 0 12px; }
+  ul { padding-left: 22px; margin: 0 0 12px; }
+  li { margin: 4px 0; }
+  .tabla { width: 100%; overflow-x: auto; margin: 10px 0 14px; border: 1px solid var(--borde); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 520px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--borde); }
+  th { background: var(--chip); font-weight: 700; }
+  tr:last-child td { border-bottom: 0; }
+  .nota { border-radius: 12px; padding: 12px 16px; margin: 12px 0; font-size: 15px; }
+  .nota.ok { background: var(--ok-fondo); border-left: 4px solid var(--ok); }
+  .nota.aviso { background: var(--aviso-fondo); border-left: 4px solid var(--aviso); }
+  .pendiente { background: var(--pendiente); color: var(--pendiente-texto); padding: 0 5px; border-radius: 4px; font-weight: 700; }
+  .contacto { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 10px 0 4px; }
+  .contacto div { border: 1px solid var(--borde); border-radius: 12px; padding: 12px 14px; }
+  .contacto small { display: block; color: var(--texto-2); font-weight: 600; }
+  footer { color: var(--texto-2); font-size: 14px; text-align: center; padding: 8px 16px 40px; }
+  @media print {
+    header.portada { background: none; color: #000; padding: 0 0 12px; }
+    .metadatos span { border-color: #999; background: none; }
+    main { margin-top: 0; }
+    .tarjeta { box-shadow: none; break-inside: avoid-page; }
+  }
+</style>
+</head>
+<body>
+
+<header class="portada">
+  <div class="contenedor">
+    <div class="marca">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5c3.6 4.4 6.5 8 6.5 11.5a6.5 6.5 0 0 1-13 0c0-3.5 2.9-7.1 6.5-11.5Z" fill="#fff"/><path d="M9 15.2a3 3 0 0 0 3 2.8" stroke="#0277BD" stroke-width="1.8" stroke-linecap="round"/></svg>
+      Acueducto Campo Amor
+    </div>
+    <h1>Política de privacidad y tratamiento de datos personales</h1>
+    <p class="lead">Te contamos qué datos usa la aplicación móvil del acueducto, para qué los usamos, con quién los compartimos y cómo puedes ejercer tus derechos.</p>
+    <div class="metadatos">
+      <span>Vigente desde: 11 de diciembre de 2026</span>
+      <span>Versión 1.0</span>
+      <span>Ley 1581 de 2012</span>
+    </div>
+  </div>
+</header>
+
+<main class="contenedor">
+
+  <div class="tarjeta">
+    <h2>En pocas palabras</h2>
+    <div class="resumen">
+      <div><strong>Solo lo necesario</strong>Usamos tus datos para prestarte el servicio de agua: facturar, recibir pagos, atender averías y avisarte de cortes.</div>
+      <div><strong>No vendemos tus datos</strong>No hay publicidad en la app ni compartimos tu información con fines comerciales.</div>
+      <div><strong>Tu huella no sale del teléfono</strong>El desbloqueo con huella lo valida tu celular. Nosotros nunca la recibimos.</div>
+      <div><strong>Pagos seguros</strong>Los datos de tu tarjeta o cuenta los recibe directamente Wompi. La app nunca los ve.</div>
+      <div><strong>Audios temporales</strong>Los audios que le envías a GOTA se borran automáticamente en horas o días.</div>
+      <div><strong>Tú decides</strong>Puedes consultar, corregir o pedir que eliminemos tus datos cuando quieras.</div>
+    </div>
+  </div>
+
+  <nav class="tarjeta indice" aria-label="Contenido">
+    <h2>Contenido</h2>
+    <ol>
+      <li><a href="#responsable">Quién es el responsable</a></li>
+      <li><a href="#alcance">A qué se aplica esta política</a></li>
+      <li><a href="#datos">Qué datos tratamos</a></li>
+      <li><a href="#no-recolectamos">Qué datos no recolectamos</a></li>
+      <li><a href="#finalidades">Para qué usamos tus datos</a></li>
+      <li><a href="#permisos">Permisos del teléfono</a></li>
+      <li><a href="#gota">Asistente GOTA e inteligencia artificial</a></li>
+      <li><a href="#compartir">Con quién compartimos tus datos</a></li>
+      <li><a href="#internacional">Transferencias fuera de Colombia</a></li>
+      <li><a href="#conservacion">Cuánto tiempo los guardamos</a></li>
+      <li><a href="#seguridad">Cómo los protegemos</a></li>
+      <li><a href="#derechos">Tus derechos</a></li>
+      <li><a href="#ejercer">Cómo ejercer tus derechos</a></li>
+      <li><a href="#eliminar">Eliminar tu cuenta</a></li>
+      <li><a href="#menores">Menores de edad</a></li>
+      <li><a href="#sensibles">Datos sensibles</a></li>
+      <li><a href="#cambios">Cambios a esta política</a></li>
+    </ol>
+  </nav>
+
+  <section class="tarjeta" id="responsable">
+    <h2><span class="num">1</span>Quién es el responsable de tus datos</h2>
+    <p>El responsable del tratamiento de tus datos personales es:</p>
+    <div class="contacto">
+      <div><small>Razón social</small>Asociación de Usuarios del Acueducto Regional Campoamor</div>
+      <div><small>NIT</small>900.790.925-0</div>
+      <div><small>Dirección</small>Vereda Majo, sector Campoamor, Garzón, Huila, Colombia</div>
+      <div><small>Correo para datos personales</small><a href="mailto:acueductocampoamor87@gmail.com">acueductocampoamor87@gmail.com</a></div>
+      <div><small>Teléfono / WhatsApp</small><a href="https://wa.me/573214018748">321 401 8748</a></div>
+      <div><small>Horario de atención</small>Lunes a viernes, 8:00 a. m. a 5:00 p. m.</div>
+    </div>
+    <p style="margin-top:12px">En esta política, "el acueducto", "nosotros" y "nuestro" se refieren a esta entidad. "Tú" y "el usuario" se refieren al suscriptor que usa la aplicación.</p>
+  </section>
+
+  <section class="tarjeta" id="alcance">
+    <h2><span class="num">2</span>A qué se aplica esta política</h2>
+    <p>Esta política se aplica a la aplicación móvil <strong>Acueducto Campo Amor</strong> para Android y a los servicios en línea que la hacen funcionar. Cumple la Ley 1581 de 2012, el Decreto 1377 de 2013 (incorporado en el Decreto 1074 de 2015) y las demás normas colombianas de protección de datos personales.</p>
+    <p>La app no tiene registro abierto. Las cuentas las crea el personal del acueducto para sus suscriptores y para el personal de operación (administradores y fontaneros).</p>
+  </section>
+
+  <section class="tarjeta" id="datos">
+    <h2><span class="num">3</span>Qué datos tratamos</h2>
+    <div class="tabla">
+      <table>
+        <thead><tr><th>Tipo de dato</th><th>Qué incluye</th><th>De dónde viene</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Identificación</strong></td><td>Nombre, apellido y número de cédula.</td><td>Lo registra el acueducto al crear tu cuenta.</td></tr>
+          <tr><td><strong>Contacto</strong></td><td>Correo electrónico y teléfono.</td><td>Lo registra el acueducto. Tú puedes actualizarlo desde Perfil.</td></tr>
+          <tr><td><strong>Datos del predio</strong></td><td>Dirección, número de lote y zona o sector.</td><td>Lo registra el acueducto. Tú puedes actualizarlo desde Perfil.</td></tr>
+          <tr><td><strong>Ocupación</strong></td><td>Tu ocupación, si decides informarla. Es opcional.</td><td>Tú o el acueducto.</td></tr>
+          <tr><td><strong>Facturación</strong></td><td>Facturas, periodos cobrados, valores, fechas de vencimiento, estado de cada factura, cortes y reconexiones del servicio.</td><td>Las genera el sistema del acueducto.</td></tr>
+          <tr><td><strong>Pagos</strong></td><td>Valor pagado, medio de pago (por ejemplo PSE, Nequi, tarjeta o efectivo), referencia, número y estado de la transacción en Wompi. <strong>No incluye</strong> números de tarjeta ni claves bancarias.</td><td>Wompi y el personal del acueducto.</td></tr>
+          <tr><td><strong>Comprobantes de pago</strong></td><td>La foto del recibo que eliges de tu galería cuando reportas un pago hecho por fuera de la app.</td><td>Tú, solo si decides adjuntarla.</td></tr>
+          <tr><td><strong>Reportes de averías</strong></td><td>Descripción del daño, dirección y zona del problema, estado del reporte y notas del fontanero que lo atiende.</td><td>Tú y el personal del acueducto.</td></tr>
+          <tr><td><strong>Conversaciones con GOTA</strong></td><td>Los mensajes de texto que le escribes al asistente, las notas de voz que le envías y su transcripción a texto. Ver la <a href="#gota">sección 7</a>.</td><td>Tú.</td></tr>
+          <tr><td><strong>Notificaciones</strong></td><td>Avisos de facturas, pagos, averías y cortes programados que te enviamos dentro de la app y por correo.</td><td>El sistema del acueducto.</td></tr>
+          <tr><td><strong>Seguridad de la cuenta</strong></td><td>Tu contraseña (guardada de forma cifrada, nunca en texto legible), códigos temporales de verificación y de recuperación, y el conteo de intentos fallidos de inicio de sesión para bloquear ataques.</td><td>Tú y el sistema.</td></tr>
+          <tr><td><strong>Datos técnicos</strong></td><td>Dirección IP, fecha y hora de las solicitudes y mensajes de error, que quedan en los registros normales del servidor.</td><td>Se generan automáticamente al usar la app.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="tarjeta" id="no-recolectamos">
+    <h2><span class="num">4</span>Qué datos no recolectamos</h2>
+    <ul>
+      <li><strong>Tu huella o rostro.</strong> El inicio de sesión con huella lo valida el sistema de seguridad de tu teléfono. La app solo recibe un "sí" o un "no".</li>
+      <li><strong>Tu ubicación GPS.</strong> La app no usa la ubicación del teléfono. La dirección de una avería la escribes o la dices tú.</li>
+      <li><strong>Tus contactos, llamadas, SMS ni otras fotos.</strong> De la galería solo recibimos la imagen que tú eliges.</li>
+      <li><strong>Datos de tu tarjeta o cuenta bancaria.</strong> Los recibe Wompi directamente en su página segura.</li>
+      <li><strong>Identificadores de publicidad ni datos de tus otras apps.</strong> La app no tiene publicidad ni herramientas de rastreo publicitario.</li>
+    </ul>
+    <div class="nota ok"><strong>No vendemos, alquilamos ni intercambiamos tus datos personales.</strong></div>
+  </section>
+
+  <section class="tarjeta" id="finalidades">
+    <h2><span class="num">5</span>Para qué usamos tus datos</h2>
+    <ul>
+      <li>Identificarte y darte acceso seguro a tu cuenta, ya sea con correo, cédula, código de acceso o huella.</li>
+      <li>Generar, enviar y mostrarte tus facturas del servicio de agua y su historial.</li>
+      <li>Procesar tus pagos en línea y registrar los pagos que haces en efectivo o por otros medios.</li>
+      <li>Enviarte comprobantes de pago, recordatorios de vencimiento y avisos por correo y dentro de la app.</li>
+      <li>Recibir, asignar y hacer seguimiento a tus reportes de averías.</li>
+      <li>Avisarte de cortes programados, suspensiones y reconexiones del servicio.</li>
+      <li>Responder tus preguntas por medio del asistente GOTA.</li>
+      <li>Proteger tu cuenta y el sistema contra fraudes y accesos indebidos.</li>
+      <li>Cumplir las obligaciones contables, tributarias y legales del acueducto.</li>
+      <li>Atender tus consultas, peticiones, quejas y reclamos.</li>
+    </ul>
+    <p>No usamos tus datos para fines distintos a estos sin pedirte autorización antes.</p>
+  </section>
+
+  <section class="tarjeta" id="permisos">
+    <h2><span class="num">6</span>Permisos que pide la app en tu teléfono</h2>
+    <div class="tabla">
+      <table>
+        <thead><tr><th>Permiso</th><th>Para qué se usa</th><th>¿Es obligatorio?</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Internet</strong></td><td>Conectarse de forma segura (HTTPS) con el servidor del acueducto.</td><td>Sí, la app no funciona sin conexión.</td></tr>
+          <tr><td><strong>Micrófono</strong></td><td>Grabar una nota de voz para GOTA. <strong>Solo graba mientras mantienes presionado el botón del micrófono.</strong></td><td>No. Puedes escribirle a GOTA en lugar de enviarle audios.</td></tr>
+          <tr><td><strong>Huella digital</strong></td><td>Entrar más rápido sin escribir la contraseña.</td><td>No, puedes activarlo o desactivarlo cuando quieras.</td></tr>
+          <tr><td><strong>Selector de fotos</strong></td><td>Elegir la foto de un recibo de pago. Se abre el selector del sistema y la app solo recibe la imagen que tú escojas.</td><td>No, solo se usa si adjuntas un comprobante.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Puedes retirar cualquier permiso en <em>Ajustes del teléfono → Aplicaciones → Acueducto Campo Amor → Permisos</em>.</p>
+  </section>
+
+  <section class="tarjeta" id="gota">
+    <h2><span class="num">7</span>El asistente GOTA y la inteligencia artificial</h2>
+    <p>GOTA es un asistente automático que responde preguntas sobre tus facturas, tarifas y el servicio, y que puede ayudarte a registrar una avería. Para funcionar usa servicios de inteligencia artificial de <strong>Groq, Inc.</strong> (Estados Unidos):</p>
+    <ul>
+      <li><strong>Mensajes de texto:</strong> se envían a un modelo de lenguaje junto con la información mínima para darte una respuesta útil: tu nombre, número de lote, zona, dirección, tus tres últimas facturas (periodo, valor, vencimiento y estado) y tus tres últimas averías. <strong>No le enviamos tu cédula, tu correo ni tu teléfono.</strong></li>
+      <li><strong>Notas de voz:</strong> se envían a un servicio de transcripción (Whisper) que las convierte en texto. Cada audio dura máximo 60 segundos y cada usuario puede enviar hasta 5 al día.</li>
+      <li><strong>Historial de la conversación:</strong> se mantiene en tu teléfono mientras tienes el chat abierto y no lo guardamos en nuestros servidores. Solo guardamos lo que se convierte en un reporte de avería y las transcripciones de tus audios.</li>
+    </ul>
+    <div class="nota aviso">GOTA es un sistema automático y puede equivocarse. Los valores oficiales son los que aparecen en tus facturas. No compartas con GOTA contraseñas, datos bancarios ni información que no sea necesaria.</div>
+  </section>
+
+  <section class="tarjeta" id="compartir">
+    <h2><span class="num">8</span>Con quién compartimos tus datos</h2>
+    <p>Dentro del acueducto, solo accede a tus datos el personal que los necesita para su trabajo. Los <strong>administradores</strong> gestionan cuentas, facturas y pagos. Los <strong>fontaneros</strong> solo ven la información necesaria para atender las averías que tienen asignadas.</p>
+    <p>Para operar la app trabajamos con proveedores tecnológicos que tratan los datos <strong>en nuestro nombre y solo siguiendo nuestras instrucciones</strong> (encargados del tratamiento):</p>
+    <div class="tabla">
+      <table>
+        <thead><tr><th>Proveedor</th><th>Qué hace</th><th>Datos que recibe</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Supabase</strong></td><td>Base de datos, autenticación y almacenamiento privado de archivos.</td><td>Todos los datos de la <a href="#datos">sección 3</a>.</td></tr>
+          <tr><td><strong>Render</strong></td><td>Servidor donde funciona el sistema del acueducto.</td><td>Los datos que pasan por la app y los registros técnicos.</td></tr>
+          <tr><td><strong>Wompi</strong> (Bancolombia)</td><td>Pasarela de pagos en línea.</td><td>Referencia y valor del pago, y los datos que tú ingresas directamente en su página.</td></tr>
+          <tr><td><strong>Brevo</strong></td><td>Envío de correos electrónicos (facturas, comprobantes, códigos y avisos).</td><td>Nombre, correo y el contenido del mensaje.</td></tr>
+          <tr><td><strong>Groq</strong></td><td>Inteligencia artificial del asistente GOTA.</td><td>Lo descrito en la <a href="#gota">sección 7</a>.</td></tr>
+          <tr><td><strong>Google Fonts</strong></td><td>Tipografía de la app.</td><td>Solo datos técnicos de la conexión, como la dirección IP.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>También podemos entregar datos a autoridades públicas cuando una ley o una orden judicial lo exija, y solo en la medida en que lo exija.</p>
+  </section>
+
+  <section class="tarjeta" id="internacional">
+    <h2><span class="num">9</span>Transferencias fuera de Colombia</h2>
+    <p>Algunos de nuestros proveedores (Supabase, Render, Brevo, Groq y Google) tienen sus servidores fuera de Colombia, principalmente en Estados Unidos y la Unión Europea. Por eso, tus datos pueden almacenarse o procesarse en esos países. Escogemos proveedores que aplican estándares reconocidos de seguridad y protección de datos, y les entregamos solo lo necesario para prestar el servicio. Al aceptar esta política autorizas esta transmisión internacional, conforme a los artículos 26 de la Ley 1581 de 2012 y 2.2.2.25.5.2 del Decreto 1074 de 2015.</p>
+  </section>
+
+  <section class="tarjeta" id="conservacion">
+    <h2><span class="num">10</span>Cuánto tiempo guardamos tus datos</h2>
+    <div class="tabla">
+      <table>
+        <thead><tr><th>Dato</th><th>Tiempo de conservación</th></tr></thead>
+        <tbody>
+          <tr><td>Datos de la cuenta y del predio</td><td>Mientras seas suscriptor o usuario de la app. Si pides eliminar la cuenta, se aplica lo descrito en la <a href="#eliminar">sección 14</a>.</td></tr>
+          <tr><td>Facturas, pagos y comprobantes</td><td><span class="pendiente">10 años</span>, porque son soporte contable y la ley obliga a conservarlos (artículo 28 de la Ley 962 de 2005 y artículo 60 del Código de Comercio).</td></tr>
+          <tr><td>Archivo de cuentas eliminadas</td><td>Cuando se elimina una cuenta guardamos, con acceso solo para administradores, una copia de los datos del perfil y de su historial de facturas, pagos y averías, para respaldar la contabilidad y atender reclamos. Se conserva <span class="pendiente">10 años</span>, igual que los registros contables.</td></tr>
+          <tr><td>Notas de voz enviadas a GOTA</td><td>Se borran automáticamente: <strong>2 horas</strong> después de enviarlas si no se convierten en una avería, o <strong>hasta 15 días</strong> si quedan asociadas a una. El plazo se acorta a <strong>72 horas</strong> cuando el personal ya escuchó el audio o cuando la avería se cierra.</td></tr>
+          <tr><td>Transcripciones de audios y reportes de averías</td><td>Forman parte del historial del servicio y se conservan mientras exista la cuenta.</td></tr>
+          <tr><td>Códigos de verificación y recuperación</td><td>Vencen a los pocos minutos y dejan de servir después de usarse.</td></tr>
+          <tr><td>Sesión guardada en tu teléfono</td><td>Hasta que cierres sesión o desinstales la app. No se incluye en las copias de seguridad del teléfono.</td></tr>
+          <tr><td>Registros técnicos del servidor</td><td>El tiempo que mantienen nuestros proveedores de infraestructura, normalmente pocas semanas.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="tarjeta" id="seguridad">
+    <h2><span class="num">11</span>Cómo protegemos tus datos</h2>
+    <ul>
+      <li>Toda la comunicación entre la app y el servidor viaja cifrada con HTTPS.</li>
+      <li>Tu sesión se guarda cifrada en el almacenamiento seguro del teléfono.</li>
+      <li>Las contraseñas se guardan cifradas con algoritmos de una sola vía. Nadie del acueducto puede verlas.</li>
+      <li>Los comprobantes y los audios se guardan en almacenamiento privado y solo se abren con enlaces temporales.</li>
+      <li>Hay límites de intentos de inicio de sesión y de códigos para frenar ataques.</li>
+      <li>Cada persona del acueducto tiene un rol con permisos limitados, y las acciones administrativas quedan registradas.</li>
+    </ul>
+    <p>Ningún sistema es infalible. Si ocurre un incidente de seguridad que afecte tus datos, te avisaremos y lo informaremos a la Superintendencia de Industria y Comercio como exige la ley.</p>
+  </section>
+
+  <section class="tarjeta" id="derechos">
+    <h2><span class="num">12</span>Tus derechos</h2>
+    <p>Como titular de tus datos, según el artículo 8 de la Ley 1581 de 2012, tienes derecho a:</p>
+    <ul>
+      <li><strong>Conocer</strong> los datos que tenemos sobre ti, de forma gratuita.</li>
+      <li><strong>Actualizar y corregir</strong> tus datos si están incompletos o son incorrectos. Varios puedes cambiarlos tú mismo desde <em>Perfil → Editar perfil</em>.</li>
+      <li><strong>Pedir prueba</strong> de la autorización que nos diste.</li>
+      <li><strong>Saber cómo usamos</strong> tus datos.</li>
+      <li><strong>Revocar la autorización y pedir que eliminemos</strong> tus datos, salvo cuando la ley nos obligue a conservarlos.</li>
+      <li><strong>Presentar quejas</strong> ante la Superintendencia de Industria y Comercio (<a href="https://www.sic.gov.co" rel="noopener">www.sic.gov.co</a>), después de haber acudido primero a nosotros.</li>
+    </ul>
+  </section>
+
+  <section class="tarjeta" id="ejercer">
+    <h2><span class="num">13</span>Cómo ejercer tus derechos</h2>
+    <p>Escríbenos al correo <a href="mailto:acueductocampoamor87@gmail.com">acueductocampoamor87@gmail.com</a>, por WhatsApp al <a href="https://wa.me/573214018748">321 401 8748</a> o acércate a la oficina del acueducto. Incluye tu nombre completo, número de cédula, lo que solicitas y un medio para responderte.</p>
+    <div class="tabla">
+      <table>
+        <thead><tr><th>Tipo de solicitud</th><th>Plazo de respuesta</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Consulta</strong> (conocer tus datos o cómo los usamos)</td><td>Máximo <strong>10 días hábiles</strong>, prorrogables por 5 días hábiles más si te avisamos el motivo.</td></tr>
+          <tr><td><strong>Reclamo</strong> (corregir, actualizar, eliminar o revocar)</td><td>Máximo <strong>15 días hábiles</strong>, prorrogables por 8 días hábiles más si te avisamos el motivo.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Para proteger tu información, antes de responder verificaremos que eres el titular de la cuenta o su representante autorizado.</p>
+  </section>
+
+  <section class="tarjeta" id="eliminar">
+    <h2><span class="num">14</span>Eliminar tu cuenta</h2>
+    <p>Puedes pedir que eliminemos tu cuenta y tus datos personales en cualquier momento, desde la app o por los canales de la sección anterior. El proceso, qué se borra y qué debemos conservar por ley se explica en la página <a href="/eliminar-cuenta"><strong>Eliminar mi cuenta</strong></a>.</p>
+    <div class="nota aviso">Eliminar tu cuenta de la app <strong>no cancela tu suscripción al servicio de agua ni las deudas pendientes</strong>. Para eso debes hacer el trámite en la oficina del acueducto.</div>
+  </section>
+
+  <section class="tarjeta" id="menores">
+    <h2><span class="num">15</span>Menores de edad</h2>
+    <p>La app está dirigida a los suscriptores del servicio y al personal del acueducto, que deben ser mayores de 18 años. No creamos cuentas a menores de edad ni recolectamos sus datos de forma intencional. Si crees que tenemos datos de un menor, escríbenos y los eliminaremos.</p>
+  </section>
+
+  <section class="tarjeta" id="sensibles">
+    <h2><span class="num">16</span>Datos sensibles</h2>
+    <p>No solicitamos datos sensibles (como salud, creencias, orientación sexual ni datos biométricos). Tu voz solo se usa para convertir tus notas de voz en texto, <strong>nunca para identificarte</strong>. Te pedimos no incluir datos sensibles en tus mensajes, audios ni reportes. Responder preguntas sobre datos sensibles siempre es opcional.</p>
+  </section>
+
+  <section class="tarjeta" id="cambios">
+    <h2><span class="num">17</span>Cambios a esta política</h2>
+    <p>Podemos actualizar esta política cuando cambie la app o la ley. Publicaremos la nueva versión en esta página con su fecha de vigencia y, si el cambio es importante, te avisaremos dentro de la app o por correo antes de que empiece a aplicarse.</p>
+    <p><strong>Vigencia:</strong> esta política rige desde el 11 de diciembre de 2026. Tus datos se tratarán mientras exista la relación con el acueducto y durante los plazos indicados en la <a href="#conservacion">sección 10</a>.</p>
+  </section>
+
+</main>
+
+<footer>
+  Asociación de Usuarios del Acueducto Regional Campoamor · NIT 900.790.925-0 · Garzón, Huila, Colombia<br>
+  <a href="/eliminar-cuenta">Eliminar mi cuenta</a>
+</footer>
+
+</body>
+</html>
