@@ -40,9 +40,9 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
     setState(() => _guardando = true);
     try {
       await context.read<AuthProvider>().cambiarPassword(
-            _actualCtrl.text,
-            _nuevaCtrl.text,
-          );
+        _actualCtrl.text,
+        _nuevaCtrl.text,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Contraseña actualizada correctamente')),
@@ -50,9 +50,9 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
       Navigator.of(context).pop();
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } finally {
       if (mounted) setState(() => _guardando = false);
@@ -69,14 +69,14 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
   }
 
   Widget _botonVer(bool visible, VoidCallback onPressed) => IconButton(
-        splashRadius: 20,
-        icon: Icon(
-          visible ? LucideIcons.eyeOff : LucideIcons.eye,
-          color: authMuted,
-          size: 20,
-        ),
-        onPressed: onPressed,
-      );
+    splashRadius: 20,
+    icon: Icon(
+      visible ? LucideIcons.eyeOff : LucideIcons.eye,
+      color: authMuted,
+      size: 20,
+    ),
+    onPressed: onPressed,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +94,10 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                   const Text(
                     'Por seguridad, primero confirma tu contraseña actual.',
                     style: TextStyle(
-                        fontSize: 13.5, color: authMuted, height: 1.4),
+                      fontSize: 13.5,
+                      color: authMuted,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 22),
                   authFieldLabel(context, 'CONTRASEÑA ACTUAL'),
@@ -106,8 +109,10 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                       context,
                       hint: 'Tu contraseña actual',
                       icon: LucideIcons.lockKeyhole,
-                      suffix: _botonVer(_verActual,
-                          () => setState(() => _verActual = !_verActual)),
+                      suffix: _botonVer(
+                        _verActual,
+                        () => setState(() => _verActual = !_verActual),
+                      ),
                     ),
                     validator: (v) => (v == null || v.isEmpty)
                         ? 'Ingresa tu contraseña actual'
@@ -123,12 +128,15 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                       context,
                       hint: 'Mínimo 8 caracteres',
                       icon: LucideIcons.lock,
-                      suffix: _botonVer(_verNueva,
-                          () => setState(() => _verNueva = !_verNueva)),
+                      suffix: _botonVer(
+                        _verNueva,
+                        () => setState(() => _verNueva = !_verNueva),
+                      ),
                     ),
                     validator: (v) {
                       final t = v ?? '';
-                      if (t.length < 8) return 'Debe tener al menos 8 caracteres';
+                      if (t.length < 8)
+                        return 'Debe tener al menos 8 caracteres';
                       if (t == _actualCtrl.text) {
                         return 'Debe ser distinta de la actual';
                       }
@@ -159,7 +167,9 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                             height: 22,
                             width: 22,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text('Guardar contraseña'),
                   ),

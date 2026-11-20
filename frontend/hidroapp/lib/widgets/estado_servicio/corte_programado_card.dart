@@ -58,7 +58,9 @@ class CorteProgramadoCard extends StatelessWidget {
             ),
             FilaDetalle(
               icono: LucideIcons.mapPin,
-              texto: corte.zona == null ? 'Todo el acueducto' : 'Zona ${corte.zona}',
+              texto: corte.zona == null
+                  ? 'Todo el acueducto'
+                  : 'Zona ${corte.zona}',
             ),
             if (!enCurso) ...[
               const SizedBox(height: 6),

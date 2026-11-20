@@ -41,7 +41,9 @@ class WompiCheckoutService {
     if (cotizacion != null) {
       desglose = cotizacion;
     } else {
-      final cotizacionRespuesta = await api.get('/pagos/cotizacion-wompi/$facturaId');
+      final cotizacionRespuesta = await api.get(
+        '/pagos/cotizacion-wompi/$facturaId',
+      );
       if (cotizacionRespuesta is! Map) {
         throw ApiException('El servidor no devolvió el desglose del pago.');
       }
@@ -61,8 +63,14 @@ class WompiCheckoutService {
           'El cargo de Wompi cubre la tarifa de la transacción. El valor del servicio que recibe el acueducto se mantiene igual.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continuar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Continuar'),
+          ),
         ],
       ),
     );

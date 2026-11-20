@@ -73,7 +73,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _refrescar();
     } catch (_) {
       if (!mounted) return;
-      AppSnackbar.error(context, 'No se pudo completar el pago. Intenta de nuevo.');
+      AppSnackbar.error(
+        context,
+        'No se pudo completar el pago. Intenta de nuevo.',
+      );
       _refrescar();
     }
   }

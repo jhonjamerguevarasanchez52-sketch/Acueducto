@@ -124,10 +124,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> login(String correo, String password) async {
-    final data = await _api.post('/auth/login', body: {
-      'correo': correo.trim(),
-      'password': password,
-    });
+    final data = await _api.post(
+      '/auth/login',
+      body: {'correo': correo.trim(), 'password': password},
+    );
     await _abrirSesion(data);
   }
 
@@ -135,10 +135,10 @@ class AuthProvider extends ChangeNotifier {
   /// que tiene esa cédula registrada. Se envían solo los dígitos (sin puntos
   /// ni espacios).
   Future<void> loginConCedula(String cedula, String password) async {
-    final data = await _api.post('/auth/login', body: {
-      'cedula': soloDigitosCedula(cedula),
-      'password': password,
-    });
+    final data = await _api.post(
+      '/auth/login',
+      body: {'cedula': soloDigitosCedula(cedula), 'password': password},
+    );
     await _abrirSesion(data);
   }
 
@@ -149,17 +149,18 @@ class AuthProvider extends ChangeNotifier {
   /// Pide al backend que envíe un código de acceso de 6 dígitos al correo.
   /// La respuesta es la misma exista o no la cuenta.
   Future<void> solicitarCodigoAcceso(String correo) async {
-    await _api.post('/auth/codigo-acceso', body: {
-      'correo': correo.trim().toLowerCase(),
-    });
+    await _api.post(
+      '/auth/codigo-acceso',
+      body: {'correo': correo.trim().toLowerCase()},
+    );
   }
 
   /// Entra sin contraseña con el código que llegó al correo.
   Future<void> loginConCodigo(String correo, String codigo) async {
-    final data = await _api.post('/auth/ingresar-con-codigo', body: {
-      'correo': correo.trim().toLowerCase(),
-      'codigo': codigo.trim(),
-    });
+    final data = await _api.post(
+      '/auth/ingresar-con-codigo',
+      body: {'correo': correo.trim().toLowerCase(), 'codigo': codigo.trim()},
+    );
     await _abrirSesion(data);
   }
 
@@ -211,9 +212,12 @@ class AuthProvider extends ChangeNotifier {
     if (enabled) {
       final supported = await deviceSupportsBiometrics();
       if (!supported) {
-        throw ApiException('Este dispositivo no tiene huella ni rostro configurados.');
+        throw ApiException(
+          'Este dispositivo no tiene huella ni rostro configurados.',
+        );
       }
-      final refreshToken = await _storage.read(_refreshTokenKey) ??
+      final refreshToken =
+          await _storage.read(_refreshTokenKey) ??
           await _storage.read(_legacyRefreshTokenKey);
       if (refreshToken == null || refreshToken.isEmpty) {
         throw ApiException(
@@ -240,7 +244,8 @@ class AuthProvider extends ChangeNotifier {
     if (!_biometricEnabled) {
       throw ApiException('El acceso biométrico está desactivado.');
     }
-    final refreshToken = await _storage.read(_refreshTokenKey) ??
+    final refreshToken =
+        await _storage.read(_refreshTokenKey) ??
         await _storage.read(_legacyRefreshTokenKey);
     if (refreshToken == null || refreshToken.isEmpty) {
       throw ApiException(
@@ -289,10 +294,8 @@ class AuthProvider extends ChangeNotifier {
   /// sesión no se cierre mientras se usa la app. Lo invoca [ApiService] al
   /// recibir un 401; si no se puede renovar, cierra la sesión y vuelve a la
   /// pantalla de acceso en vez de dejar al usuario viendo un error suelto.
-  Future<bool> _renovarSesion() =>
-      _renovacionEnCurso ??= _intentarRenovar().whenComplete(
-        () => _renovacionEnCurso = null,
-      );
+  Future<bool> _renovarSesion() => _renovacionEnCurso ??= _intentarRenovar()
+      .whenComplete(() => _renovacionEnCurso = null);
 
   Future<bool> _intentarRenovar() async {
     final refreshToken = await _leerRefreshToken();
@@ -309,7 +312,8 @@ class AuthProvider extends ChangeNotifier {
       // peticiones): la sesión sigue siendo válida. No se saca al usuario a
       // la pantalla de acceso; la petición falla con un mensaje de conexión
       // y la próxima vuelve a intentar renovar con el mismo refresh token.
-      final temporal = statusCode == null ||
+      final temporal =
+          statusCode == null ||
           statusCode >= 500 ||
           statusCode == 408 ||
           statusCode == 429;
@@ -349,10 +353,10 @@ class AuthProvider extends ChangeNotifier {
     String codigo,
     String password,
   ) async {
-    await _api.post('/auth/verificar', body: {
-      'correo': correo.trim(),
-      'codigo': codigo.trim(),
-    });
+    await _api.post(
+      '/auth/verificar',
+      body: {'correo': correo.trim(), 'codigo': codigo.trim()},
+    );
     await login(correo, password);
   }
 
@@ -364,8 +368,10 @@ class AuthProvider extends ChangeNotifier {
   /// Pide al backend que envíe un código de recuperación de contraseña al
   /// correo. Por seguridad responde igual exista o no la cuenta.
   Future<void> solicitarRecuperacion(String correo) async {
-    await _api.post('/auth/solicitar-recuperacion',
-        body: {'correo': correo.trim()});
+    await _api.post(
+      '/auth/solicitar-recuperacion',
+      body: {'correo': correo.trim()},
+    );
   }
 
   /// Restablece la contraseña (sin sesión) con el código recibido por correo.
@@ -374,11 +380,14 @@ class AuthProvider extends ChangeNotifier {
     String codigo,
     String nuevaPassword,
   ) async {
-    await _api.post('/auth/resetear-password', body: {
-      'correo': correo.trim(),
-      'codigo': codigo.trim(),
-      'nuevaPassword': nuevaPassword,
-    });
+    await _api.post(
+      '/auth/resetear-password',
+      body: {
+        'correo': correo.trim(),
+        'codigo': codigo.trim(),
+        'nuevaPassword': nuevaPassword,
+      },
+    );
   }
 
   /// Cambia la contraseña de la cuenta ya autenticada. Se usa para el cambio

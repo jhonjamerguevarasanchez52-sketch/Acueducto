@@ -16,12 +16,16 @@ class ApiConfig {
 
   static const String _remoteUrl = 'https://hidro-app.onrender.com/api';
 
-  static const String _override =
-      String.fromEnvironment('API_BASE_URL', defaultValue: '');
+  static const String _override = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
   // Solo para probar un build de release contra un servidor en la red local:
   // hay que pedirlo explícitamente con --dart-define=ALLOW_INSECURE_LOCAL_API=true.
-  static const bool _allowInsecureLocalApi =
-      bool.fromEnvironment('ALLOW_INSECURE_LOCAL_API', defaultValue: false);
+  static const bool _allowInsecureLocalApi = bool.fromEnvironment(
+    'ALLOW_INSECURE_LOCAL_API',
+    defaultValue: false,
+  );
 
   static String get baseUrl {
     // 1. Si se pasó --dart-define, tiene prioridad (validado en release).
@@ -29,7 +33,9 @@ class ApiConfig {
       if (kReleaseMode &&
           !_override.startsWith('https://') &&
           !(_allowInsecureLocalApi && _isPrivateHttpUrl(_override))) {
-        throw StateError('API_BASE_URL debe ser https:// en un build de release.');
+        throw StateError(
+          'API_BASE_URL debe ser https:// en un build de release.',
+        );
       }
       return _override;
     }

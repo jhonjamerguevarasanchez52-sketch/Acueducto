@@ -164,7 +164,9 @@ class AveriaCard extends StatelessWidget {
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: () => onCambiarEstado!(
-                        averia.estado == 'en_proceso' ? 'resuelta' : 'en_proceso',
+                        averia.estado == 'en_proceso'
+                            ? 'resuelta'
+                            : 'en_proceso',
                       ),
                       icon: Icon(
                         averia.estado == 'en_proceso'

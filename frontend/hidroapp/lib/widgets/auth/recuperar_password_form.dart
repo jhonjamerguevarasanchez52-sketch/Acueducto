@@ -46,9 +46,7 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
   }
 
   void _mensaje(String texto) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(texto)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
   }
 
   Future<void> _enviarCodigo() async {
@@ -56,9 +54,9 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
     FocusScope.of(context).unfocus();
     setState(() => _cargando = true);
     try {
-      await context
-          .read<AuthProvider>()
-          .solicitarRecuperacion(_correoCtrl.text);
+      await context.read<AuthProvider>().solicitarRecuperacion(
+        _correoCtrl.text,
+      );
       if (!mounted) return;
       setState(() => _codigoEnviado = true);
       _mensaje('Si el correo está registrado, te enviamos un código.');
@@ -73,9 +71,9 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
     if (_reenviando) return;
     setState(() => _reenviando = true);
     try {
-      await context
-          .read<AuthProvider>()
-          .solicitarRecuperacion(_correoCtrl.text);
+      await context.read<AuthProvider>().solicitarRecuperacion(
+        _correoCtrl.text,
+      );
       if (mounted) _mensaje('Te enviamos un código nuevo.');
     } on ApiException catch (e) {
       if (mounted) _mensaje(e.message);
@@ -90,10 +88,10 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
     setState(() => _cargando = true);
     try {
       await context.read<AuthProvider>().resetearPassword(
-            _correoCtrl.text,
-            _codigoCtrl.text,
-            _passwordCtrl.text,
-          );
+        _correoCtrl.text,
+        _codigoCtrl.text,
+        _passwordCtrl.text,
+      );
       if (!mounted) return;
       _mensaje('Contraseña actualizada. Ya puedes iniciar sesión.');
       Navigator.of(context).pop();
@@ -115,7 +113,9 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              _codigoEnviado ? 'Crea tu nueva contraseña' : '¿Olvidaste tu contraseña?',
+              _codigoEnviado
+                  ? 'Crea tu nueva contraseña'
+                  : '¿Olvidaste tu contraseña?',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -133,7 +133,10 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
               Text.rich(
                 TextSpan(
                   style: const TextStyle(
-                      fontSize: 13.5, color: authMuted, height: 1.4),
+                    fontSize: 13.5,
+                    color: authMuted,
+                    height: 1.4,
+                  ),
                   children: [
                     const TextSpan(text: 'Enviamos un código a\n'),
                     TextSpan(
@@ -156,119 +159,115 @@ class _RecuperarPasswordFormState extends State<RecuperarPasswordForm> {
   }
 
   List<Widget> _pasoCorreo() => [
-        authFieldLabel(context, 'CORREO ELECTRÓNICO'),
-        TextFormField(
-          controller: _correoCtrl,
-          keyboardType: TextInputType.emailAddress,
-          autocorrect: false,
-          textInputAction: TextInputAction.done,
-          onFieldSubmitted: (_) => _cargando ? null : _enviarCodigo(),
-          decoration: authInputDecoration(
-            context,
-            hint: 'tucorreo@ejemplo.com',
-            icon: LucideIcons.mail,
-          ),
-          validator: (v) {
-            final t = v?.trim() ?? '';
-            if (t.isEmpty) return 'Ingresa tu correo';
-            if (!_correoValido.hasMatch(t)) return 'Correo no válido';
-            return null;
-          },
-        ),
-        const SizedBox(height: 24),
-        FilledButton(
-          onPressed: _cargando ? null : _enviarCodigo,
-          child: _cargando ? const _Cargando() : const Text('Enviar código'),
-        ),
-      ];
+    authFieldLabel(context, 'CORREO ELECTRÓNICO'),
+    TextFormField(
+      controller: _correoCtrl,
+      keyboardType: TextInputType.emailAddress,
+      autocorrect: false,
+      textInputAction: TextInputAction.done,
+      onFieldSubmitted: (_) => _cargando ? null : _enviarCodigo(),
+      decoration: authInputDecoration(
+        context,
+        hint: 'tucorreo@ejemplo.com',
+        icon: LucideIcons.mail,
+      ),
+      validator: (v) {
+        final t = v?.trim() ?? '';
+        if (t.isEmpty) return 'Ingresa tu correo';
+        if (!_correoValido.hasMatch(t)) return 'Correo no válido';
+        return null;
+      },
+    ),
+    const SizedBox(height: 24),
+    FilledButton(
+      onPressed: _cargando ? null : _enviarCodigo,
+      child: _cargando ? const _Cargando() : const Text('Enviar código'),
+    ),
+  ];
 
   List<Widget> _pasoPassword() => [
-        authFieldLabel(context, 'CÓDIGO DE RECUPERACIÓN'),
-        TextFormField(
-          controller: _codigoCtrl,
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.next,
-          maxLength: 6,
-          autofocus: true,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(6),
-          ],
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 8,
+    authFieldLabel(context, 'CÓDIGO DE RECUPERACIÓN'),
+    TextFormField(
+      controller: _codigoCtrl,
+      keyboardType: TextInputType.number,
+      textInputAction: TextInputAction.next,
+      maxLength: 6,
+      autofocus: true,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(6),
+      ],
+      style: const TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 8,
+      ),
+      textAlign: TextAlign.center,
+      decoration: authInputDecoration(context, hint: '000000', counterText: ''),
+      validator: (v) =>
+          (v?.trim().length ?? 0) != 6 ? 'Ingresa los 6 dígitos' : null,
+    ),
+    const SizedBox(height: 16),
+    authFieldLabel(context, 'NUEVA CONTRASEÑA'),
+    TextFormField(
+      controller: _passwordCtrl,
+      obscureText: !_verPassword,
+      textInputAction: TextInputAction.next,
+      decoration: authInputDecoration(
+        context,
+        hint: 'Mínimo 8 caracteres',
+        icon: LucideIcons.lock,
+        suffix: IconButton(
+          splashRadius: 20,
+          icon: Icon(
+            _verPassword ? LucideIcons.eyeOff : LucideIcons.eye,
+            color: authMuted,
+            size: 20,
           ),
-          textAlign: TextAlign.center,
-          decoration: authInputDecoration(context, hint: '000000', counterText: ''),
-          validator: (v) =>
-              (v?.trim().length ?? 0) != 6 ? 'Ingresa los 6 dígitos' : null,
+          onPressed: () => setState(() => _verPassword = !_verPassword),
         ),
-        const SizedBox(height: 16),
-        authFieldLabel(context, 'NUEVA CONTRASEÑA'),
-        TextFormField(
-          controller: _passwordCtrl,
-          obscureText: !_verPassword,
-          textInputAction: TextInputAction.next,
-          decoration: authInputDecoration(
-            context,
-            hint: 'Mínimo 8 caracteres',
-            icon: LucideIcons.lock,
-            suffix: IconButton(
-              splashRadius: 20,
-              icon: Icon(
-                _verPassword
-                    ? LucideIcons.eyeOff
-                    : LucideIcons.eye,
-                color: authMuted,
-                size: 20,
-              ),
-              onPressed: () => setState(() => _verPassword = !_verPassword),
-            ),
-          ),
-          validator: (v) => (v == null || v.length < 8)
-              ? 'Debe tener al menos 8 caracteres'
-              : null,
-        ),
-        const SizedBox(height: 16),
-        authFieldLabel(context, 'CONFIRMAR CONTRASEÑA'),
-        TextFormField(
-          controller: _confirmarCtrl,
-          obscureText: !_verPassword,
-          textInputAction: TextInputAction.done,
-          onFieldSubmitted: (_) => _cargando ? null : _cambiarPassword(),
-          decoration: authInputDecoration(
-            context,
-            hint: 'Repite la contraseña',
-            icon: LucideIcons.lock,
-          ),
-          validator: (v) => v != _passwordCtrl.text
-              ? 'Las contraseñas no coinciden'
-              : null,
-        ),
-        const SizedBox(height: 24),
-        FilledButton(
-          onPressed: _cargando ? null : _cambiarPassword,
-          child:
-              _cargando ? const _Cargando() : const Text('Cambiar contraseña'),
-        ),
-        const SizedBox(height: 4),
-        TextButton(
-          onPressed: _reenviando ? null : _reenviar,
-          style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
-          child: Text(_reenviando ? 'Enviando…' : 'Reenviar código'),
-        ),
-        TextButton(
-          onPressed: _cargando
-              ? null
-              : () => setState(() {
-                    _codigoEnviado = false;
-                    _codigoCtrl.clear();
-                  }),
-          style: TextButton.styleFrom(foregroundColor: authMuted),
-          child: const Text('Usar otro correo'),
-        ),
-      ];
+      ),
+      validator: (v) => (v == null || v.length < 8)
+          ? 'Debe tener al menos 8 caracteres'
+          : null,
+    ),
+    const SizedBox(height: 16),
+    authFieldLabel(context, 'CONFIRMAR CONTRASEÑA'),
+    TextFormField(
+      controller: _confirmarCtrl,
+      obscureText: !_verPassword,
+      textInputAction: TextInputAction.done,
+      onFieldSubmitted: (_) => _cargando ? null : _cambiarPassword(),
+      decoration: authInputDecoration(
+        context,
+        hint: 'Repite la contraseña',
+        icon: LucideIcons.lock,
+      ),
+      validator: (v) =>
+          v != _passwordCtrl.text ? 'Las contraseñas no coinciden' : null,
+    ),
+    const SizedBox(height: 24),
+    FilledButton(
+      onPressed: _cargando ? null : _cambiarPassword,
+      child: _cargando ? const _Cargando() : const Text('Cambiar contraseña'),
+    ),
+    const SizedBox(height: 4),
+    TextButton(
+      onPressed: _reenviando ? null : _reenviar,
+      style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
+      child: Text(_reenviando ? 'Enviando…' : 'Reenviar código'),
+    ),
+    TextButton(
+      onPressed: _cargando
+          ? null
+          : () => setState(() {
+              _codigoEnviado = false;
+              _codigoCtrl.clear();
+            }),
+      style: TextButton.styleFrom(foregroundColor: authMuted),
+      child: const Text('Usar otro correo'),
+    ),
+  ];
 }
 
 class _Cargando extends StatelessWidget {
@@ -276,8 +275,8 @@ class _Cargando extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const SizedBox(
-        height: 22,
-        width: 22,
-        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-      );
+    height: 22,
+    width: 22,
+    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+  );
 }

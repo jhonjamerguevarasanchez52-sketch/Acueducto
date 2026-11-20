@@ -85,7 +85,8 @@ class _AveriaAudioTileState extends State<AveriaAudioTile> {
         final limite = DateTime.now().add(const Duration(hours: 72));
         setState(() {
           _escuchado = true;
-          if (_expiraEn == null || _expiraEn!.isAfter(limite)) _expiraEn = limite;
+          if (_expiraEn == null || _expiraEn!.isAfter(limite))
+            _expiraEn = limite;
         });
       }
       await reproductor.play(UrlSource(url));
@@ -108,7 +109,8 @@ class _AveriaAudioTileState extends State<AveriaAudioTile> {
   Widget build(BuildContext context) {
     final colores = AppColors.of(context);
     final duracion = widget.audio.duracionS;
-    final etiqueta = 'Audio del usuario · '
+    final etiqueta =
+        'Audio del usuario · '
         '${duracion ~/ 60}:${(duracion % 60).toString().padLeft(2, '0')}';
 
     return Container(
@@ -149,7 +151,10 @@ class _AveriaAudioTileState extends State<AveriaAudioTile> {
               children: [
                 Text(
                   etiqueta,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 Text(
                   _disponible

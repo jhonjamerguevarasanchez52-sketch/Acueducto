@@ -118,7 +118,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
       decoration: InputDecoration(
         labelText: etiqueta,
         suffixIcon: bloqueado ? const Icon(LucideIcons.lock, size: 18) : null,
-        helperText: bloqueado ? 'Lo cambia el administrador' : 'Escríbelo con cuidado: luego solo lo cambia el administrador',
+        helperText: bloqueado
+            ? 'Lo cambia el administrador'
+            : 'Escríbelo con cuidado: luego solo lo cambia el administrador',
         helperMaxLines: 2,
       ),
     );
@@ -165,10 +167,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                   inputFormatters: _limiteCampo,
                   textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(labelText: 'Nombre'),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'Requerido'
-                          : validarSinGroserias(v),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Requerido'
+                      : validarSinGroserias(v),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -176,10 +177,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                   inputFormatters: _limiteCampo,
                   textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(labelText: 'Apellido'),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'Requerido'
-                          : validarSinGroserias(v),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Requerido'
+                      : validarSinGroserias(v),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -223,7 +223,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                           height: 22,
                           width: 22,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Text('Guardar cambios'),
                 ),

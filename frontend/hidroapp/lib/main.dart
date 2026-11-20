@@ -53,9 +53,7 @@ class AuthGate extends StatelessWidget {
 
     switch (auth.status) {
       case AuthStatus.unknown:
-        return const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        );
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
       case AuthStatus.authenticated:
         // Cuentas creadas por un administrador (incluye siempre al
         // fontanero, que nunca se autorregistra) arrancan con una

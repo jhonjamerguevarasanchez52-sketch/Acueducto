@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// lo persiste para que no haya que elegirlo de nuevo en cada sesión.
 class ThemeProvider extends ChangeNotifier {
   ThemeProvider({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage() {
+    : _storage = storage ?? const FlutterSecureStorage() {
     _cargar();
   }
 

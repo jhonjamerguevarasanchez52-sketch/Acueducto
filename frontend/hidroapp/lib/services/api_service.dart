@@ -86,8 +86,8 @@ class ApiService {
   /// al instante sin esperar al servidor (que tiene la misma regla).
   static Future<dynamic>? _rechazarOfensivo(Object? body) =>
       cuerpoConLenguajeOfensivo(body)
-          ? Future.error(ApiException(mensajeLenguajeOfensivo, statusCode: 400))
-          : null;
+      ? Future.error(ApiException(mensajeLenguajeOfensivo, statusCode: 400))
+      : null;
 
   Future<dynamic> post(String path, {Object? body}) =>
       _rechazarOfensivo(body) ??
@@ -211,7 +211,8 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      if (kDebugMode) debugPrint('[ApiService] no se pudo renovar la sesión: $e');
+      if (kDebugMode)
+        debugPrint('[ApiService] no se pudo renovar la sesión: $e');
       return false;
     }
   }

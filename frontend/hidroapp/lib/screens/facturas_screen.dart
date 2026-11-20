@@ -75,11 +75,13 @@ class _FacturasScreenState extends State<FacturasScreen>
       _refrescar();
     } catch (_) {
       if (!mounted) return;
-      AppSnackbar.error(context, 'No se pudo completar el pago. Intenta de nuevo.');
+      AppSnackbar.error(
+        context,
+        'No se pudo completar el pago. Intenta de nuevo.',
+      );
       _refrescar();
     }
   }
-
 
   void _verPagos() {
     Navigator.of(

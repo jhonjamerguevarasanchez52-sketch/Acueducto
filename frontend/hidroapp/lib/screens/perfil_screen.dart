@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
@@ -18,9 +18,9 @@ class PerfilScreen extends StatelessWidget {
   const PerfilScreen({super.key});
 
   Future<void> _editarPerfil(BuildContext context) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const EditarPerfilScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const EditarPerfilScreen()));
   }
 
   Future<void> _cerrarSesion(BuildContext context) async {
@@ -47,7 +47,10 @@ class PerfilScreen extends StatelessWidget {
       await context.read<AuthProvider>().logout();
     } catch (_) {
       if (context.mounted) {
-        AppSnackbar.error(context, 'No se pudo cerrar sesión. Intenta de nuevo.');
+        AppSnackbar.error(
+          context,
+          'No se pudo cerrar sesión. Intenta de nuevo.',
+        );
       }
     }
   }
@@ -70,14 +73,18 @@ class PerfilScreen extends StatelessWidget {
                 CircleAvatar(
                   radius: 40,
                   backgroundColor: colores.chipBackground,
-                  child: const Icon(LucideIcons.user,
-                      color: Color.fromARGB(255, 91, 153, 247), size: 44),
+                  child: const Icon(
+                    LucideIcons.user,
+                    color: Color.fromARGB(255, 91, 153, 247),
+                    size: 44,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   perfil?.nombreCompleto ?? 'Usuario',
-                  style: textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
@@ -87,8 +94,10 @@ class PerfilScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: colores.chipBackground,
                     borderRadius: BorderRadius.circular(20),
@@ -145,18 +154,25 @@ class PerfilScreen extends StatelessWidget {
                 children: [
                   Text(
                     'Ajustes',
-                    style: textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     'Apariencia',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: colores.secondaryText),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: colores.secondaryText,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Elige cómo se ve la app en este dispositivo.',
-                    style: TextStyle(fontSize: 12.5, color: colores.secondaryText),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: colores.secondaryText,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   SegmentedButton<ThemeMode>(
@@ -258,14 +274,17 @@ class _AjusteBiometria extends StatefulWidget {
 }
 
 class _AjusteBiometriaState extends State<_AjusteBiometria> {
-  late final Future<bool> _soportada =
-      context.read<AuthProvider>().deviceSupportsBiometrics();
+  late final Future<bool> _soportada = context
+      .read<AuthProvider>()
+      .deviceSupportsBiometrics();
   bool _cambiando = false;
 
   Future<void> _cambiar(bool activar) async {
     setState(() => _cambiando = true);
     try {
-      final hecho = await context.read<AuthProvider>().setBiometricEnabled(activar);
+      final hecho = await context.read<AuthProvider>().setBiometricEnabled(
+        activar,
+      );
       if (!mounted || !hecho) return;
       AppSnackbar.success(
         context,
@@ -276,7 +295,11 @@ class _AjusteBiometriaState extends State<_AjusteBiometria> {
     } on ApiException catch (e) {
       if (mounted) AppSnackbar.error(context, e.message);
     } catch (_) {
-      if (mounted) AppSnackbar.error(context, 'No se pudo validar la biometría. Intenta de nuevo.');
+      if (mounted)
+        AppSnackbar.error(
+          context,
+          'No se pudo validar la biometría. Intenta de nuevo.',
+        );
     } finally {
       if (mounted) setState(() => _cambiando = false);
     }
@@ -321,12 +344,17 @@ class _Dato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final texto = (valor == null || valor!.trim().isEmpty) ? 'Sin registrar' : valor!;
+    final texto = (valor == null || valor!.trim().isEmpty)
+        ? 'Sin registrar'
+        : valor!;
     final sinDato = texto == 'Sin registrar';
     final colores = AppColors.of(context);
     return ListTile(
       leading: Icon(icono, color: colores.info),
-      title: Text(etiqueta, style: TextStyle(fontSize: 13, color: colores.secondaryText)),
+      title: Text(
+        etiqueta,
+        style: TextStyle(fontSize: 13, color: colores.secondaryText),
+      ),
       subtitle: Text(
         texto,
         style: TextStyle(

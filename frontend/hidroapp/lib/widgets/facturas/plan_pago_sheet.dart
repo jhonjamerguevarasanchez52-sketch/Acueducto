@@ -81,7 +81,8 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
   List<Map<String, dynamic>> get _otras =>
       widget.opciones.where((o) => !identical(o, _principal)).toList();
 
-  void _elegir(Map<String, dynamic> opcion) => Navigator.of(context).pop(opcion);
+  void _elegir(Map<String, dynamic> opcion) =>
+      Navigator.of(context).pop(opcion);
 
   /// Un plan bloqueado explica por qué y ofrece pagar solo la mensualidad.
   Future<void> _explicarBloqueo(Map<String, dynamic> opcion) async {
@@ -91,7 +92,9 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
       builder: (ctx) => AlertDialog(
         scrollable: true,
         icon: const Icon(LucideIcons.lock),
-        title: Text('El plan ${nombrePlanPago(meses).toLowerCase()} no está disponible'),
+        title: Text(
+          'El plan ${nombrePlanPago(meses).toLowerCase()} no está disponible',
+        ),
         content: Text(
           opcion['motivoNoDisponible']?.toString() ??
               'Este plan incluye meses que ya tienen su propia factura.',
@@ -158,7 +161,9 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
     final fin = '${opcion['periodoFin'] ?? ''}';
     final servicio = _num(opcion['valorServicio']);
     final total = _num(opcion['totalCobrar']);
-    final proxima = DateTime.tryParse('${opcion['fechaProximaFacturacion'] ?? ''}');
+    final proxima = DateTime.tryParse(
+      '${opcion['fechaProximaFacturacion'] ?? ''}',
+    );
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -170,7 +175,10 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
               meses > 1
                   ? '${nombrePlanPago(meses)}: ${Formato.periodo(inicio)} – ${Formato.periodo(fin)}'
                   : 'Mensualidad de ${Formato.periodo(inicio)}',
-              style: TextStyle(color: colores.secondaryText, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: colores.secondaryText,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
@@ -179,7 +187,10 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
             ),
             Text(
               'Con Wompi: ${Formato.pesos(total)} (comisión ${Formato.pesos(_num(opcion['cargoWompi']))})',
-              style: TextStyle(color: colores.info, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: colores.info,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             if (opcion['proximoPeriodo'] != null && proxima != null) ...[
               const SizedBox(height: 4),
@@ -206,7 +217,12 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
                       onPressed: () => setState(() {
                         _verMas = !_verMas;
                       }),
-                      icon: Icon(_verMas ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18),
+                      icon: Icon(
+                        _verMas
+                            ? LucideIcons.chevronUp
+                            : LucideIcons.chevronDown,
+                        size: 18,
+                      ),
                       label: const Text('Más pagos'),
                     ),
                   ),
@@ -223,7 +239,9 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
     final meses = _meses(opcion);
     final inicio = '${opcion['periodoInicio'] ?? ''}';
     final fin = '${opcion['periodoFin'] ?? ''}';
-    final proxima = DateTime.tryParse('${opcion['fechaProximaFacturacion'] ?? ''}');
+    final proxima = DateTime.tryParse(
+      '${opcion['fechaProximaFacturacion'] ?? ''}',
+    );
     final servicio = _num(opcion['valorServicio']);
     final total = _num(opcion['totalCobrar']);
     // Respuestas antiguas del backend no traen el campo: se asume disponible.
@@ -247,14 +265,21 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
                     Expanded(
                       child: Text(
                         '${nombrePlanPago(meses)} · ${Formato.pesos(servicio)}',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    Icon(disponible ? LucideIcons.chevronRight : LucideIcons.lock),
+                    Icon(
+                      disponible ? LucideIcons.chevronRight : LucideIcons.lock,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('$meses mensualidades: ${Formato.periodo(inicio)} – ${Formato.periodo(fin)}'),
+                Text(
+                  '$meses mensualidades: ${Formato.periodo(inicio)} – ${Formato.periodo(fin)}',
+                ),
                 if (opcion['proximoPeriodo'] != null && proxima != null)
                   Text(
                     'Próxima factura: ${Formato.periodo('${opcion['proximoPeriodo']}')} · '
@@ -263,11 +288,20 @@ class _PlanPagoSheetState extends State<_PlanPagoSheet> {
                 const SizedBox(height: 6),
                 Text(
                   'Total con Wompi: ${Formato.pesos(total)}',
-                  style: TextStyle(color: colores.info, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: colores.info,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 if (!disponible && motivo != null) ...[
                   const SizedBox(height: 4),
-                  Text(motivo, style: TextStyle(color: colores.secondaryText, fontSize: 12)),
+                  Text(
+                    motivo,
+                    style: TextStyle(
+                      color: colores.secondaryText,
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ],
             ),

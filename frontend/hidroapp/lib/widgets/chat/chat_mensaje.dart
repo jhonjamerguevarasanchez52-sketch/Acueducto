@@ -10,9 +10,9 @@ class ChatMensaje {
     this.averiaPorConfirmar,
   });
   ChatMensaje.usuario(String texto, {bool deAudio = false})
-      : this(ChatAutor.usuario, texto, deAudio: deAudio);
+    : this(ChatAutor.usuario, texto, deAudio: deAudio);
   ChatMensaje.asistente(String texto, {String? averiaPorConfirmar})
-      : this(ChatAutor.asistente, texto, averiaPorConfirmar: averiaPorConfirmar);
+    : this(ChatAutor.asistente, texto, averiaPorConfirmar: averiaPorConfirmar);
   ChatMensaje.error(String texto) : this(ChatAutor.error, texto);
 
   final ChatAutor autor;

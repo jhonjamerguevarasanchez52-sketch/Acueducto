@@ -89,7 +89,10 @@ class _OlvidePasswordScreenState extends State<OlvidePasswordScreen> {
       if (mounted) AppSnackbar.error(context, e.message);
     } catch (_) {
       if (mounted) {
-        AppSnackbar.error(context, 'No se pudo enviar el código. Intenta de nuevo.');
+        AppSnackbar.error(
+          context,
+          'No se pudo enviar el código. Intenta de nuevo.',
+        );
       }
     } finally {
       if (mounted) setState(() => _cargando = false);
@@ -111,7 +114,10 @@ class _OlvidePasswordScreenState extends State<OlvidePasswordScreen> {
         },
       );
       if (!mounted) return;
-      AppSnackbar.success(context, 'Contraseña actualizada. Ya puedes ingresar.');
+      AppSnackbar.success(
+        context,
+        'Contraseña actualizada. Ya puedes ingresar.',
+      );
       Navigator.of(context).pop();
     } on ApiException catch (e) {
       if (mounted) AppSnackbar.error(context, e.message);
@@ -147,17 +153,20 @@ class _OlvidePasswordScreenState extends State<OlvidePasswordScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                _codigoEnviado ? 'Revisa tu correo' : '¿Olvidaste tu contraseña?',
-                style: tema.textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                _codigoEnviado
+                    ? 'Revisa tu correo'
+                    : '¿Olvidaste tu contraseña?',
+                style: tema.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 _codigoEnviado
                     ? 'Te enviamos un código a ${_correo.text.trim()}. '
-                        'Ingrésalo junto con tu nueva contraseña.'
+                          'Ingrésalo junto con tu nueva contraseña.'
                     : 'Escribe el correo con el que te registraste y te '
-                        'enviaremos un código para crear una contraseña nueva.',
+                          'enviaremos un código para crear una contraseña nueva.',
                 style: tema.textTheme.bodyMedium,
               ),
               const SizedBox(height: 24),
@@ -295,9 +304,9 @@ class _OlvidePasswordScreenState extends State<OlvidePasswordScreen> {
             onPressed: _cargando
                 ? null
                 : () => setState(() {
-                      _codigoEnviado = false;
-                      _codigo.clear();
-                    }),
+                    _codigoEnviado = false;
+                    _codigo.clear();
+                  }),
             child: const Text('Usar otro correo'),
           ),
         ],
