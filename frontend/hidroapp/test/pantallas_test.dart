@@ -133,6 +133,16 @@ void main() {
           // Abrir "Pagar" en cada factura pendiente muestra los planes reales.
           await tester.tap(find.text('Factura').last);
           await asentar(tester);
+          // La primera factura de los datos de prueba tiene un recibo en
+          // revisión: muestra el aviso en vez del botón. En un teléfono
+          // pequeño el siguiente "Pagar" queda fuera de pantalla.
+          final pagar = find.widgetWithText(FilledButton, 'Pagar');
+          for (var intento = 0;
+              rol == 'usuario' && pagar.evaluate().isEmpty && intento < 10;
+              intento++) {
+            await tester.drag(find.byType(Scrollable).last, const Offset(0, -200));
+            await asentar(tester);
+          }
           var abiertas = 0;
           for (var i = 0; i < 4; i++) {
             final botones = find.widgetWithText(FilledButton, 'Pagar').evaluate().toList();

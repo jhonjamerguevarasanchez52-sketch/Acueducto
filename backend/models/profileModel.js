@@ -19,9 +19,9 @@ function findByEmail(correo, columns) {
   return supabaseAdmin.from(TABLE).select(columns).eq('correo', correo).single();
 }
 
-// Busca por cédula normalizada (solo dígitos) para resolver el correo de Auth.
+// Un perfil por cédula (ya normalizada: solo dígitos).
 function findByCedula(cedula, columns) {
-  return supabaseAdmin.from(TABLE).select(columns).eq('cedula', cedula).single();
+  return supabaseAdmin.from(TABLE).select(columns).eq('cedula', cedula).maybeSingle();
 }
 
 // Listado con filtros opcionales { rol, activo: 'true' | 'false' } y paginación { limit, offset }.

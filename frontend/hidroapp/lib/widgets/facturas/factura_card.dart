@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/factura.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formato.dart';
+import '../core/aviso_pago_en_curso.dart';
 import '../core/fila_detalle.dart';
 import '../core/hidro_logo.dart';
 import '../core/mensaje_estado.dart';
@@ -22,6 +23,19 @@ class FacturaCard extends StatelessWidget {
   final Factura factura;
   final VoidCallback onPagar;
   final VoidCallback onVerPagos;
+
+  /// "FACTURA N.º 19 · PLAN ANUAL", "CUOTA EXTRAORDINARIA N.º 20"... El número
+  /// es el mismo que llega en los correos.
+  String get _encabezado {
+    final numero = factura.numeroFactura == null
+        ? ''
+        : ' N.º ${factura.numeroFactura}';
+    if (factura.esExtraordinaria) return 'CUOTA EXTRAORDINARIA$numero';
+    final plan = factura.mesesCubiertos > 1
+        ? ' · PLAN ${nombrePlanPago(factura.mesesCubiertos).toUpperCase()}'
+        : '';
+    return 'FACTURA DE SERVICIO$numero$plan';
+  }
 
   ({String texto, Color color}) _estado(AppColors colores) {
     switch (factura.estado) {
@@ -91,9 +105,7 @@ class FacturaCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  factura.mesesCubiertos > 1
-                      ? 'FACTURA DE SERVICIO · PLAN ${nombrePlanPago(factura.mesesCubiertos).toUpperCase()}'
-                      : 'FACTURA DE SERVICIO',
+                  _encabezado,
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 11,
@@ -224,32 +236,38 @@ class FacturaCard extends StatelessWidget {
                               'Medio de pago: ${Formato.etiqueta(pago.medioPagoWompi)}',
                         ),
                     ],
+                    if (factura.tienePagoEnCurso) ...[
+                      const SizedBox(height: 14),
+                      const AvisoPagoEnCurso(),
+                    ],
                     if (factura.estaPendiente) ...[
                       const SizedBox(height: 14),
                       Row(
                         children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: onPagar,
-                              icon: const Icon(
-                                LucideIcons.banknote,
-                                size: 18,
-                              ),
-                              label: const Text('Pagar'),
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(44),
-                                backgroundColor: const Color(0xFF007A55),
-                                foregroundColor: Colors.white,
-                                elevation: 2,
-                                shadowColor: const Color(0xFF007A55),
-                                textStyle: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
+                          if (!factura.tienePagoEnCurso) ...[
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: onPagar,
+                                icon: const Icon(
+                                  LucideIcons.banknote,
+                                  size: 18,
+                                ),
+                                label: const Text('Pagar'),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(44),
+                                  backgroundColor: const Color(0xFF007A55),
+                                  foregroundColor: Colors.white,
+                                  elevation: 2,
+                                  shadowColor: const Color(0xFF007A55),
+                                  textStyle: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
+                            const SizedBox(width: 10),
+                          ],
                           Expanded(
                             child: OutlinedButton(
                               onPressed: onVerPagos,

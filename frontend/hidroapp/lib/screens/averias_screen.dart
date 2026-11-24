@@ -131,10 +131,9 @@ class _AveriasScreenState extends State<AveriasScreen> {
   /// Si el archivo ya se borró (410) avisa y devuelve null.
   Future<String?> _obtenerUrlAudio(Averia averia, AveriaAudio audio) async {
     try {
-      final data = await context
-          .read<AuthProvider>()
-          .api
-          .get('/averias/${averia.id}/audios/${audio.id}');
+      final data = await context.read<AuthProvider>().api.get(
+        '/averias/${averia.id}/audios/${audio.id}',
+      );
       final url = data is Map ? data['url'] : null;
       return url is String ? url : null;
     } on ApiException catch (e) {
@@ -348,7 +347,11 @@ class _AveriaReportadaDialogState extends State<_AveriaReportadaDialog>
             child: CircleAvatar(
               radius: 34,
               backgroundColor: colores.success.withValues(alpha: 0.14),
-              child: Icon(LucideIcons.droplet, size: 38, color: colores.success),
+              child: Icon(
+                LucideIcons.droplet,
+                size: 38,
+                color: colores.success,
+              ),
             ),
           ),
           const SizedBox(height: 16),

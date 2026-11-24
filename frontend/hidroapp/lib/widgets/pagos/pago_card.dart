@@ -10,9 +10,19 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 /// Tarjeta de un pago del historial: monto, método, estado de confirmación y,
 /// mientras no esté confirmado, un botón para volver a intentarlo.
 class PagoCard extends StatelessWidget {
-  const PagoCard({super.key, required this.pago, required this.onPagar});
+  const PagoCard({
+    super.key,
+    required this.pago,
+    required this.onPagar,
+    this.puedeReintentar = true,
+  });
 
   final Pago pago;
+
+  /// `false` si este intento no es el último de su factura o si la factura ya
+  /// tiene otro pago confirmado o en curso (ver [Pago.reintentables]): en ese
+  /// caso el servidor rechazaría el nuevo pago.
+  final bool puedeReintentar;
 
   /// Registra un nuevo intento de pago para esta factura. Solo tiene sentido
   /// mientras el pago no esté confirmado.
@@ -37,7 +47,11 @@ class PagoCard extends StatelessWidget {
       );
     }
     if (pago.rechazado) {
-      return (texto: 'Rechazado', color: colores.danger, icono: LucideIcons.circleX);
+      return (
+        texto: 'Rechazado',
+        color: colores.danger,
+        icono: LucideIcons.circleX,
+      );
     }
     if (pago.requiereRevision) {
       return (
@@ -181,7 +195,9 @@ class PagoCard extends StatelessWidget {
                 ),
               ),
             ],
-            if (!pago.confirmado && (pago.rechazado || pago.abandonado())) ...[
+            if (puedeReintentar &&
+                !pago.confirmado &&
+                (pago.rechazado || pago.abandonado())) ...[
               const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: onPagar,

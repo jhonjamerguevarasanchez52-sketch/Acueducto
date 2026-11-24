@@ -6,6 +6,9 @@ const { obtenerConfiguracionPublica } = require('../utils/wompiConfig');
 
 const EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET;
 
+// Wompi cobró, pero el pago no se aplicó a la factura: requiere devolución.
+const ESTADOS_COBRADOS_SIN_APLICAR = new Set(['APPROVED_NO_APLICADO', 'MONTO_INVALIDO']);
+
 /**
  * Verifica la firma del evento de Wompi.
  * checksum = SHA256( valores de signature.properties, en orden
@@ -167,6 +170,14 @@ async function webhook(req, res) {
           return res.status(500).json({ error: 'No se pudo enviar el comprobante del pago' });
         }
       }
+    } else if (ESTADOS_COBRADOS_SIN_APLICAR.has(pago.estado_wompi)) {
+      // Wompi ya cobró este pago (está marcado para devolver el dinero). Un
+      // evento tardío o fuera de orden (PENDING, DECLINED...) no debe borrar
+      // esa marca: el administrador dejaría de verlo como cobro por devolver.
+      console.warn(
+        `[wompi] se ignoró el estado ${estadoWompi} para el pago ${pago.id}, que ya está marcado como ${pago.estado_wompi}.`
+      );
+      return res.status(200).json({ received: true, ignored: true });
     } else {
       const { error: updateError } = await paymentModel.update(pago.id, {
         estado_wompi: estadoWompi,

@@ -84,7 +84,31 @@ class AuthProvider extends ChangeNotifier {
   bool get debeCambiarPassword => _profile?.debeCambiarPassword ?? false;
 
   /// Se llama al arrancar la app: intenta restaurar la sesión guardada.
+  ///
+  /// Si el almacenamiento seguro del teléfono falla al leer (llave del
+  /// sistema perdida o datos restaurados de otro equipo), se descarta la
+  /// sesión guardada y se muestra el login. Sin esto la excepción dejaba la
+  /// app para siempre en la pantalla de carga.
   Future<void> bootstrap() async {
+    try {
+      await _restaurarSesion();
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[AuthProvider] sesión guardada ilegible: $error');
+      }
+      try {
+        await _clear();
+      } catch (_) {
+        // Si ni siquiera se puede borrar, igual se sigue al login.
+      }
+      _api.authToken = null;
+      _profile = null;
+      _biometricEnabled = false;
+      _setStatus(AuthStatus.unauthenticated);
+    }
+  }
+
+  Future<void> _restaurarSesion() async {
     _biometricEnabled = await _storage.read(_biometricEnabledKey) == 'true';
     if (_biometricEnabled) {
       // Si el usuario eligió biometría, cada apertura de la app pide su
@@ -123,23 +147,28 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> login(
-    String identificador,
-    String password, {
-    bool conCedula = false,
-  }) async {
+  Future<void> login(String correo, String password) async {
     final data = await _api.post(
       '/auth/login',
-      body: {
-        if (conCedula)
-          'cedula': identificador.replaceAll(RegExp(r'\D'), '')
-        else
-          'correo': identificador.trim(),
-        'password': password,
-      },
+      body: {'correo': correo.trim(), 'password': password},
     );
     await _abrirSesion(data);
   }
+
+  /// Inicia sesión con la cédula en vez del correo. El backend busca la cuenta
+  /// que tiene esa cédula registrada. Se envían solo los dígitos (sin puntos
+  /// ni espacios).
+  Future<void> loginConCedula(String cedula, String password) async {
+    final data = await _api.post(
+      '/auth/login',
+      body: {'cedula': soloDigitosCedula(cedula), 'password': password},
+    );
+    await _abrirSesion(data);
+  }
+
+  /// Quita puntos, espacios y guiones de una cédula escrita a mano.
+  static String soloDigitosCedula(String cedula) =>
+      cedula.replaceAll(RegExp(r'[^0-9]'), '');
 
   /// Pide al backend que envíe un código de acceso de 6 dígitos al correo.
   /// La respuesta es la misma exista o no la cuenta.
@@ -303,14 +332,25 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (error) {
       final statusCode = error is ApiException ? error.statusCode : null;
-      // Ante una falla temporal (red, servidor caído, límite de peticiones)
-      // se conserva el refresh token para poder reintentar luego.
+      // Falla temporal (sin red, servidor caído o despertando, límite de
+      // peticiones): la sesión sigue siendo válida. No se saca al usuario a
+      // la pantalla de acceso; la petición falla con un mensaje de conexión
+      // y la próxima vuelve a intentar renovar con el mismo refresh token.
       final temporal =
           statusCode == null ||
           statusCode >= 500 ||
           statusCode == 408 ||
           statusCode == 429;
-      await _sesionExpirada(conservarRefresh: temporal);
+      if (temporal) {
+        throw ApiException(
+          'No se pudo conectar con el servidor para mantener tu sesión. '
+          'Revisa tu conexión e intenta de nuevo.',
+          statusCode: statusCode,
+          data: const {'sesionTemporal': true},
+        );
+      }
+      // El servidor rechazó el refresh token: la sesión terminó de verdad.
+      await _sesionExpirada(conservarRefresh: false);
       return false;
     }
   }

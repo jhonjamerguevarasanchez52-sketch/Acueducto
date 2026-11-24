@@ -74,7 +74,11 @@ class ChatBurbuja extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(LucideIcons.mic, size: 14, color: texto.withValues(alpha: 0.8)),
+                    Icon(
+                      LucideIcons.mic,
+                      size: 14,
+                      color: texto.withValues(alpha: 0.8),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Audio',
@@ -110,7 +114,11 @@ class ChatBurbuja extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(LucideIcons.refreshCw, size: 16, color: colores.danger),
+                    Icon(
+                      LucideIcons.refreshCw,
+                      size: 16,
+                      color: colores.danger,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Reintentar',

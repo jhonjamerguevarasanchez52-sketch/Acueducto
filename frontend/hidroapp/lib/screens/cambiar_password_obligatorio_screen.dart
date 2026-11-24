@@ -52,9 +52,9 @@ class _CambiarPasswordObligatorioScreenState
     setState(() => _guardando = true);
     try {
       await context.read<AuthProvider>().cambiarPassword(
-            _actualCtrl.text,
-            _nuevaCtrl.text,
-          );
+        _actualCtrl.text,
+        _nuevaCtrl.text,
+      );
       // AuthGate observa debeCambiarPassword y reconstruye esta ruta como
       // MainShell apenas el perfil se refresque: no hay nada que "pop-ear".
     } on ApiException catch (e) {
@@ -192,17 +192,16 @@ class _CambiarPasswordObligatorioScreenState
                 suffix: IconButton(
                   splashRadius: 20,
                   icon: Icon(
-                    _verActual
-                        ? LucideIcons.eyeOff
-                        : LucideIcons.eye,
+                    _verActual ? LucideIcons.eyeOff : LucideIcons.eye,
                     color: _muted,
                     size: 20,
                   ),
                   onPressed: () => setState(() => _verActual = !_verActual),
                 ),
               ),
-              validator: (v) =>
-                  (v == null || v.isEmpty) ? 'Ingresa tu contraseña actual' : null,
+              validator: (v) => (v == null || v.isEmpty)
+                  ? 'Ingresa tu contraseña actual'
+                  : null,
             ),
             const SizedBox(height: 16),
             _fieldLabel('NUEVA CONTRASEÑA'),
@@ -216,9 +215,7 @@ class _CambiarPasswordObligatorioScreenState
                 suffix: IconButton(
                   splashRadius: 20,
                   icon: Icon(
-                    _verNueva
-                        ? LucideIcons.eyeOff
-                        : LucideIcons.eye,
+                    _verNueva ? LucideIcons.eyeOff : LucideIcons.eye,
                     color: _muted,
                     size: 20,
                   ),
@@ -256,7 +253,9 @@ class _CambiarPasswordObligatorioScreenState
                       height: 22,
                       width: 22,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Guardar y continuar'),
             ),
@@ -275,17 +274,17 @@ class _CambiarPasswordObligatorioScreenState
   }
 
   Widget _fieldLabel(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
-            color: _label,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.8,
+        color: _label,
+      ),
+    ),
+  );
 
   InputDecoration _decoration({
     required String hint,
@@ -305,8 +304,7 @@ class _CambiarPasswordObligatorioScreenState
       suffixIcon: suffix,
       filled: true,
       fillColor: _fieldFill,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       enabledBorder: border(_fieldBorder),
       focusedBorder: border(AppTheme.primary, 1.6),
       errorBorder: border(const Color(0xFFD9534F)),

@@ -58,10 +58,7 @@ class _EntradaAnimadaState extends State<EntradaAnimada>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _curva,
-      child: SlideTransition(
-        position: _desplazamiento,
-        child: widget.child,
-      ),
+      child: SlideTransition(position: _desplazamiento, child: widget.child),
     );
   }
 }

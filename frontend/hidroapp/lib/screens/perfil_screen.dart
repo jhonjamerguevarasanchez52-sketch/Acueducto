@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../config/api_config.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import 'admin/admin_api.dart';
+import 'admin/admin_pagos_screen.dart';
 import 'cambiar_password_screen.dart';
 import '../widgets/core/core.dart';
 import 'editar_perfil_screen.dart';
@@ -218,6 +222,22 @@ class PerfilScreen extends StatelessWidget {
               style: TextStyle(color: colores.secondaryText, fontSize: 12),
             ),
           ),
+          if (perfil?.rol == 'administrador') ...[
+            const SizedBox(height: 16),
+            // Revisión de los recibos de pago físico que suben los usuarios.
+            FilledButton.tonalIcon(
+              key: const ValueKey('abrir-recibos-por-revisar'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AdminPagosScreen(
+                    api: AdminApi(context.read<AuthProvider>().api),
+                  ),
+                ),
+              ),
+              icon: const Icon(LucideIcons.receiptText),
+              label: const Text('Recibos por revisar'),
+            ),
+          ],
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () => Navigator.of(context).push(
@@ -241,18 +261,134 @@ class PerfilScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () =>
-                solicitarEliminacionCuenta(context, perfil?.rol ?? 'usuario'),
-            icon: const Icon(Icons.delete_forever_outlined),
-            label: const Text('Eliminar cuenta'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colores.danger,
-              side: BorderSide(color: colores.danger),
-            ),
+          // La política de privacidad va junto a "Eliminar cuenta" para que
+          // el usuario pueda consultarla antes de decidir.
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const ValueKey('abrir-politica-privacidad'),
+                  onPressed: () => _abrirPaginaLegal(
+                    context,
+                    ApiConfig.politicaPrivacidadUrl,
+                  ),
+                  icon: const Icon(LucideIcons.shieldCheck),
+                  label: const Text(
+                    'Política de privacidad',
+                    textAlign: TextAlign.center,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colores.info,
+                    side: BorderSide(color: colores.info),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => solicitarEliminacionCuenta(
+                    context,
+                    perfil?.rol ?? 'usuario',
+                  ),
+                  icon: const Icon(Icons.delete_forever_outlined),
+                  label: const Text(
+                    'Eliminar cuenta',
+                    textAlign: TextAlign.center,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colores.danger,
+                    side: BorderSide(color: colores.danger),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 24),
+          const _InformacionLegal(),
         ],
       ),
+    );
+  }
+}
+
+/// Abre una de las páginas públicas legales (política de privacidad o
+/// eliminación de cuenta) que exige Google Play.
+Future<void> _abrirPaginaLegal(BuildContext context, String url) async {
+  final uri = Uri.parse(url);
+  var abierta = false;
+  try {
+    // Dentro de la app (pestaña del navegador); si el teléfono no lo
+    // permite, se intenta con el navegador externo.
+    abierta = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+    if (!abierta) {
+      abierta = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  } catch (_) {
+    abierta = false;
+  }
+  if (!abierta && context.mounted) {
+    AppSnackbar.error(
+      context,
+      'No se pudo abrir la página. Revisa tu conexión e intenta de nuevo.',
+    );
+  }
+}
+
+/// Enlace a la página pública de eliminación de cuenta (qué se borra y qué
+/// se conserva). La política de privacidad está junto a "Eliminar cuenta".
+class _InformacionLegal extends StatelessWidget {
+  const _InformacionLegal();
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = AppColors.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'Información legal',
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: colores.secondaryText,
+            ),
+          ),
+        ),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                key: const ValueKey('abrir-eliminar-cuenta'),
+                leading: Icon(LucideIcons.fileText, color: colores.info),
+                title: const Text('Eliminación de cuenta y datos'),
+                subtitle: Text(
+                  'Qué se borra y qué se conserva',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: colores.secondaryText,
+                  ),
+                ),
+                trailing: Icon(
+                  LucideIcons.chevronRight,
+                  color: colores.secondaryText,
+                ),
+                onTap: () =>
+                    _abrirPaginaLegal(context, ApiConfig.eliminarCuentaUrl),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

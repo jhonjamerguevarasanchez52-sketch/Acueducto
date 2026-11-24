@@ -124,3 +124,45 @@ test('confirma el pago aprobado y envía el comprobante con el medio informado p
   assert.equal(resAntiguo.codigo, 200);
   assert.equal(resAntiguo.cuerpo.ignored, true);
 });
+
+test('un evento tardío no borra la marca de un cobro que hay que devolver', async (t) => {
+  const ambiente = process.env.WOMPI_AMBIENTE;
+  const secreto = process.env.WOMPI_EVENTS_SECRET;
+  const actualizar = paymentModel.update;
+  process.env.WOMPI_AMBIENTE = 'test';
+  process.env.WOMPI_EVENTS_SECRET = 'test_events_webhook_unit';
+  t.after(() => {
+    paymentModel.getById = originales.getById;
+    paymentModel.update = actualizar;
+    if (ambiente === undefined) delete process.env.WOMPI_AMBIENTE;
+    else process.env.WOMPI_AMBIENTE = ambiente;
+    if (secreto === undefined) delete process.env.WOMPI_EVENTS_SECRET;
+    else process.env.WOMPI_EVENTS_SECRET = secreto;
+  });
+
+  for (const marcado of ['APPROVED_NO_APLICADO', 'MONTO_INVALIDO']) {
+    let actualizaciones = 0;
+    paymentModel.getById = async () => ({
+      data: {
+        id: 'pago-unitario', monto: 12000, monto_total: 13251,
+        confirmado: false, estado_wompi: marcado, correo_comprobante_enviado_at: null,
+      },
+      error: null,
+    });
+    paymentModel.update = async () => { actualizaciones += 1; return { data: {}, error: null }; };
+
+    const evento = crearEventoAprobado();
+    evento.data.transaction.status = 'DECLINED';
+    const valores = evento.signature.properties.map((ruta) =>
+      ruta.split('.').reduce((obj, clave) => obj?.[clave], evento.data)).join('');
+    evento.signature.checksum = crypto.createHash('sha256')
+      .update(`${valores}${evento.timestamp}test_events_webhook_unit`).digest('hex');
+
+    const res = crearRespuesta();
+    await webhook({ body: evento }, res);
+
+    assert.equal(res.codigo, 200);
+    assert.equal(res.cuerpo.ignored, true);
+    assert.equal(actualizaciones, 0, `no debe sobrescribir ${marcado}`);
+  }
+});

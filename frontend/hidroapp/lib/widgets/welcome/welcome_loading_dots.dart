@@ -26,7 +26,8 @@ class WelcomeLoadingDots extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: List<Widget>.generate(3, (i) {
-          final v = 0.5 +
+          final v =
+              0.5 +
               0.5 *
                   math.sin(
                     bubblesValue * 2 * math.pi * 3 - i * (2 * math.pi / 3),

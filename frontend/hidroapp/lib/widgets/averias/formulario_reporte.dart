@@ -155,12 +155,18 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                     ),
                     const Text(
                       'Reportar una avería',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '¿Qué está pasando? Toca una opción.',
-                      style: TextStyle(color: colores.secondaryText, fontSize: 13),
+                      style: TextStyle(
+                        color: colores.secondaryText,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Wrap(
@@ -187,8 +193,11 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                       maxLength: 500,
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
-                        labelText: esOtro ? 'Cuéntanos qué ocurre' : 'Detalle (opcional)',
-                        hintText: 'Ej.: desde esta mañana sale agua por el tubo junto al portón.',
+                        labelText: esOtro
+                            ? 'Cuéntanos qué ocurre'
+                            : 'Detalle (opcional)',
+                        hintText:
+                            'Ej.: desde esta mañana sale agua por el tubo junto al portón.',
                         alignLabelWithHint: true,
                       ),
                       validator: (v) {
@@ -235,12 +244,17 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                                 children: [
                                   Text(
                                     'El fontanero irá a tu dirección registrada',
-                                    style: TextStyle(fontSize: 12, color: colores.secondaryText),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: colores.secondaryText,
+                                    ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     ubicacion,
-                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -254,7 +268,10 @@ class _FormularioReporteAveriaState extends State<FormularioReporteAveria> {
                         child: Text(
                           'Tu cuenta no tiene una dirección registrada. Agrégala en '
                           'Perfil > Editar perfil para poder reportar una avería.',
-                          style: TextStyle(color: colores.danger, fontSize: 12.5),
+                          style: TextStyle(
+                            color: colores.danger,
+                            fontSize: 12.5,
+                          ),
                         ),
                       ),
                     const SizedBox(height: 16),

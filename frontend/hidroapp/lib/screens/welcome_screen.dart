@@ -57,7 +57,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   // --- Controllers en bucle (arrancan solo cuando corresponde) ---
   late final AnimationController _ringIdle; // giro 3D del anillo, 7 s / vuelta
   late final AnimationController _dropIdle; // flotado de la gota, 2.2 s
-  late final AnimationController _bubbles; // burbujas de fondo (desde el inicio)
+  late final AnimationController
+  _bubbles; // burbujas de fondo (desde el inicio)
 
   late final Animation<double> _dropShake; // vibración al cerrar la gota
 

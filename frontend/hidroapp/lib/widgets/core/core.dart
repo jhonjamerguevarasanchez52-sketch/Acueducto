@@ -3,6 +3,7 @@
 library;
 
 export 'app_snackbar.dart';
+export 'aviso_pago_en_curso.dart';
 export 'entrada_animada.dart';
 export 'fila_detalle.dart';
 export 'gota_fab.dart';

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
@@ -7,6 +8,10 @@ import '../theme/app_theme.dart';
 import '../utils/lenguaje_ofensivo.dart';
 import '../widgets/core/core.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+/// El servidor acepta máximo 150 caracteres por campo del perfil
+/// (`MAX_LARGO_CAMPO_PERFIL`); se corta aquí para no fallar al guardar.
+final _limiteCampo = [LengthLimitingTextInputFormatter(150)];
 
 /// Formulario para que el propio usuario edite sus datos de perfil.
 ///
@@ -105,6 +110,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   }) {
     return TextFormField(
       controller: controller,
+      inputFormatters: _limiteCampo,
       readOnly: bloqueado,
       enabled: !bloqueado,
       textCapitalization: capitalizacion,
@@ -112,7 +118,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
       decoration: InputDecoration(
         labelText: etiqueta,
         suffixIcon: bloqueado ? const Icon(LucideIcons.lock, size: 18) : null,
-        helperText: bloqueado ? 'Lo cambia el administrador' : 'Escríbelo con cuidado: luego solo lo cambia el administrador',
+        helperText: bloqueado
+            ? 'Lo cambia el administrador'
+            : 'Escríbelo con cuidado: luego solo lo cambia el administrador',
         helperMaxLines: 2,
       ),
     );
@@ -156,32 +164,34 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
               children: [
                 TextFormField(
                   controller: _nombreCtrl,
+                  inputFormatters: _limiteCampo,
                   textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(labelText: 'Nombre'),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'Requerido'
-                          : validarSinGroserias(v),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Requerido'
+                      : validarSinGroserias(v),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _apellidoCtrl,
+                  inputFormatters: _limiteCampo,
                   textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(labelText: 'Apellido'),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'Requerido'
-                          : validarSinGroserias(v),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Requerido'
+                      : validarSinGroserias(v),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _telefonoCtrl,
+                  inputFormatters: _limiteCampo,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(labelText: 'Teléfono'),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _ocupacionCtrl,
+                  inputFormatters: _limiteCampo,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(labelText: 'Ocupación'),
                   validator: validarSinGroserias,
@@ -213,7 +223,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                           height: 22,
                           width: 22,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Text('Guardar cambios'),
                 ),

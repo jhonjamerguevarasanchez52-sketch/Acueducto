@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
@@ -10,13 +10,24 @@ import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../core/app_snackbar.dart';
 import 'auth_style.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// Tarjeta blanca con el formulario de inicio de sesión: correo, contraseña y
-/// el botón de entrar. Conserva su propio estado (controllers, validación y la
+/// Cómo se identifica la persona al iniciar sesión.
+enum MetodoIngreso { correo, cedula }
+
+/// Tarjeta blanca con el formulario de inicio de sesión: un selector para
+/// entrar con correo o con cédula, la contraseña y el botón de entrar. Conserva su propio estado (controllers, validación y la
 /// llamada a `AuthProvider.login`); si la cuenta no está verificada, abre la
 /// pantalla de verificación.
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
+
+  /// Tras este tiempo sin respuesta se avisa que el servidor está despertando.
+  static const esperaAntesDelAviso = Duration(seconds: 6);
+
+  static const avisoServidorDespertando =
+      'El servidor se está despertando, esto puede tardar hasta un minuto. '
+      'No cierres la app.';
 
   @override
   State<LoginForm> createState() => _LoginFormState();
@@ -24,12 +35,16 @@ class LoginForm extends StatefulWidget {
 
 class _LoginFormState extends State<LoginForm> {
   static final _correoValido = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+  static final _cedulaValida = RegExp(r'^[0-9]{5,15}$');
 
   final _formKey = GlobalKey<FormState>();
   final _correoCtrl = TextEditingController();
+  final _cedulaCtrl = TextEditingController();
+  MetodoIngreso _metodo = MetodoIngreso.correo;
   final _passwordCtrl = TextEditingController();
-  bool _ingresarConCedula = false;
   bool _cargando = false;
+  bool _servidorLento = false;
+  Timer? _avisoLento;
   bool _verPassword = false;
 
   @override
@@ -52,7 +67,12 @@ class _LoginFormState extends State<LoginForm> {
     } on ApiException catch (e) {
       if (mounted) AppSnackbar.error(context, e.message);
     } catch (_) {
-      if (mounted) AppSnackbar.error(context, 'No se pudo validar la biometría. Intenta con tu contraseña.');
+      if (mounted) {
+        AppSnackbar.error(
+          context,
+          'No se pudo validar la biometría. Intenta con tu contraseña.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
@@ -60,7 +80,9 @@ class _LoginFormState extends State<LoginForm> {
 
   @override
   void dispose() {
+    _avisoLento?.cancel();
     _correoCtrl.dispose();
+    _cedulaCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
@@ -70,24 +92,28 @@ class _LoginFormState extends State<LoginForm> {
     final auth = context.read<AuthProvider>();
     FocusScope.of(context).unfocus();
     setState(() => _cargando = true);
+    // Si el servidor estaba dormido (Render gratuito) la respuesta puede
+    // tardar cerca de un minuto: se explica en vez de dejar solo el círculo.
+    _avisoLento?.cancel();
+    _avisoLento = Timer(LoginForm.esperaAntesDelAviso, () {
+      if (mounted && _cargando) setState(() => _servidorLento = true);
+    });
     try {
-      await auth.login(
-        _correoCtrl.text,
-        _passwordCtrl.text,
-        conCedula: _ingresarConCedula,
-      );
+      if (_metodo == MetodoIngreso.cedula) {
+        await auth.loginConCedula(_cedulaCtrl.text, _passwordCtrl.text);
+      } else {
+        await auth.login(_correoCtrl.text, _passwordCtrl.text);
+      }
       // La huella o el rostro se activan después, desde Ajustes en Perfil.
       // AuthGate observa el AuthProvider y esta misma ruta se reconstruye
       // como HomeScreen al quedar autenticado: no hay nada que "pop-ear".
     } on ApiException catch (e) {
       if (!mounted) return;
-      if (e.requiereVerificacion) {
+      if (e.requiereVerificacion && _metodo == MetodoIngreso.correo) {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => VerificarCuentaScreen(
-              correo: e.data is Map
-                  ? (e.data as Map)['correo']?.toString() ?? _correoCtrl.text.trim()
-                  : _correoCtrl.text.trim(),
+              correo: _correoCtrl.text.trim(),
               password: _passwordCtrl.text,
             ),
           ),
@@ -95,8 +121,23 @@ class _LoginFormState extends State<LoginForm> {
         return;
       }
       AppSnackbar.error(context, e.message);
+    } catch (_) {
+      // Fallos que no vienen del servidor (por ejemplo, el teléfono no pudo
+      // guardar la sesión): antes no se mostraba ningún mensaje.
+      if (mounted) {
+        AppSnackbar.error(
+          context,
+          'No se pudo iniciar sesión en este teléfono. Intenta de nuevo.',
+        );
+      }
     } finally {
-      if (mounted) setState(() => _cargando = false);
+      _avisoLento?.cancel();
+      if (mounted) {
+        setState(() {
+          _cargando = false;
+          _servidorLento = false;
+        });
+      }
     }
   }
 
@@ -134,56 +175,76 @@ class _LoginFormState extends State<LoginForm> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Ingresa con tu ${_ingresarConCedula ? 'cédula' : 'correo'} y contraseña',
+              'Elige si ingresas con tu correo o con tu cédula',
               style: TextStyle(fontSize: 13.5, color: authMutedDe(context)),
             ),
             const SizedBox(height: 22),
-            Row(
-              children: [
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Text('Correo'),
-                    selected: !_ingresarConCedula,
-                    onSelected: _cargando ? null : (_) => setState(() => _ingresarConCedula = false),
-                  ),
+            SegmentedButton<MetodoIngreso>(
+              key: const Key('selector_metodo_ingreso'),
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: MetodoIngreso.correo,
+                  label: Text('Correo'),
+                  icon: Icon(LucideIcons.mail, size: 18),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Text('Cédula'),
-                    selected: _ingresarConCedula,
-                    onSelected: _cargando ? null : (_) => setState(() => _ingresarConCedula = true),
-                  ),
+                ButtonSegment(
+                  value: MetodoIngreso.cedula,
+                  label: Text('Cédula'),
+                  icon: Icon(LucideIcons.idCard, size: 18),
                 ),
               ],
+              selected: {_metodo},
+              onSelectionChanged: _cargando
+                  ? null
+                  : (seleccion) => setState(() => _metodo = seleccion.first),
             ),
-            const SizedBox(height: 10),
-            authFieldLabel(context, _ingresarConCedula ? 'CÉDULA' : 'CORREO ELECTRÓNICO'),
-            TextFormField(
-              controller: _correoCtrl,
-              keyboardType: _ingresarConCedula ? TextInputType.number : TextInputType.emailAddress,
-              inputFormatters: _ingresarConCedula
-                  ? [FilteringTextInputFormatter.digitsOnly]
-                  : const [],
-              autocorrect: false,
-              textInputAction: TextInputAction.next,
-              decoration: authInputDecoration(
-                context,
-                hint: _ingresarConCedula ? 'Número de cédula' : 'tucorreo@ejemplo.com',
-                icon: _ingresarConCedula ? Icons.badge_outlined : LucideIcons.mail,
+            const SizedBox(height: 18),
+            if (_metodo == MetodoIngreso.correo) ...[
+              authFieldLabel(context, 'CORREO ELECTRÓNICO'),
+              TextFormField(
+                key: const Key('campo_correo'),
+                controller: _correoCtrl,
+                keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+                textInputAction: TextInputAction.next,
+                decoration: authInputDecoration(
+                  context,
+                  hint: 'tucorreo@ejemplo.com',
+                  icon: LucideIcons.mail,
+                ),
+                validator: (v) {
+                  final t = v?.trim() ?? '';
+                  if (t.isEmpty) return 'Ingresa tu correo';
+                  if (!_correoValido.hasMatch(t)) {
+                    return 'Correo no válido';
+                  }
+                  return null;
+                },
               ),
-              validator: (v) {
-                final t = v?.trim() ?? '';
-                if (t.isEmpty) return _ingresarConCedula ? 'Ingresa tu cédula' : 'Ingresa tu correo';
-                if (_ingresarConCedula && (t.length < 5 || t.length > 15)) {
-                  return 'Ingresa una cédula válida';
-                }
-                if (!_ingresarConCedula && !_correoValido.hasMatch(t)) {
-                  return 'Correo no válido';
-                }
-                return null;
-              },
-            ),
+            ] else ...[
+              authFieldLabel(context, 'NÚMERO DE CÉDULA'),
+              TextFormField(
+                key: const Key('campo_cedula'),
+                controller: _cedulaCtrl,
+                keyboardType: TextInputType.number,
+                autocorrect: false,
+                textInputAction: TextInputAction.next,
+                decoration: authInputDecoration(
+                  context,
+                  hint: 'Solo números, sin puntos',
+                  icon: LucideIcons.idCard,
+                ),
+                validator: (v) {
+                  final t = AuthProvider.soloDigitosCedula(v ?? '');
+                  if (t.isEmpty) return 'Ingresa tu número de cédula';
+                  if (!_cedulaValida.hasMatch(t)) {
+                    return 'La cédula debe tener entre 5 y 15 números';
+                  }
+                  return null;
+                },
+              ),
+            ],
             const SizedBox(height: 16),
             authFieldLabel(context, 'CONTRASEÑA'),
             TextFormField(
@@ -198,14 +259,11 @@ class _LoginFormState extends State<LoginForm> {
                 suffix: IconButton(
                   splashRadius: 20,
                   icon: Icon(
-                    _verPassword
-                        ? LucideIcons.eyeOff
-                        : LucideIcons.eye,
+                    _verPassword ? LucideIcons.eyeOff : LucideIcons.eye,
                     color: authMutedDe(context),
                     size: 20,
                   ),
-                  onPressed: () =>
-                      setState(() => _verPassword = !_verPassword),
+                  onPressed: () => setState(() => _verPassword = !_verPassword),
                 ),
               ),
               validator: (v) =>
@@ -222,7 +280,9 @@ class _LoginFormState extends State<LoginForm> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   foregroundColor: AppTheme.primary,
                   textStyle: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 child: const Text('¿Olvidaste tu contraseña?'),
               ),
@@ -235,10 +295,21 @@ class _LoginFormState extends State<LoginForm> {
                       height: 22,
                       width: 22,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Ingresar al sistema'),
             ),
+            if (_cargando && _servidorLento) ...[
+              const SizedBox(height: 12),
+              Text(
+                LoginForm.avisoServidorDespertando,
+                key: const Key('aviso_servidor_despertando'),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, color: authMutedDe(context)),
+              ),
+            ],
           ],
         ),
       ),

@@ -8,6 +8,8 @@ const audiosAveriaService = require('../services/audiosAveriaService');
 const ESTADOS_VALIDOS = ['reportada', 'en_proceso', 'resuelta', 'cancelada'];
 // "Fuga · Baja presión" ya basta para que el fontanero sepa qué pasa.
 const MIN_DESCRIPCION = 10;
+// Mismo tope que el reporte por el chat con GOTA (chatbotController).
+const MAX_DESCRIPCION = 1000;
 
 // ---------- USUARIO FINAL ----------
 
@@ -21,6 +23,9 @@ async function reportarAveria(req, res) {
 
     if (typeof descripcion !== 'string' || descripcion.trim().length < MIN_DESCRIPCION) {
       return res.status(400).json({ error: `Describe el problema con más detalle (mínimo ${MIN_DESCRIPCION} caracteres).` });
+    }
+    if (descripcion.trim().length > MAX_DESCRIPCION) {
+      return res.status(400).json({ error: `La descripción admite máximo ${MAX_DESCRIPCION} caracteres.` });
     }
 
     let zonaReporte = zonaUsuario;

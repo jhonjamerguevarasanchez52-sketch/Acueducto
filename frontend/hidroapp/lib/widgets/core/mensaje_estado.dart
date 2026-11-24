@@ -22,9 +22,9 @@ class MensajeEstado extends StatelessWidget {
     super.key,
     required String mensaje,
     required VoidCallback this.onReintentar,
-  })  : icono = LucideIcons.cloudOff,
-        titulo = 'No se pudo cargar',
-        detalle = mensaje;
+  }) : icono = LucideIcons.cloudOff,
+       titulo = 'No se pudo cargar',
+       detalle = mensaje;
 
   final IconData icono;
   final String titulo;
@@ -52,10 +52,7 @@ class MensajeEstado extends StatelessWidget {
             Text(
               titulo,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             if (detalle != null) ...[
               const SizedBox(height: 6),
@@ -86,11 +83,7 @@ class MensajeEstado extends StatelessWidget {
 
 /// Pastilla de color para el estado de una factura, avería, pago o corte.
 class EtiquetaEstado extends StatelessWidget {
-  const EtiquetaEstado({
-    super.key,
-    required this.texto,
-    required this.color,
-  });
+  const EtiquetaEstado({super.key, required this.texto, required this.color});
 
   final String texto;
   final Color color;

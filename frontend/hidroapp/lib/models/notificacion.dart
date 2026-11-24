@@ -17,12 +17,12 @@ class Notificacion {
   final DateTime? fecha;
 
   Notificacion copyWith({bool? leida}) => Notificacion(
-        id: id,
-        mensaje: mensaje,
-        tipo: tipo,
-        leida: leida ?? this.leida,
-        fecha: fecha,
-      );
+    id: id,
+    mensaje: mensaje,
+    tipo: tipo,
+    leida: leida ?? this.leida,
+    fecha: fecha,
+  );
 
   factory Notificacion.fromJson(Map<String, dynamic> json) {
     return Notificacion(

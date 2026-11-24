@@ -34,8 +34,10 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.acueductocampoamor.acueducto_app"
+        // Identificador de la app en Google Play. Es permanente: una vez subido
+        // el primer .aab no se puede cambiar. El `namespace` de arriba es solo
+        // el paquete interno del código Kotlin y no tiene que coincidir.
+        applicationId = "com.hidroapp.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -64,6 +66,27 @@ android {
             }
         }
     }
+}
+
+// El .aab es lo que se sube a Play Store. Firmado con la clave de debug, Play
+// Console lo rechaza (y si se perdiera la clave real no se podría actualizar
+// la app): sin android/key.properties el bundle de release no se genera.
+gradle.taskGraph.whenReady {
+    // Solo la tarea que genera el .aab (flutter build appbundle); el APK de
+    // prueba (flutter build apk --release) sigue funcionando sin la clave.
+    val generaBundleRelease = allTasks.any { it.path == ":app:bundleRelease" }
+    if (generaBundleRelease && !tieneKeystoreReal) {
+        throw GradleException(
+            "Falta android/key.properties: el .aab para Play Store debe firmarse con la " +
+                "clave de subida (ver android/key.properties.example)."
+        )
+    }
+}
+
+dependencies {
+    // Los temas de arranque heredan de Theme.AppCompat: local_auth lo exige para
+    // que el diálogo de huella no cierre la app en Android 8 y anteriores.
+    implementation("androidx.appcompat:appcompat:1.7.0")
 }
 
 kotlin {

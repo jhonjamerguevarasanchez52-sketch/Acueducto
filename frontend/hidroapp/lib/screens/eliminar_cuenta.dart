@@ -23,8 +23,15 @@ Future<void> solicitarEliminacionCuenta(
     );
   } on ApiException catch (error) {
     if (context.mounted) AppSnackbar.error(context, error.message);
-  } catch (error) {
-    if (context.mounted) AppSnackbar.error(context, error.toString());
+  } catch (_) {
+    // Fallos que no vienen del servidor (por ejemplo, del almacenamiento del
+    // teléfono): no se muestra el detalle técnico.
+    if (context.mounted) {
+      AppSnackbar.error(
+        context,
+        'No se pudo eliminar la cuenta. Revisa tu conexión e intenta de nuevo.',
+      );
+    }
   }
 }
 
